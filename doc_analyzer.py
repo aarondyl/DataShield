@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """文档智能分析模块：上传项目计划书，自动预填合规问卷。
 
-支持 .txt / .md / .docx / .pdf 四种格式。
+支持 .txt / .md / .docx / .pdf 四种格式，也可以直接粘贴文本。
 分析提供两种模式：
     AI 模式：交给 LLM 通读文档后代为作答（配置 API Key 时可用）；
-    规则模式：关键词启发式打分（离线可用，结果偏保守）。
+    规则模式：关键词启发式打分（离线可用），同时给出每个判断的匹配依据，
+             方便用户核对预填结果是否可靠。
 两种模式都只给出「预填建议」，最终答案由用户在问卷页逐项确认。
 """
 
@@ -38,6 +39,12 @@ HEURISTIC_RULES = {
     "policy_updated": (["更新日期", "最近更新"], True),
     "consent_popup": (["弹窗", "首次启动", "启动页提示"], True),
     "eu_users": (["欧盟", "欧洲", "海外用户", "出海", "GDPR"], True),
+}
+
+# 存储位置推断词（单独处理，因为答案是选项而非布尔）
+STORAGE_HINTS = {
+    "跨境传输到中国境外": ["境外服务器", "海外服务器", "跨境", "AWS", "亚马逊云", "谷歌云", "Azure"],
+    "欧盟境内": ["欧盟服务器", "欧洲服务器", "法兰克福节点"],
 }
 
 
@@ -78,21 +85,40 @@ def questions_brief():
     ]
 
 
-def heuristic_analyze(text):
-    """关键词启发式分析（离线模式）。返回 {题目 key: 建议答案}。
+def _find_snippet(text, keyword, width=30):
+    """截取关键词在文中的上下文片段，作为「匹配依据」展示。"""
+    idx = text.find(keyword)
+    if idx < 0:
+        return ""
+    start = max(0, idx - width)
+    end = min(len(text), idx + len(keyword) + width)
+    snippet = text[start:end].replace("\n", " ")
+    return ("…" if start > 0 else "") + snippet + ("…" if end < len(text) else "")
 
-    布尔题命中关键词则建议 True；选项类题目不做猜测，保持默认。
+
+def heuristic_analyze(text):
+    """关键词启发式分析（离线模式）。
+
+    返回：(suggestions, evidence)
+        suggestions: {题目 key: 建议答案}
+        evidence:    {题目 key: {"keyword": 命中的关键词, "snippet": 上下文片段}}
     """
-    suggestions = {}
+    suggestions, evidence = {}, {}
     for key, (keywords, value) in HEURISTIC_RULES.items():
-        if any(kw in text for kw in keywords):
-            suggestions[key] = value
-    # 存储位置的简单推断
-    if any(kw in text for kw in ["境外服务器", "海外服务器", "跨境", "AWS", "亚马逊云", "谷歌云"]):
-        suggestions["storage_location"] = "跨境传输到中国境外"
-    elif "欧盟" in text:
-        suggestions["storage_location"] = "欧盟境内"
-    return suggestions
+        for kw in keywords:
+            if kw in text:
+                suggestions[key] = value
+                evidence[key] = {"keyword": kw, "snippet": _find_snippet(text, kw)}
+                break
+    for location, keywords in STORAGE_HINTS.items():
+        for kw in keywords:
+            if kw in text:
+                suggestions["storage_location"] = location
+                evidence["storage_location"] = {"keyword": kw, "snippet": _find_snippet(text, kw)}
+                break
+        if "storage_location" in suggestions:
+            break
+    return suggestions, evidence
 
 
 def analyze(text):
@@ -101,10 +127,13 @@ def analyze(text):
     返回：dict：
         {
           "suggestions": {题目 key: 建议答案},
+          "evidence":    {题目 key: 匹配依据}（仅启发式模式有），
           "mode": "llm" 或 "heuristic",
+          "truncated": 文档是否因超长被截断,
           "note": 给用户的说明文字,
         }
     """
+    truncated = len(text) > MAX_TEXT_FOR_LLM
     if is_llm_available():
         result = analyze_document(text[:MAX_TEXT_FOR_LLM], questions_brief())
         if result:
@@ -112,14 +141,22 @@ def analyze(text):
             valid_keys = {q["key"] for q in QUESTIONS}
             suggestions = {k: v for k, v in result.items() if k in valid_keys}
             if suggestions:
+                note = "AI 已通读文档并给出预填建议，请在问卷页逐项确认后再提交。"
+                if truncated:
+                    note += f"文档较长，仅分析了前 {MAX_TEXT_FOR_LLM} 字。"
                 return {
                     "suggestions": suggestions,
+                    "evidence": {},
                     "mode": "llm",
-                    "note": "🤖 AI 已通读文档并给出预填建议，请在问卷页逐项确认后再提交。",
+                    "truncated": truncated,
+                    "note": note,
                 }
+    suggestions, evidence = heuristic_analyze(text)
     return {
-        "suggestions": heuristic_analyze(text),
+        "suggestions": suggestions,
+        "evidence": evidence,
         "mode": "heuristic",
-        "note": "📋 已用关键词规则给出预填建议（未配置 API Key 或 AI 调用失败时的离线模式），"
+        "truncated": False,
+        "note": "已用关键词规则给出预填建议（未配置 API Key 或 AI 调用失败时的离线模式），"
                 "覆盖不全属正常，请在问卷页逐项确认。",
     }

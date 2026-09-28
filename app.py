@@ -1,20 +1,20 @@
 # -*- coding: utf-8 -*-
-"""数盾 DataShield 豪华版 — Streamlit 主入口。
+"""数盾 DataShield — Streamlit 主入口。
 
-面向中小 App 开发者/网站主的数据合规自查工具，覆盖
+面向中小 App 开发者和网站主的数据合规自查工具，对照
 GDPR（欧盟《通用数据保护条例》）、中国《数据安全法》《个人信息保护法》。
 
 页面结构（侧边栏导航）：
-    1. 首页            项目简介、功能总览、免责声明
-    2. 文档智能分析    上传计划书/文档，AI 或规则自动预填问卷
-    3. 合规自查问卷    六大模块 + 动态追问 + 行业预设一键加载
-    4. 合规仪表盘      雷达图、维度得分、风险分布、案例联动
+    1. 首页            工具说明与使用流程
+    2. 文档智能分析    上传计划书或粘贴文本，自动预填问卷
+    3. 合规自查问卷    六个模块的问题，含追问和行业预设
+    4. 合规仪表盘      雷达图、维度得分、风险分布、案例警示
     5. 整改路线图      7/30/90 天整改计划，可勾选进度
-    6. 合规报告        总分/评级、结构化汇总、Markdown 下载
-    7. 隐私政策生成    按问卷答案自动生成隐私政策初稿，可下载
-    8. 隐私政策体检    粘贴现有政策，检查 12 项必备要素
-    9. 历史趋势        多次自查得分趋势对比
-    10. 法条与案例     法条速查（可搜索）+ 真实处罚案例库
+    6. 合规报告        总分与评级、汇总表、Markdown 下载
+    7. 隐私政策生成    按问卷答案生成隐私政策初稿
+    8. 隐私政策体检    检查现有政策是否缺少法定必备要素
+    9. 历史趋势        多次自查得分对比
+    10. 法条与案例     法条检索和处罚案例
 
 运行方式：streamlit run app.py
 """
@@ -45,13 +45,13 @@ from rules import DIMENSIONS, LEVEL_EMOJI, compute_dimension_scores, evaluate_ru
 # 页面全局配置
 st.set_page_config(page_title="数盾 DataShield · 合规自查", page_icon="🛡️", layout="wide")
 
-# 评级配色
+# 评级标识
 RATING_COLOR = {"优秀": "🟢", "良好": "🟢", "待改进": "🟡", "高风险": "🔴"}
 
 
 # ---------------- 公共函数 ----------------
 def _hits_to_dataframe(hits):
-    """把命中记录整理成结果表格（风险等级带 emoji，已按严重度排序）。"""
+    """把命中记录整理成结果表格（风险等级带标识，已按严重度排序）。"""
     rows = []
     for h in hits:
         article_names = "、".join(
@@ -70,7 +70,7 @@ def _hits_to_dataframe(hits):
 
 
 def _render_hit_detail(h, use_ai):
-    """在 expander 中展示单条命中规则的详细解释（含法条摘要与可选 AI 解释）。"""
+    """在 expander 中展示单条命中规则的详细说明（含法条摘要与可选 AI 解释）。"""
     st.markdown(f"**命中条件**：{h['condition']}")
     st.markdown(f"**整改建议**：{h['advice']}")
     st.markdown("**违反法条**：")
@@ -80,13 +80,13 @@ def _render_hit_detail(h, use_ai):
             st.markdown(f"- {item['law']}{item['article']}：{item['summary']}")
 
     if use_ai:
-        # 解释结果缓存在 session_state，避免每次页面重绘重复调用 LLM
+        # 解释结果缓存在 session_state，避免页面重绘时重复调用
         if h["rule_id"] not in st.session_state.explanations:
             with st.spinner(f"正在生成 {h['rule_id']} 的详细解释…"):
                 st.session_state.explanations[h["rule_id"]] = explain_risk(h)
         res = st.session_state.explanations[h["rule_id"]]
-        badge = "🤖 AI 生成" if res["source"] == "llm" else "📋 内置模板（离线/未配置 Key 时降级）"
-        st.markdown(f"**详细解释**（{badge}）：")
+        source = "AI 生成" if res["source"] == "llm" else "内置模板（未配置 Key 或调用失败时使用）"
+        st.markdown(f"**详细解释**（来源：{source}）：")
         st.info(res["text"])
 
 
@@ -113,88 +113,96 @@ def _apply_answers(new_answers):
 
 # ---------------- 页面 1：首页 ----------------
 def page_home():
-    st.title("🛡️ 数盾 DataShield 豪华版")
-    st.subheader("中小开发者的一站式数据合规自查与整改工具")
+    st.title("🛡️ 数盾 DataShield")
+    st.markdown("**中小开发者的数据合规自查工具**")
     st.markdown(
-        """
-        覆盖 🇪🇺 **GDPR**、🇨🇳 **《数据安全法》**、🇨🇳 **《个人信息保护法》**，
-        无需法律背景，10 分钟完成一次专业级合规自查。
-        """
+        "对照 GDPR（欧盟《通用数据保护条例》）、中国《数据安全法》《个人信息保护法》，"
+        "通过问卷和规则引擎检查产品在数据处理上的常见违规点，并给出整改建议。"
     )
 
-    cols = st.columns(3)
-    with cols[0]:
-        st.markdown("#### 🔍 智能自查")
+    st.markdown("#### 主要功能")
+    col1, col2 = st.columns(2)
+    with col1:
         st.markdown(
-            "- 📄 上传计划书，AI 自动预填问卷\n"
-            "- 📝 六模块问卷 + 动态追问\n"
-            "- 🏭 六大行业预设一键加载\n"
-            "- ⚖️ 35 条合规规则引擎"
+            "- **文档智能分析**：上传项目计划书或粘贴文本，自动预填问卷\n"
+            "- **合规自查问卷**：六个模块的问题，按回答自动追问细节\n"
+            "- **合规仪表盘**：七维度得分雷达图、风险分布、案例警示\n"
+            "- **整改路线图**：按轻重缓急生成 7/30/90 天整改清单\n"
+            "- **历史趋势**：保存每次自查结果，对比整改前后得分"
         )
-    with cols[1]:
-        st.markdown("#### 📊 评估分析")
+    with col2:
         st.markdown(
-            "- 🎯 七维度雷达图仪表盘\n"
-            "- 💯 总分 + 维度分双评分\n"
-            "- ⚖️ 真实处罚案例联动警示\n"
-            "- 📈 历史趋势对比"
-        )
-    with cols[2]:
-        st.markdown("#### 🛠️ 整改落地")
-        st.markdown(
-            "- 🗺️ 7/30/90 天整改路线图\n"
-            "- 🛡️ 隐私政策一键生成\n"
-            "- 🔬 隐私政策 12 要素体检\n"
-            "- 📑 Markdown 报告导出"
+            "- **合规报告**：总分与评级，可下载 Markdown 报告\n"
+            "- **隐私政策生成**：按问卷答案生成政策初稿\n"
+            "- **隐私政策体检**：检查现有政策是否缺少法定要素\n"
+            "- **法条与案例**：59 组法条摘要检索、16 个处罚案例\n"
+            "- **行业预设**：电商、社交、教育、医疗等典型场景一键加载"
         )
 
     st.divider()
-    st.markdown(
-        """
-        **使用流程**：📄 上传文档（可选）→ 📝 完善问卷 → 📊 查看仪表盘 →
-        🗺️ 按路线图整改 → 📑 导出报告存档
-        """
-    )
-    st.warning("⚠️ 免责声明：本工具基于规则引擎与公开法条生成自查结果，仅供参考，不构成法律意见。"
+    st.markdown("**使用顺序**：文档智能分析（可选）→ 合规自查问卷 → 合规仪表盘 → 整改路线图 → 合规报告")
+    st.warning("免责声明：本工具依据公开法条和预设规则生成结果，仅供参考，不构成法律意见。"
                "涉及重大数据处理决策时，请咨询专业律师。")
     if is_llm_available():
-        st.success("已检测到 DEEPSEEK_API_KEY，AI 功能（文档分析 / 详细解释 / 政策复核）可用。")
+        st.success("已配置 DEEPSEEK_API_KEY：文档分析、详细解释等功能使用 AI 生成。")
     else:
-        st.info("未配置 DEEPSEEK_API_KEY，当前为纯规则模式：全部功能可用，"
-                "AI 相关输出由内置模板/算法生成。")
+        st.info("未配置 DEEPSEEK_API_KEY：全部功能可正常使用，解释与文档分析由内置模板和规则完成。")
 
 
 # ---------------- 页面 2：文档智能分析 ----------------
+def _run_doc_analysis(text):
+    """执行文档分析并把结果写入会话（上传与粘贴两个入口共用）。"""
+    with st.spinner("正在分析文档内容…"):
+        st.session_state.doc_text = text
+        st.session_state.doc_result = analyze(text)
+
+
 def page_doc_analysis():
-    st.title("📄 文档智能分析")
+    st.title("文档智能分析")
     st.markdown(
-        "上传项目计划书 / 产品文档（支持 `.txt` `.md` `.docx` `.pdf`），"
-        "系统将自主分析文档中的数据处理行为，给出问卷预填建议。"
+        "把项目计划书、需求文档或产品介绍交给系统分析，识别其中涉及的数据处理行为，"
+        "自动给出问卷预填建议。分析结果只是参考，请在问卷页逐项确认后再生成评估结果。"
     )
 
-    uploaded = st.file_uploader("选择文件", type=["txt", "md", "docx", "pdf"])
-    if uploaded and st.button("开始分析", type="primary"):
-        try:
-            with st.spinner("正在解析文档…"):
-                text = extract_text(uploaded)
-            st.session_state.doc_text = text
-            with st.spinner("正在分析文档内容…"):
-                st.session_state.doc_result = analyze(text)
-        except Exception as e:
-            st.error(f"文档解析失败：{e}")
+    tab_file, tab_text = st.tabs(["上传文件", "粘贴文本"])
+    with tab_file:
+        uploaded = st.file_uploader(
+            "支持 .txt / .md / .docx / .pdf", type=["txt", "md", "docx", "pdf"])
+        if uploaded:
+            st.caption(f"已选择：{uploaded.name}（{uploaded.size / 1024:.1f} KB）")
+        if st.button("分析上传的文件", type="primary", disabled=not uploaded):
+            try:
+                with st.spinner("正在解析文档…"):
+                    text = extract_text(uploaded)
+                if len(text.strip()) < 50:
+                    st.warning("提取到的文本过少（可能是扫描件或空文档），请换文件或改用粘贴文本。")
+                else:
+                    _run_doc_analysis(text)
+            except Exception as e:
+                st.error(f"文档解析失败：{e}")
+    with tab_text:
+        pasted = st.text_area("把文档内容粘贴到这里", height=200,
+                              placeholder="例如：本 App 需要手机号注册，接入第三方广告 SDK，数据存储在境内服务器……")
+        if st.button("分析粘贴的文本", disabled=len(pasted.strip()) < 20):
+            _run_doc_analysis(pasted)
 
     result = st.session_state.get("doc_result")
     if not result:
         return
 
-    st.success(result["note"])
+    st.divider()
+    text_len = len(st.session_state.get("doc_text", ""))
+    mode_name = "AI 通读" if result["mode"] == "llm" else "关键词规则"
+    st.success(f"分析完成（方式：{mode_name}，提取文本 {text_len} 字）。{result['note']}")
+
     suggestions = result["suggestions"]
     if not suggestions:
-        st.warning("未从文档中识别出有效信息，请直接到问卷页手动填写。")
+        st.warning("未从文档中识别出与问卷相关的信息，建议直接到问卷页手动填写。")
         return
 
-    # 展示识别结果
+    # 展示识别结果（启发式模式附匹配依据，便于核对可靠性）
     q_index = {q["key"]: q for q in QUESTIONS}
+    evidence = result.get("evidence", {})
     rows = []
     for key, value in suggestions.items():
         q = q_index.get(key)
@@ -206,14 +214,16 @@ def page_doc_analysis():
             show = "、".join(map(str, value))
         else:
             show = str(value)
-        rows.append({"问题": q["text"], "预填答案": show})
+        ev = evidence.get(key)
+        basis = f"命中「{ev['keyword']}」：{ev['snippet']}" if ev else "AI 通读全文判断"
+        rows.append({"问题": q["text"], "预填答案": show, "判断依据": basis})
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
-    if st.button("✅ 采纳建议并前往问卷", type="primary"):
+    if st.button("采纳建议并填入问卷", type="primary"):
         merged = dict(st.session_state.answers)
         merged.update(suggestions)
         _apply_answers(merged)
-        st.success("已预填到问卷，请从左侧进入「合规自查问卷」逐项确认。")
+        st.success("已填入问卷。请从左侧进入「合规自查问卷」逐项核对后生成评估结果。")
 
     with st.expander("查看提取的文档原文（前 3000 字）"):
         st.text(st.session_state.get("doc_text", "")[:3000])
@@ -228,20 +238,20 @@ def _yesno_widget(q, current):
 
 
 def page_questionnaire():
-    st.title("📝 合规自查问卷")
+    st.title("合规自查问卷")
 
     # 行业预设加载
     col1, col2 = st.columns([3, 1])
-    preset_name = col1.selectbox("🏭 行业预设（选择典型场景一键加载，再按实际情况微调）",
+    preset_name = col1.selectbox("行业预设（选择相近场景一键填入，再按实际情况修改）",
                                  list(PRESETS.keys()))
     if col2.button("加载预设", width="stretch"):
         _apply_answers(dict(PRESETS[preset_name]))
         st.rerun()
 
     if st.session_state.pop("prefill_applied", False):
-        st.success("已加载预填答案，请逐项核对（尤其是标「未选择」的追问项）。")
+        st.success("已填入预置答案，请逐项核对后再生成结果。")
 
-    st.caption("带「是」的主问题会自动展开追问细节；答案实时生效，最后点击底部按钮生成结果。")
+    st.caption("部分问题回答「是」后会展开追问。答案实时生效，填完点击底部按钮生成结果。")
 
     answers = dict(st.session_state.answers)
     # 逐模块渲染；控件变更会触发 rerun，从而实现动态追问
@@ -251,7 +261,7 @@ def page_questionnaire():
             if q["module"] != module:
                 continue
             if not q.get("show_if", lambda a: True)(answers):
-                continue  # 动态追问未触发，跳过本题
+                continue  # 追问未触发，跳过本题
             current = answers.get(q["key"])
             if q["type"] == "yesno":
                 answers[q["key"]] = _yesno_widget(q, current)
@@ -264,7 +274,7 @@ def page_questionnaire():
                                                    default=current or [], key=f"q_{q['key']}")
         st.divider()
 
-    if st.button("🚀 生成评估结果", type="primary", width="stretch"):
+    if st.button("生成评估结果", type="primary", width="stretch"):
         answers = normalize_answers(answers)
         st.session_state.answers = answers
         st.session_state.hits = evaluate_rules(answers)
@@ -278,20 +288,19 @@ def page_questionnaire():
         st.rerun()
 
     if st.session_state.pop("just_evaluated", False):
-        st.balloons()
-        st.success("评估完成！已自动存档。请从左侧进入「合规仪表盘」查看结果。")
+        st.success("评估完成，结果已自动存档。可从左侧进入「合规仪表盘」或「合规报告」查看。")
 
     # 问卷页内直接预览结果摘要
     hits = st.session_state.get("hits")
     if hits:
         counts = level_counts(hits)
-        st.subheader(f"当前结果：🔴 高 {counts['高']} 项　🟡 中 {counts['中']} 项　🟢 低 {counts['低']} 项")
+        st.subheader(f"当前结果：🔴 高风险 {counts['高']} 项　🟡 中风险 {counts['中']} 项　🟢 低风险 {counts['低']} 项")
         st.dataframe(_hits_to_dataframe(hits), width="stretch", hide_index=True)
 
 
 # ---------------- 页面 4：合规仪表盘 ----------------
 def page_dashboard():
-    st.title("📊 合规仪表盘")
+    st.title("合规仪表盘")
     hits = _require_hits()
     if not hits:
         return
@@ -318,21 +327,20 @@ def page_dashboard():
     st.markdown("#### 维度得分明细")
     st.plotly_chart(dimension_bar_chart(dim_scores), width="stretch")
 
-    # 案例联动警示
+    # 案例警示：展示与命中维度相关的真实处罚案例
     hit_dims = {h["dimension"] for h in hits if h["level"] in ("高", "中")}
     related = cases_for_dimensions(hit_dims)
     if related:
-        st.markdown("#### ⚖️ 相关处罚案例警示")
+        st.markdown("#### 相关处罚案例")
         for case in related:
-            with st.expander(f"💰 {case['name']} —— {case['fine']}"):
-                st.markdown(f"- **时间/机构**：{case['time']} · {case['authority']}")
+            with st.expander(f"{case['name']} —— {case['fine']}"):
+                st.markdown(f"- **时间与机构**：{case['time']} · {case['authority']}")
                 st.markdown(f"- **事由**：{case['reason']}")
                 st.markdown(f"- **启示**：{case['lesson']}")
 
-    # 命中详情 + AI 解释开关
+    # 命中详情 + 详细解释开关
     st.markdown("#### 命中规则详情")
-    use_ai = st.toggle("启用 AI 详细解释", value=False,
-                       help="调用 DeepSeek 生成通俗解释与整改步骤；未配置 Key 或调用失败时自动降级为内置模板。")
+    use_ai = st.toggle("生成详细解释（配置 API Key 时由 AI 生成，否则用内置模板）", value=False)
     for h in hits:
         with st.expander(f"{LEVEL_EMOJI[h['level']]} {h['rule_id']}｜{h['dimension']}｜{h['condition']}"):
             _render_hit_detail(h, use_ai)
@@ -340,7 +348,7 @@ def page_dashboard():
 
 # ---------------- 页面 5：整改路线图 ----------------
 def page_roadmap():
-    st.title("🗺️ 整改路线图")
+    st.title("整改路线图")
     hits = _require_hits()
     if not hits:
         return
@@ -365,12 +373,12 @@ def page_roadmap():
                 done_keys.add(h["rule_id"])
             else:
                 done_keys.discard(h["rule_id"])
-    st.caption("勾选状态仅在本次会话内保留；整改完成后建议重新运行问卷验证效果。")
+    st.caption("勾选状态仅在本次会话内保留。整改完成后建议重新填写问卷验证效果。")
 
 
 # ---------------- 页面 6：合规报告 ----------------
 def page_report():
-    st.title("📑 合规报告")
+    st.title("合规报告")
     answers = st.session_state.get("answers")
     hits = _require_hits()
     if not hits:
@@ -391,13 +399,13 @@ def page_report():
     col4.metric("🟡 中风险", f"{counts['中']} 项")
 
     if score >= 90:
-        st.success(f"评级「{rating}」：合规状况良好，请继续保持并定期复查。")
+        st.success(f"评级「{rating}」：合规状况良好，请保持并定期复查。")
     elif score >= 75:
-        st.success(f"评级「{rating}」：整体合规，仍有少量低风险事项建议完善。")
+        st.success(f"评级「{rating}」：整体合规，少量低风险事项建议完善。")
     elif score >= 60:
-        st.warning(f"评级「{rating}」：存在中风险事项，建议尽快完成整改。")
+        st.warning(f"评级「{rating}」：存在中风险事项，建议尽快整改。")
     else:
-        st.error(f"评级「{rating}」：存在高风险违规情形，请立即按整改建议处理！")
+        st.error(f"评级「{rating}」：存在高风险违规情形，请立即按整改建议处理。")
 
     with st.expander("问卷答案回顾"):
         for line in answers_review_lines(answers):
@@ -411,7 +419,7 @@ def page_report():
     } or None
     md = build_markdown_report(answers, hits, score, rating, dim_scores, explanations)
     st.download_button(
-        "⬇️ 下载 Markdown 格式报告",
+        "下载 Markdown 格式报告",
         data=md.encode("utf-8-sig"),  # 带 BOM，Windows 记事本/Office 打开不乱码
         file_name="datacheck_compliance_report.md",
         mime="text/markdown",
@@ -422,8 +430,8 @@ def page_report():
 
 # ---------------- 页面 7：隐私政策生成 ----------------
 def page_policy_generator():
-    st.title("🛡️ 隐私政策一键生成")
-    st.markdown("根据当前问卷答案自动生成隐私政策初稿，替换【占位符】后即可使用。")
+    st.title("隐私政策生成")
+    st.markdown("根据当前问卷答案生成隐私政策初稿，替换文中的【占位符】后即可作为工作底稿。")
 
     col1, col2, col3 = st.columns(3)
     app_name = col1.text_input("产品名称", "我的App")
@@ -432,41 +440,41 @@ def page_policy_generator():
 
     answers = st.session_state.get("answers") or default_answers()
     if not st.session_state.get("hits"):
-        st.caption("（尚未完成问卷：先按默认答案演示，完成问卷后生成内容会更贴合实际。）")
+        st.caption("尚未完成问卷，当前按默认答案演示；完成问卷后生成的内容会更贴合实际情况。")
 
-    if st.button("📝 生成隐私政策", type="primary", width="stretch"):
+    if st.button("生成隐私政策", type="primary", width="stretch"):
         st.session_state.policy_text = generate_policy(answers, app_name, company, contact)
 
     policy = st.session_state.get("policy_text")
     if not policy:
         return
 
-    if is_llm_available() and st.button("✨ AI 润色（可选）"):
-        with st.spinner("AI 润色中…"):
+    if is_llm_available() and st.button("AI 润色（可选）"):
+        with st.spinner("润色中…"):
             polished = polish_policy(policy)
         if polished:
             st.session_state.policy_text = polished
             st.rerun()
         else:
-            st.warning("AI 润色失败，已保留模板版内容。")
+            st.warning("AI 润色失败，已保留原有内容。")
 
     st.markdown(policy)
     st.download_button(
-        "⬇️ 下载隐私政策（Markdown）",
+        "下载隐私政策（Markdown）",
         data=policy.encode("utf-8-sig"),
         file_name="privacy_policy.md",
         mime="text/markdown",
     )
-    st.caption("初稿仅供参考，发布前请核对全部【占位符】并咨询专业律师。")
+    st.caption("初稿仅供参考，发布前请核对全部【占位符】，必要时咨询专业律师。")
 
 
 # ---------------- 页面 8：隐私政策体检 ----------------
 def page_policy_checker():
-    st.title("🔍 隐私政策体检")
-    st.markdown("粘贴你现有的隐私政策全文，自动检查 12 项法定必备要素的覆盖情况。")
+    st.title("隐私政策体检")
+    st.markdown("粘贴现有的隐私政策全文，检查 12 项法定必备要素的覆盖情况。")
 
     text = st.text_area("隐私政策全文", height=220,
-                        placeholder="把你的隐私政策全文粘贴到这里…")
+                        placeholder="把隐私政策全文粘贴到这里…")
     if st.button("开始体检", type="primary") and text.strip():
         st.session_state.policy_check = check_policy(text)
         st.session_state.policy_check_text = text
@@ -492,10 +500,10 @@ def page_policy_checker():
         st.warning("缺失要素：" + "、".join(i["name"] for i in missing) +
                    "。建议补充后重新体检，或到「隐私政策生成」页重新生成。")
     else:
-        st.success("12 项要素全部覆盖！仍建议人工核对表述是否准确。")
+        st.success("12 项要素全部覆盖，仍建议人工核对表述是否准确。")
 
-    if is_llm_available() and st.toggle("AI 深度复核（语义级）", value=False):
-        with st.spinner("AI 复核中…"):
+    if is_llm_available() and st.toggle("AI 深度复核（按语义检查表述是否到位）", value=False):
+        with st.spinner("复核中…"):
             review = review_policy_text(st.session_state.get("policy_check_text", ""))
         if review:
             st.info(review)
@@ -505,7 +513,7 @@ def page_policy_checker():
 
 # ---------------- 页面 9：历史趋势 ----------------
 def page_history():
-    st.title("📈 历史趋势")
+    st.title("历史趋势")
     records = list_records()
     if not records:
         st.info("暂无历史记录。在「合规自查问卷」页生成评估结果后会自动存档。")
@@ -528,7 +536,7 @@ def page_history():
     } for r in reversed(records)]
     st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
 
-    if st.button("🗑️ 清空历史记录"):
+    if st.button("清空历史记录"):
         clear_records()
         st.rerun()
     st.caption("历史保存在本地文件 .datacheck_history.json 中，最多保留 50 条。")
@@ -536,11 +544,11 @@ def page_history():
 
 # ---------------- 页面 10：法条与案例 ----------------
 def page_laws_cases():
-    st.title("📖 法条与案例")
+    st.title("法条与案例")
     tab_law, tab_case = st.tabs(["法条速查", "处罚案例库"])
 
     with tab_law:
-        keyword = st.text_input("🔍 关键词搜索（匹配法规名、条款号、摘要内容）", "")
+        keyword = st.text_input("关键词搜索（匹配法规名、条款号、摘要内容）", "")
         categories = []
         for item in REGULATIONS.values():
             if item["category"] not in categories:
@@ -568,7 +576,7 @@ def page_laws_cases():
     with tab_case:
         st.caption("以下案例均来自公开报道，金额与细节以官方通报为准。")
         for case in CASES:
-            with st.expander(f"💰 {case['name']}（{case['time']}）—— {case['fine']}"):
+            with st.expander(f"{case['name']}（{case['time']}）—— {case['fine']}"):
                 st.markdown(f"- **处罚机构**：{case['authority']}")
                 st.markdown(f"- **事由**：{case['reason']}")
                 st.markdown(f"- **关联维度**：{'、'.join(case['dimensions'])}")
@@ -601,10 +609,10 @@ def main():
     )
     st.sidebar.divider()
     if is_llm_available():
-        st.sidebar.success("AI 模式已启用", icon="🤖")
+        st.sidebar.caption("🤖 AI 功能：已启用")
     else:
-        st.sidebar.info("纯规则模式（AI 未配置）", icon="📋")
-    st.sidebar.caption("仅供参考，不构成法律意见")
+        st.sidebar.caption("📋 AI 功能：未配置（纯规则模式）")
+    st.sidebar.caption("结果仅供参考，不构成法律意见")
 
     pages = {
         "首页": page_home,
