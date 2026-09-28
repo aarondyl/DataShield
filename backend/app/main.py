@@ -39,6 +39,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(title="DataShield API", version="3.0.0", lifespan=lifespan)
 
+
+@app.middleware("http")
+async def prevent_stale_frontend_cache(request, call_next):
+    """Avoid serving an old HTML shell that points at assets from a prior deployment."""
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 # 前端开发服务器（Vite 默认 5173）
 app.add_middleware(
     CORSMiddleware,
