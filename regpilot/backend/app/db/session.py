@@ -1,0 +1,61 @@
+"""数据库引擎与会话工厂。
+
+根据 DATABASE_URL 自动切换两种后端：
+- ``postgresql+psycopg://...``：PostgreSQL + pgvector（生产/Docker 部署）；
+- ``sqlite:///...``：SQLite（本机无 Docker 时的降级开发路径，向量检索自动切换为本地内存实现）。
+"""
+
+from collections.abc import Generator
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
+
+from app.core.config import get_settings
+
+_settings = get_settings()
+
+#: 当前是否为 SQLite 降级模式（向量存储、启动流程等据此分支）
+IS_SQLITE: bool = _settings.database_url.startswith("sqlite")
+
+# SQLite 默认不允许跨线程使用连接，FastAPI 多线程环境下需关闭该检查
+_connect_args = {"check_same_thread": False} if IS_SQLITE else {}
+
+engine = create_engine(
+    _settings.database_url,
+    connect_args=_connect_args,
+    pool_pre_ping=True,
+)
+
+#: 全局会话工厂。expire_on_commit=False 便于提交后继续读取对象属性
+SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+
+def is_sqlite() -> bool:
+    """返回当前是否运行在 SQLite 降级模式。"""
+    return IS_SQLITE
+
+
+def db_kind() -> str:
+    """返回数据库种类标识（供健康检查接口展示）。"""
+    return "sqlite" if IS_SQLITE else "postgresql"
+
+
+def get_db() -> Generator[Session, None, None]:
+    """FastAPI 依赖注入用的会话生成器。"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def init_db() -> None:
+    """建表（checkfirst，幂等）。
+
+    本机 SQLite 开发路径直接靠它建表；Docker/PostgreSQL 路径由
+    ``alembic upgrade head`` 建表，这里作为兜底也不会重复创建。
+    """
+    from app import models  # noqa: F401  确保全部模型注册到 Base.metadata
+    from app.db.base import Base
+
+    Base.metadata.create_all(bind=engine)

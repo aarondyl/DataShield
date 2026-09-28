@@ -11,6 +11,13 @@ __pycache__/
 .venv/
 venv/
 
+# RegPilot
+regpilot/backend/.env
+regpilot/backend/regpilot.db
+regpilot/frontend/node_modules/
+regpilot/frontend/dist/
+node_modules/
+
 # 系统文件
 .DS_Store
 Thumbs.db

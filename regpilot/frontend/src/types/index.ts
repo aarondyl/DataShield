@@ -1,0 +1,137 @@
+export interface Company {
+  id: number;
+  name: string;
+  industry: string;
+  country: string;
+  target_markets: string[];
+  business_model: string;
+  created_at: string;
+}
+
+export interface CompanyPayload {
+  name: string;
+  industry: string;
+  country: string;
+  target_markets: string[];
+  business_model: string;
+}
+
+export interface Product {
+  id: number;
+  company_id: number;
+  name: string;
+  category: string;
+  target_markets: string[];
+  collects_personal_data: boolean;
+  collects_sensitive_data: boolean;
+  collects_health_data: boolean;
+  collects_location_data: boolean;
+  children_related: boolean;
+  third_party_data_sharing: boolean;
+  has_privacy_policy: boolean;
+  cross_border_data_transfer: boolean;
+  description: string;
+  created_at: string;
+}
+
+export type ProductPayload = Omit<Product, 'id' | 'created_at'>;
+
+export interface Regulation {
+  id: number;
+  name: string;
+  jurisdiction: string;
+  description: string;
+  source_url: string;
+  article_count: number;
+  published_at: string | null;
+  effective_at: string | null;
+}
+
+export interface RegulationArticle {
+  id: number;
+  article_number: string;
+  title: string;
+  content: string;
+  topic: string;
+}
+
+export interface RegulationDetail extends Regulation {
+  articles: RegulationArticle[];
+}
+
+export interface RegulationUploadResult {
+  id: number;
+  name: string;
+  articles_ingested: number;
+}
+
+export type RiskLevel = 'low' | 'medium' | 'high';
+export type Confidence = 'high' | 'medium' | 'low';
+export type AnalysisStatus = 'completed' | 'degraded' | 'failed';
+
+export interface Evidence {
+  regulation: string;
+  article: string;
+  content: string;
+  source_url: string;
+  reason: string;
+  verified: boolean;
+}
+
+export interface RecommendedAction {
+  title: string;
+  priority: RiskLevel;
+  department: string;
+  description: string;
+  evidence: { regulation: string; article: string };
+}
+
+export interface AnalysisResult {
+  id: number;
+  status: AnalysisStatus;
+  relevant: boolean | null;
+  risk_level: RiskLevel | null;
+  affected_products: string[];
+  affected_areas: string[];
+  summary: string;
+  reasoning_summary: string;
+  confidence: Confidence | null;
+  evidence: Evidence[];
+  actions: RecommendedAction[];
+  llm_mode: string;
+  created_at: string;
+}
+
+export interface AnalysisRunListItem {
+  id: number;
+  company_name: string;
+  product_name: string;
+  relevant: boolean | null;
+  risk_level: RiskLevel | null;
+  status: AnalysisStatus;
+  created_at: string;
+}
+
+export interface ActionItem {
+  id: number;
+  run_id: number;
+  title: string;
+  priority: RiskLevel;
+  department: string;
+  description: string;
+  created_at: string;
+}
+
+export interface AnalysisRequest {
+  company_id: number;
+  product_id: number;
+  regulation_id?: number | null;
+  query: string;
+}
+
+export interface HealthStatus {
+  status: string;
+  db: string;
+  llm_provider: string;
+  embedding_provider: string;
+}

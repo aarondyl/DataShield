@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: regpilot-postgres
+    environment:
+      POSTGRES_USER: regpilot
+      POSTGRES_PASSWORD: regpilot
+      POSTGRES_DB: regpilot
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U regpilot"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: regpilot-backend
+    env_file:
+      - ./backend/.env
+    environment:
+      # 容器内数据库地址（覆盖 .env 中的同名项）
+      DATABASE_URL: postgresql+psycopg://regpilot:regpilot@postgres:5432/regpilot
+      RUN_SEED: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
