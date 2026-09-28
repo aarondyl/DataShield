@@ -1,35 +1,34 @@
 @echo off
-chcp 65001 >nul
-title æ•°ç›¾ DataShield
+title Êı¶Ü DataShield
 cd /d "%~dp0"
 
-REM ================= æ•°ç›¾ DataShield ä¸€é”®å¯åŠ¨ =================
-REM åŒå‡»æœ¬æ–‡ä»¶å³å¯å¯åŠ¨åº”ç”¨ï¼Œæµè§ˆå™¨ä¼šè‡ªåŠ¨æ‰“å¼€é¡µé¢ã€‚
-REM å…³é—­æœ¬é»‘è‰²çª—å£å³å¯åœæ­¢åº”ç”¨ã€‚
+REM ================= Êı¶Ü DataShield Ò»¼üÆô¶¯ =================
+REM Ë«»÷±¾ÎÄ¼ş¼´¿ÉÆô¶¯Ó¦ÓÃ£¬ä¯ÀÀÆ÷»á×Ô¶¯´ò¿ªÒ³Ãæ¡£
+REM ¹Ø±Õ±¾ºÚÉ«´°¿Ú¼´¿ÉÍ£Ö¹Ó¦ÓÃ¡£
 
 where python >nul 2>nul
 if errorlevel 1 (
-    echo [é”™è¯¯] æœªæ‰¾åˆ° Pythonï¼Œè¯·å…ˆå®‰è£… Python 3.10 æˆ–æ›´é«˜ç‰ˆæœ¬ã€‚
+    echo [´íÎó] Î´ÕÒµ½ Python£¬ÇëÏÈ°²×° Python 3.10 »ò¸ü¸ß°æ±¾¡£
     pause
     exit /b 1
 )
 
-REM é¦–æ¬¡è¿è¡Œè‡ªåŠ¨å®‰è£…ä¾èµ–ï¼ˆå·²å®‰è£…åˆ™è·³è¿‡ï¼‰
+REM Ê×´ÎÔËĞĞ×Ô¶¯°²×°ÒÀÀµ£¨ÒÑ°²×°ÔòÌø¹ı£©
 python -c "import streamlit" >nul 2>nul
 if errorlevel 1 (
-    echo é¦–æ¬¡è¿è¡Œï¼Œæ­£åœ¨å®‰è£…ä¾èµ–ï¼ˆæ¸…åé•œåƒï¼‰...
+    echo Ê×´ÎÔËĞĞ£¬ÕıÔÚ°²×°ÒÀÀµ£¨Çå»ª¾µÏñ£©...
     python -m pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
     if errorlevel 1 (
-        echo [é”™è¯¯] ä¾èµ–å®‰è£…å¤±è´¥ï¼Œè¯·æ£€æŸ¥ç½‘ç»œåé‡è¯•ã€‚
+        echo [´íÎó] ÒÀÀµ°²×°Ê§°Ü£¬Çë¼ì²éÍøÂçºóÖØÊÔ¡£
         pause
         exit /b 1
     )
 )
 
 echo.
-echo  æ­£åœ¨å¯åŠ¨ æ•°ç›¾ DataShield ...
-echo  æµè§ˆå™¨å°†è‡ªåŠ¨æ‰“å¼€ http://localhost:8501
-echo  å…³é—­æœ¬çª—å£å³å¯åœæ­¢åº”ç”¨ã€‚
+echo  ÕıÔÚÆô¶¯ Êı¶Ü DataShield ...
+echo  ä¯ÀÀÆ÷½«×Ô¶¯´ò¿ª http://localhost:8501
+echo  ¹Ø±Õ±¾´°¿Ú¼´¿ÉÍ£Ö¹Ó¦ÓÃ¡£
 echo.
 python -m streamlit run app.py
 pause
