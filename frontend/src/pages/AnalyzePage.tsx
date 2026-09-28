@@ -56,7 +56,7 @@ export default function AnalyzePage() {
 
   return (
     <div>
-      <PageHeader title="Analyze 发起法规影响分析" desc="选择企业与产品,系统将检索相关法规条款并评估影响" />
+      <PageHeader title="发起法规影响分析" desc="选择企业与产品，系统将检索相关法规条款并评估影响" />
       {loading ? (
         <Spinner />
       ) : error ? (
@@ -69,13 +69,13 @@ export default function AnalyzePage() {
         />
       ) : submitting ? (
         <div className="bg-white border border-gray-200 rounded-lg py-20">
-          <Spinner text="分析中,LLM 正在评估法规影响,请稍候…" />
+          <Spinner text="分析中，大模型正在评估法规影响，请稍候…" />
         </div>
       ) : (
         <form onSubmit={onSubmit} className="max-w-2xl bg-white border border-gray-200 rounded-lg p-6">
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-900 mb-1">企业 Company *</label>
+              <label className="block text-sm font-medium text-slate-900 mb-1">企业 *</label>
               <select
                 required
                 className={inputCls}
@@ -91,7 +91,7 @@ export default function AnalyzePage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-900 mb-1">产品 Product *</label>
+              <label className="block text-sm font-medium text-slate-900 mb-1">产品 *</label>
               <select
                 required
                 className={inputCls}
@@ -107,12 +107,12 @@ export default function AnalyzePage() {
                 ))}
               </select>
               {companyId !== '' && !products.loading && (products.data ?? []).length === 0 && (
-                <p className="mt-1 text-xs text-gray-400">该企业暂无产品,请先在 Products 页面创建</p>
+                <p className="mt-1 text-xs text-gray-400">该企业暂无产品,请先在 产品合规护照页面创建</p>
               )}
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-900 mb-1">
-                法规 Regulation <span className="text-xs text-gray-400 font-normal">(可选,不选则检索全部法规)</span>
+                法规 <span className="text-xs text-gray-400 font-normal">(可选,不选则检索全部法规)</span>
               </label>
               <select
                 className={inputCls}
@@ -128,7 +128,7 @@ export default function AnalyzePage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-900 mb-1">分析问题 Query</label>
+              <label className="block text-sm font-medium text-slate-900 mb-1">分析问题</label>
               <textarea
                 className={inputCls}
                 rows={4}
@@ -142,7 +142,7 @@ export default function AnalyzePage() {
             type="submit"
             className="mt-6 px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700"
           >
-            Analyze Impact
+            开始影响分析
           </button>
         </form>
       )}

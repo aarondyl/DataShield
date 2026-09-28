@@ -76,7 +76,7 @@ export default function CompanyPage() {
 
   return (
     <div>
-      <PageHeader title="Company 企业管理" desc="维护出海企业档案,分析将基于企业信息匹配法规影响" />
+      <PageHeader title="企业画像" desc="维护企业合规背景，分析代理将自动读取这些信息" />
       {loading ? (
         <Spinner />
       ) : error ? (
@@ -128,16 +128,16 @@ export default function CompanyPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">行业 Industry</label>
+                <label className="block text-xs text-gray-500 mb-1">行业</label>
                 <input
                   className={inputCls}
                   value={form.industry}
                   onChange={(e) => setForm({ ...form, industry: e.target.value })}
-                  placeholder="如 SaaS / E-commerce / Fintech"
+                  placeholder="如软件服务 / 电子商务 / 金融科技"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">所在国家 Country</label>
+                <label className="block text-xs text-gray-500 mb-1">所在国家</label>
                 <input
                   className={inputCls}
                   value={form.country}
@@ -154,7 +154,7 @@ export default function CompanyPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">商业模式 Business Model</label>
+                <label className="block text-xs text-gray-500 mb-1">商业模式</label>
                 <input
                   className={inputCls}
                   value={form.business_model}

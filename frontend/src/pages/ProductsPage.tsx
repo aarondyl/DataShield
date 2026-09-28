@@ -111,7 +111,7 @@ export default function ProductsPage() {
 
   return (
     <div>
-      <PageHeader title="Products 产品管理" desc="登记产品及其数据属性,用于法规影响匹配" />
+      <PageHeader title="产品合规护照" desc="集中记录产品市场、数据处理方式和合规风险" />
       {loading ? (
         <Spinner />
       ) : error ? (
@@ -192,12 +192,12 @@ export default function ProductsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">类别 Category</label>
+                <label className="block text-xs text-gray-500 mb-1">产品类别</label>
                 <input
                   className={inputCls}
                   value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  placeholder="如 Mobile App / Web SaaS"
+                  placeholder="如移动应用 / 网站服务"
                 />
               </div>
               <div>
@@ -219,7 +219,7 @@ export default function ProductsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-2">数据属性 Data Attributes</label>
+                <label className="block text-xs text-gray-500 mb-2">数据属性</label>
                 <div className="grid grid-cols-2 gap-2">
                   {boolFields.map((f) => (
                     <label key={f.key} className="flex items-center gap-2 text-sm text-gray-700">

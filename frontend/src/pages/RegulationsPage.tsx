@@ -75,7 +75,7 @@ export default function RegulationsPage() {
 
   return (
     <div>
-      <PageHeader title="Regulations 法规库" desc="查看法规与条款明细,或上传新的法规文件" />
+      <PageHeader title="法规情报中心" desc="查看法规与条款明细,或上传新的法规文件" />
       {loading ? (
         <Spinner />
       ) : error ? (
@@ -154,7 +154,7 @@ export default function RegulationsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">地区 Jurisdiction *</label>
+                <label className="block text-xs text-gray-500 mb-1">适用地区 *</label>
                 <input
                   required
                   className={inputCls}
@@ -173,7 +173,7 @@ export default function RegulationsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">Source URL</label>
+                <label className="block text-xs text-gray-500 mb-1">来源网址</label>
                 <input
                   className={inputCls}
                   value={upForm.source_url}

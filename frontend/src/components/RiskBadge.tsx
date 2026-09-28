@@ -9,9 +9,10 @@ const styles: Record<string, string> = {
 
 export default function RiskBadge({ level }: { level: RiskLevel | null | undefined }) {
   const key = level ?? 'unknown';
+  const labels = { high: '高', medium: '中', low: '低', unknown: '未知' };
   return (
     <span className={`inline-block px-2 py-0.5 text-xs font-medium border rounded ${styles[key]}`}>
-      {level ? level.toUpperCase() : 'N/A'}
+      {labels[key as keyof typeof labels]}
     </span>
   );
 }
