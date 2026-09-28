@@ -60,14 +60,18 @@ DEEPSEEK_API_KEY = "sk-你的key"
 ## ☁️ 部署到 Streamlit Cloud
 
 1. Fork / 克隆本仓库到你的 GitHub 账号；
-2. 打开 [share.streamlit.io](https://share.streamlit.io)，选择该仓库，入口文件填 `app.py`；
+2. 打开 [share.streamlit.io](https://share.streamlit.io)，选择该仓库与 `main` 分支，**Main file path** 填 `streamlit_app.py`（原入口 `app.py` 也可使用）；
 3. （可选）在 Secrets 中配置 `DEEPSEEK_API_KEY`；
 4. Deploy，即可获得公开访问的网页版。
+
+若提示 **This file does not exist**，请确认所选仓库和分支中存在该入口文件；
+旧版本可直接填写 `app.py`，更新到本版本后也可使用 `streamlit_app.py`。
 
 ## 📁 项目结构
 
 ```
 DataShield/
+├── streamlit_app.py      # Streamlit Cloud 兼容入口
 ├── app.py                # Streamlit 主入口（10 个页面）
 ├── questionnaire.py      # 问卷定义（六模块 + 动态追问）
 ├── rules.py              # 合规规则引擎（核心：35 条规则、七维度评分）
