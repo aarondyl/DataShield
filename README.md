@@ -1,103 +1,126 @@
-# 🛡️ 数盾 DataShield
+# DataShield
 
-面向中小 App 开发者 / 网站主的**一站式数据合规自查与整改工具**，覆盖
-GDPR（欧盟《通用数据保护条例》）、中国《数据安全法》《个人信息保护法》。
-无需法律背景，10 分钟完成一次专业级合规自查。
+DataShield 是面向出海企业的数据合规分析与整改平台。新版将原有的规则自查工具与企业级法规影响分析架构合并为一套产品：React 前端、FastAPI 后端、LangGraph Agent、RAG 法规检索以及 PostgreSQL/pgvector 数据层。
 
-> ⚠️ 本工具由规则引擎与公开法条生成自查结果，仅供参考，不构成法律意见。
+> 本工具输出仅供合规工作参考，不构成法律意见。仓库中的预置法规内容带有 `[DEMO SUMMARY]` 标记，生产使用前应替换为经过核验的官方法规文本。
 
-## ✨ 功能一览
+## 核心能力
 
-| 模块 | 说明 |
-| --- | --- |
-| 📄 文档智能分析 | 上传项目计划书（txt/md/docx/pdf），AI 或规则自动预填问卷 |
-| 📝 合规自查问卷 | 六大模块 20+ 问题、动态追问、六大行业预设一键加载 |
-| ⚖️ 规则引擎 | 35 条合规规则，纯 Python if-else，逻辑透明可审计 |
-| 📊 合规仪表盘 | 七维度雷达图、风险分布、维度得分、处罚案例联动警示 |
-| 🗺️ 整改路线图 | 自动生成 7/30/90 天整改计划，可勾选进度 |
-| 📑 合规报告 | 总分 + 评级，Markdown 报告一键导出 |
-| 🛡️ 隐私政策生成 | 按问卷答案自动生成隐私政策初稿（可选 AI 润色） |
-| 🔍 隐私政策体检 | 粘贴现有政策，检查 12 项法定必备要素（可选 AI 复核） |
-| 📈 历史趋势 | 每次评估自动存档，多次得分趋势对比 |
-| 📖 法条与案例 | 59 组法条摘要（可搜索）+ 16 个真实处罚案例 |
+- 企业与产品档案：维护企业、目标市场、产品及数据处理属性。
+- 合规自查：六大问卷模块、35 条确定性规则、七维度评分和历史记录。
+- 整改路线图：按高、中、低风险生成 7/30/90 天整改建议。
+- 法规影响分析：通过 RAG + LangGraph 判断适用法规、受影响产品、风险与证据。
+- 法规库：预置 GDPR、《个人信息保护法》《数据安全法》，支持上传法规文档。
+- 隐私政策工具：根据评估答案生成初稿，检查现有政策的 12 项法定要素。
+- 文档预填：根据产品说明或需求文档生成合规问卷预填建议。
 
-## 🚀 快速开始
+## 架构
 
-```bash
-git clone https://github.com/aarondyl/DataShield.git
-cd DataShield
-pip install -r requirements.txt
-streamlit run app.py
+```text
+React + TypeScript
+        │
+        ▼
+FastAPI ── 确定性规则引擎（问卷、评分、报告、隐私政策）
+        │
+        ├── LangGraph Agent（影响判断、证据验证、行动规划）
+        ├── RAG（法规切片、Embedding、Top-K 检索）
+        └── PostgreSQL + pgvector（本地开发可使用 SQLite）
 ```
 
-浏览器自动打开 `http://localhost:8501`。Windows 用户也可以直接双击 `启动数盾.bat`。
+仓库现在只有一套应用：
 
-## 🤖 启用 AI 功能（可选）
-
-不配置也能完整运行（纯规则模式）。配置后解锁：AI 文档分析、AI 详细解释、隐私政策 AI 润色与复核。
-
-方式一：复制 `config.example.py` 为 `config.py`，填入 Key：
-
-```python
-API_KEY = "sk-你的key"          # https://platform.deepseek.com/ 创建
-MODEL = "deepseek-v4.1-flash"   # 可按平台实际模型名调整
-```
-
-方式二：环境变量（优先级更高）：
-
-```bash
-export DEEPSEEK_API_KEY="sk-你的key"     # Windows PowerShell: $env:DEEPSEEK_API_KEY="..."
-```
-
-方式三：Streamlit Cloud 部署时，在应用的 **Settings → Secrets** 中配置：
-
-```toml
-DEEPSEEK_API_KEY = "sk-你的key"
-```
-
-任何 AI 调用失败（无网络、Key 无效、超时）都会自动降级为内置模板/算法，应用绝不报错中断。
-
-## ☁️ 部署到 Streamlit Cloud
-
-1. Fork / 克隆本仓库到你的 GitHub 账号；
-2. 打开 [share.streamlit.io](https://share.streamlit.io)，选择该仓库与 `main` 分支，**Main file path** 填 `streamlit_app.py`（原入口 `app.py` 也可使用）；
-3. （可选）在 Secrets 中配置 `DEEPSEEK_API_KEY`；
-4. Deploy，即可获得公开访问的网页版。
-
-若提示 **This file does not exist**，请确认所选仓库和分支中存在该入口文件；
-旧版本可直接填写 `app.py`，更新到本版本后也可使用 `streamlit_app.py`。
-
-## 📁 项目结构
-
-```
+```text
 DataShield/
-├── streamlit_app.py      # Streamlit Cloud 兼容入口
-├── app.py                # Streamlit 主入口（10 个页面）
-├── questionnaire.py      # 问卷定义（六模块 + 动态追问）
-├── rules.py              # 合规规则引擎（核心：35 条规则、七维度评分）
-├── regulations_data.py   # 法条引用数据库（个保法/数安法/GDPR 24 组）
-├── cases_data.py         # 真实处罚案例库
-├── presets.py            # 行业预设画像
-├── doc_analyzer.py       # 文档上传解析与自动预填（AI/关键词双模式）
-├── policy_generator.py   # 隐私政策生成器
-├── policy_checker.py     # 隐私政策 12 要素体检
-├── roadmap.py            # 整改路线图（7/30/90 天）
-├── history.py            # 历史记录（本地 JSON）
-├── charts.py             # 可视化图表（plotly）
-├── report.py             # 评分与 Markdown 报告导出
-├── llm_explainer.py      # LLM 模块（可选，全链路降级）
-├── config.example.py     # 配置模板（复制为 config.py 使用）
-├── requirements.txt
-├── 启动数盾.bat           # Windows 一键启动
-└── README.md
+├── frontend/              # React + Vite + TypeScript
+├── backend/
+│   ├── app/api/           # REST API
+│   ├── app/agents/        # LangGraph 工作流
+│   ├── app/compliance/    # 原 DataShield 规则、评分、报告和政策能力
+│   ├── app/rag/           # 法规入库与检索
+│   ├── app/models/        # SQLAlchemy 模型
+│   └── tests/             # 后端自动化测试
+├── docker-compose.yml     # 应用 + PostgreSQL/pgvector
+└── 启动DataShield.bat      # Windows 本地开发启动器
 ```
 
-## 🧮 评分规则
+## Docker 一键运行
 
-总分 100 起始：命中 🔴 高风险 -15、🟡 中风险 -8、🟢 低风险 -3，下限 0 分。
-评级：90+ 优秀 / 75-89 良好 / 60-74 待改进 / <60 高风险。
-七个维度按同一规则独立计分，形成雷达图。
+需要 Docker Desktop：
 
-## 📄 License
+```bash
+docker compose up --build
+```
+
+打开 <http://localhost:8000>。生产镜像会先构建 React 前端，再由 FastAPI 从同一端口提供网页和 API。
+
+默认使用离线 `mock` LLM 和本地 Embedding，可完整体验流程。启用 DeepSeek：
+
+```bash
+LLM_PROVIDER=api LLM_API_KEY=你的密钥 docker compose up --build
+```
+
+## 本地开发
+
+后端使用 Python 3.12：
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env
+# 若本机没有 PostgreSQL，将 .env 中 DATABASE_URL 改为 sqlite:///./datashield.db
+uvicorn app.main:app --reload
+```
+
+前端：
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+打开 <http://localhost:5173>。Vite 会把 `/api` 请求代理到 `http://localhost:8000`。
+
+## 测试
+
+```bash
+cd backend && python -m pytest tests -q
+cd ../frontend && npm run build
+```
+
+## 主要 API
+
+```text
+GET  /api/health
+GET/POST/PUT /api/companies
+GET/POST/PUT /api/products
+GET/POST     /api/regulations
+GET/POST     /api/analysis
+GET          /api/actions
+
+GET      /api/compliance/questionnaire
+GET/POST /api/compliance/assessments
+POST     /api/compliance/documents/analyze
+POST     /api/compliance/policy/generate
+POST     /api/compliance/policy/check
+```
+
+## 配置
+
+后端读取 `backend/.env` 或环境变量：
+
+| 变量 | 默认值 | 说明 |
+| --- | --- | --- |
+| `DATABASE_URL` | `sqlite:///./datashield.db` | SQLAlchemy 数据库地址 |
+| `LLM_PROVIDER` | `mock` | `mock` 离线演示；`api` 调用真实模型 |
+| `LLM_API_KEY` | 空 | OpenAI 兼容 API 密钥 |
+| `LLM_BASE_URL` | DeepSeek API | OpenAI 兼容接口地址 |
+| `LLM_MODEL` | `deepseek-chat` | 模型名称 |
+| `EMBEDDING_PROVIDER` | `local` | `local` 哈希向量；`api` 远程 Embedding |
+| `RUN_SEED` | `true` | 空数据库启动时写入演示数据 |
+
+## License
 
 MIT

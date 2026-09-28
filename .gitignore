@@ -1,5 +1,5 @@
 # 本地配置（可能包含 API Key，切勿提交）
-config.py
+/config.py
 
 # 历史记录（本地运行数据）
 .datacheck_history.json
@@ -11,11 +11,13 @@ __pycache__/
 .venv/
 venv/
 
-# RegPilot
-regpilot/backend/.env
-regpilot/backend/regpilot.db
-regpilot/frontend/node_modules/
-regpilot/frontend/dist/
+# DataShield full-stack app
+backend/.env
+backend/datashield.db
+backend/tests/test_datashield.db
+frontend/node_modules/
+frontend/dist/
+.pnpm-store/
 node_modules/
 
 # 系统文件
