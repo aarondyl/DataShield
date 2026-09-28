@@ -7,12 +7,21 @@
 
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
 
 _settings = get_settings()
+
+
+def _sqlalchemy_url(url: str) -> str:
+    """Make provider-style Postgres URLs use the installed psycopg 3 driver."""
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url.removeprefix("postgres://")
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url.removeprefix("postgresql://")
+    return url
 
 #: 当前是否为 SQLite 降级模式（向量存储、启动流程等据此分支）
 IS_SQLITE: bool = _settings.database_url.startswith("sqlite")
@@ -21,7 +30,7 @@ IS_SQLITE: bool = _settings.database_url.startswith("sqlite")
 _connect_args = {"check_same_thread": False} if IS_SQLITE else {}
 
 engine = create_engine(
-    _settings.database_url,
+    _sqlalchemy_url(_settings.database_url),
     connect_args=_connect_args,
     pool_pre_ping=True,
 )
@@ -57,5 +66,11 @@ def init_db() -> None:
     """
     from app import models  # noqa: F401  确保全部模型注册到 Base.metadata
     from app.db.base import Base
+
+    # Neon supports pgvector, but the extension must exist before SQLAlchemy can
+    # create columns with the ``vector`` type. This is safe on every cold start.
+    if not IS_SQLITE:
+        with engine.begin() as connection:
+            connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
 
     Base.metadata.create_all(bind=engine)

@@ -31,6 +31,7 @@ FastAPI ── 确定性规则引擎（问卷、评分、报告、隐私政策�
 
 ```text
 DataShield/
+├── api/index.py           # Vercel FastAPI Function 入口
 ├── frontend/              # React + Vite + TypeScript
 ├── backend/
 │   ├── app/api/           # REST API
@@ -42,6 +43,29 @@ DataShield/
 ├── docker-compose.yml     # 应用 + PostgreSQL/pgvector
 └── 启动DataShield.bat      # Windows 本地开发启动器
 ```
+
+## Vercel + Neon 部署
+
+仓库已经按一个 Vercel 项目配置好：Vercel 构建 `frontend/dist`，静态页面由 CDN 提供，`/api/*` 交给 `api/index.py` 中的 FastAPI 应用。前端与 API 同域，不需要额外设置 CORS。
+
+1. 在 Vercel 选择 **Add New → Project**，导入 GitHub 仓库 `aarondyl/DataShield`。
+2. Framework Preset 选择 **Other**，Root Directory 保持仓库根目录；构建命令和输出目录会自动读取 `vercel.json`。
+3. 在项目的 **Storage** 页添加 Neon Postgres，并连接 Production（也可以同时连接 Preview）。Neon 集成会自动注入 `DATABASE_URL`。
+4. 在 **Settings → Environment Variables** 添加下表中的变量，然后重新部署。
+
+| 变量 | 建议值 | 是否必需 |
+| --- | --- | --- |
+| `DATABASE_URL` | Neon 集成自动提供的 pooled URL | 是 |
+| `RUN_SEED` | `true` | 否，默认会初始化演示法规与公司 |
+| `LLM_PROVIDER` | `mock`；启用真实模型时改为 `api` | 否 |
+| `EMBEDDING_PROVIDER` | `local` | 否，先用于免费演示 |
+| `LLM_API_KEY` | API 密钥 | `LLM_PROVIDER=api` 时设置 |
+| `LLM_BASE_URL` | `https://api.deepseek.com/v1` | 可选 |
+| `LLM_MODEL` | `deepseek-chat` | 可选 |
+
+首次请求会自动启用 Neon 的 `vector` 扩展、创建表并写入演示数据，因此不需要在 Vercel 上单独运行迁移。Neon 免费实例休眠后的首次访问可能有数秒冷启动。
+
+部署成功后可在 Vercel 的 **Settings → Domains** 添加从阿里云购买的域名，再到阿里云 DNS 按 Vercel 显示的记录添加 A 或 CNAME 解析。域名仍由阿里云管理，无需转移注册商。
 
 ## Docker 一键运行
 
@@ -67,7 +91,7 @@ LLM_PROVIDER=api LLM_API_KEY=你的密钥 docker compose up --build
 cd backend
 python -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 cp .env.example .env
 # 若本机没有 PostgreSQL，将 .env 中 DATABASE_URL 改为 sqlite:///./datashield.db
 uvicorn app.main:app --reload
