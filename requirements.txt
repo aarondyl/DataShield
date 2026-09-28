@@ -1,1 +1,16 @@
--r backend/requirements.txt
+fastapi
+uvicorn[standard]
+sqlalchemy>=2.0
+psycopg[binary]
+pgvector
+pydantic>=2.0
+pydantic-settings
+alembic
+langgraph
+langchain-core
+openai
+python-dotenv
+httpx
+python-multipart
+pypdf
+python-docx
