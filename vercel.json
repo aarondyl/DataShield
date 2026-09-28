@@ -1,6 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "cd frontend && npm ci && npm run build",
+  "buildCommand": "cd frontend && npm ci && npm run build && mkdir -p ../backend/static && cp -R dist/. ../backend/static/",
   "outputDirectory": "frontend/dist",
   "functions": {
     "api/index.py": {
@@ -11,15 +11,8 @@
   },
   "routes": [
     {
-      "src": "/api(?:/.*)?",
-      "dest": "/api/index.py"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
       "src": "/.*",
-      "dest": "/index.html"
+      "dest": "/api/index.py"
     }
   ]
 }

@@ -1,13 +1,19 @@
 """Application settings loaded from environment variables or a local .env file."""
 
 from functools import lru_cache
+import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+_DEFAULT_DATABASE_URL = (
+    "sqlite:////tmp/datashield.db" if os.getenv("VERCEL") else "sqlite:///./datashield.db"
+)
+
+
 class Settings(BaseSettings):
     app_name: str = "DataShield API"
-    database_url: str = "sqlite:///./datashield.db"
+    database_url: str = _DEFAULT_DATABASE_URL
     llm_api_key: str = ""
     llm_base_url: str = "https://api.deepseek.com/v1"
     llm_model: str = "deepseek-chat"

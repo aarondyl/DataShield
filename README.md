@@ -46,7 +46,7 @@ DataShield/
 
 ## Vercel + Neon 部署
 
-仓库已经按一个 Vercel 项目配置好：Vercel 构建 `frontend/dist`，静态页面由 CDN 提供，`/api/*` 交给 `api/index.py` 中的 FastAPI 应用。前端与 API 同域，不需要额外设置 CORS。
+仓库已经按一个 Vercel 项目配置好：Vercel 构建 React 后由 `api/index.py` 中的 FastAPI 应用统一提供页面和 `/api/*`。前端与 API 同域，不需要额外设置 CORS。
 
 1. 在 Vercel 选择 **Add New → Project**，导入 GitHub 仓库 `aarondyl/DataShield`。
 2. Framework Preset 选择 **Other**，Root Directory 保持仓库根目录；构建命令和输出目录会自动读取 `vercel.json`。
@@ -63,7 +63,7 @@ DataShield/
 | `LLM_BASE_URL` | `https://api.deepseek.com/v1` | 可选 |
 | `LLM_MODEL` | `deepseek-chat` | 可选 |
 
-首次请求会自动启用 Neon 的 `vector` 扩展、创建表并写入演示数据，因此不需要在 Vercel 上单独运行迁移。Neon 免费实例休眠后的首次访问可能有数秒冷启动。
+首次请求会自动启用 Neon 的 `vector` 扩展、创建表并写入演示数据，因此不需要在 Vercel 上单独运行迁移。Neon 免费实例休眠后的首次访问可能有数秒冷启动。尚未连接 Neon 时，Vercel 会使用 `/tmp` 下的临时 SQLite 演示库；数据可能随函数重启而清空，接入 `DATABASE_URL` 后即切换为持久存储。
 
 部署成功后可在 Vercel 的 **Settings → Domains** 添加从阿里云购买的域名，再到阿里云 DNS 按 Vercel 显示的记录添加 A 或 CNAME 解析。域名仍由阿里云管理，无需转移注册商。
 
