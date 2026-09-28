@@ -1,45 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom';
-
-const navItems = [
-  { to: '/', label: '总览', end: true },
-  { to: '/company', label: '企业档案' },
-  { to: '/products', label: '产品管理' },
-  { to: '/assessment', label: '合规自查' },
-  { to: '/analyze', label: '法规影响分析' },
-  { to: '/privacy', label: '隐私政策工具' },
-  { to: '/regulations', label: '法规库' },
-];
-
-export default function Layout() {
-  return (
-    <div className="flex min-h-screen bg-gray-50">
-      <aside className="w-56 shrink-0 bg-slate-900 text-slate-200 flex flex-col">
-        <div className="px-5 py-5 border-b border-slate-700">
-          <div className="text-lg font-semibold text-white">DataShield</div>
-          <div className="text-xs text-slate-400 mt-1">智能数据合规平台</div>
-        </div>
-        <nav className="flex-1 py-3">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                `block px-5 py-2.5 text-sm border-l-2 ${
-                  isActive
-                    ? 'border-indigo-500 bg-slate-800 text-white'
-                    : 'border-transparent text-slate-300 hover:bg-slate-800 hover:text-white'
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
-      <main className="flex-1 p-8 overflow-auto">
-        <Outlet />
-      </main>
-    </div>
-  );
-}
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+type Mode = 'business' | 'developer';
+const businessNav=[{section:'OVERVIEW',items:[{to:'/business',label:'Today'}]},{section:'ENTERPRISE',items:[{to:'/business/company',label:'Company Profile'},{to:'/business/products',label:'Product Passports'}]},{section:'COMPLIANCE',items:[{to:'/business/risks',label:'Risk Center'},{to:'/business/check',label:'Compliance Check'},{to:'/business/impact',label:'Impact Analysis'}]},{section:'ACTION',items:[{to:'/business/actions',label:'Tasks'}]},{section:'INTELLIGENCE',items:[{to:'/business/regulations',label:'Regulations'}]}];
+const developerNav=[{section:'HOME',items:[{to:'/developer',label:'Overview'}]},{section:'CHECK',items:[{to:'/developer/check',label:'Quick Compliance Check'},{to:'/developer/policy-check',label:'Privacy Policy Check'}]},{section:'CREATE',items:[{to:'/developer/policy-generator',label:'Privacy Policy Generator'}]},{section:'REFERENCE',items:[{to:'/developer/regulations',label:'Regulations'}]}];
+export default function Layout({mode}:{mode:Mode}){const location=useLocation();const nav=mode==='business'?businessNav:developerNav;return <div className={`app-shell mode-${mode}`}><aside className="app-sidebar"><NavLink to="/" className="brand-lockup"><span className="brand-mark">D</span><span><strong>DataShield</strong><small>INTELLIGENT COMPLIANCE</small></span></NavLink><div className="mode-label"><span>{mode==='business'?'BUSINESS':'DEVELOPER'}</span><i/></div><nav className="nav-groups">{nav.map(group=><div className="nav-group" key={group.section}><div className="nav-section">{group.section}</div>{group.items.map(item=><NavLink key={item.to} to={item.to} end={item.to===`/${mode}`} className={({isActive})=>isActive?'nav-link active':'nav-link'}>{item.label}<span>→</span></NavLink>)}</div>)}</nav><div className="sidebar-foot"><div><strong>{mode==='business'?'ABC Technology':'Independent Builder'}</strong><small>{mode==='business'?'Business workspace':'Developer workspace'}</small></div><NavLink to="/">Switch product ↗</NavLink></div></aside><main className="app-main" key={location.pathname}><Outlet/></main></div>}
