@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useCompanies, useProducts } from '../hooks';
-import { createProduct, updateProduct } from '../api';
+import { createCompany, createProduct, updateProduct } from '../api';
 import type { Product, ProductPayload } from '../types';
 import PageHeader from '../components/PageHeader';
 import Spinner from '../components/Spinner';
@@ -40,7 +40,8 @@ const emptyForm = (companyId: number | '' = ''): FormState => ({
 const inputCls =
   'w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500';
 
-export default function ProductsPage() {
+export default function ProductsPage({ mode = 'business' }: { mode?: 'business' | 'developer' }) {
+  const isDeveloper = mode === 'developer';
   const companies = useCompanies();
   const products = useProducts();
   const [editing, setEditing] = useState<Product | null>(null);
@@ -74,24 +75,34 @@ export default function ProductsPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (form.company_id === '') {
+    if (!isDeveloper && form.company_id === '') {
       setSubmitError('请选择所属企业');
       return;
     }
     setSubmitting(true);
     setSubmitError(null);
-    const payload: ProductPayload = {
-      company_id: form.company_id,
-      name: form.name.trim(),
-      category: form.category.trim(),
-      target_markets: form.target_markets
-        .split(/[,，]/)
-        .map((s) => s.trim())
-        .filter(Boolean),
-      description: form.description.trim(),
-      ...(form.flags as Record<string, boolean>),
-    } as ProductPayload;
     try {
+      let companyId = form.company_id;
+      if (isDeveloper && companyId === '') {
+        companyId = companies.data?.[0]?.id ?? (await createCompany({
+          name: '独立开发者',
+          industry: '软件与互联网',
+          country: '',
+          target_markets: [],
+          business_model: '独立开发',
+        })).id;
+      }
+      const payload: ProductPayload = {
+        company_id: companyId as number,
+        name: form.name.trim(),
+        category: form.category.trim(),
+        target_markets: form.target_markets
+          .split(/[,，]/)
+          .map((s) => s.trim())
+          .filter(Boolean),
+        description: form.description.trim(),
+        ...(form.flags as Record<string, boolean>),
+      } as ProductPayload;
       if (editing) {
         await updateProduct(editing.id, payload);
       } else {
@@ -111,7 +122,7 @@ export default function ProductsPage() {
 
   return (
     <div>
-      <PageHeader title="产品合规护照" desc="集中记录产品市场、数据处理方式和合规风险" />
+      <PageHeader title={isDeveloper ? '项目画像' : '产品合规护照'} desc={isDeveloper ? '记录项目的市场、数据处理方式和隐私特征，供后续合规检查使用' : '集中记录产品市场、数据处理方式和合规风险'} />
       {loading ? (
         <Spinner />
       ) : error ? (
@@ -120,14 +131,14 @@ export default function ProductsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             {(products.data ?? []).length === 0 ? (
-              <EmptyState message="暂无产品,请在右侧创建" />
+              <EmptyState message={isDeveloper ? '暂无项目，请在右侧创建项目画像' : '暂无产品，请在右侧创建'} />
             ) : (
               <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-gray-500 border-b border-gray-200">
-                      <th className="px-4 py-2.5 font-medium">产品名称</th>
-                      <th className="px-4 py-2.5 font-medium">所属企业</th>
+                      <th className="px-4 py-2.5 font-medium">{isDeveloper ? '项目名称' : '产品名称'}</th>
+                      {!isDeveloper && <th className="px-4 py-2.5 font-medium">所属企业</th>}
                       <th className="px-4 py-2.5 font-medium">类别</th>
                       <th className="px-4 py-2.5 font-medium">目标市场</th>
                       <th className="px-4 py-2.5 font-medium">数据属性</th>
@@ -138,7 +149,7 @@ export default function ProductsPage() {
                     {(products.data ?? []).map((p) => (
                       <tr key={p.id} className="border-b border-gray-100 last:border-0 align-top">
                         <td className="px-4 py-2.5 font-medium text-slate-900">{p.name}</td>
-                        <td className="px-4 py-2.5 text-gray-600">{companyName(p.company_id)}</td>
+                        {!isDeveloper && <td className="px-4 py-2.5 text-gray-600">{companyName(p.company_id)}</td>}
                         <td className="px-4 py-2.5 text-gray-600">{p.category || '-'}</td>
                         <td className="px-4 py-2.5 text-gray-600">{p.target_markets.join(', ') || '-'}</td>
                         <td className="px-4 py-2.5">
@@ -163,10 +174,10 @@ export default function ProductsPage() {
 
           <form onSubmit={onSubmit} className="bg-white border border-gray-200 rounded-lg p-5 h-fit">
             <div className="text-sm font-semibold text-slate-900 mb-4">
-              {editing ? `编辑产品 #${editing.id}` : '创建产品'}
+              {editing ? `编辑${isDeveloper ? '项目' : '产品'} #${editing.id}` : `创建${isDeveloper ? '项目画像' : '产品'}`}
             </div>
             <div className="space-y-3">
-              <div>
+              {!isDeveloper && <div>
                 <label className="block text-xs text-gray-500 mb-1">所属企业 *</label>
                 <select
                   required
@@ -181,9 +192,9 @@ export default function ProductsPage() {
                     </option>
                   ))}
                 </select>
-              </div>
+              </div>}
               <div>
-                <label className="block text-xs text-gray-500 mb-1">产品名称 *</label>
+                <label className="block text-xs text-gray-500 mb-1">{isDeveloper ? '项目名称' : '产品名称'} *</label>
                 <input
                   required
                   className={inputCls}
@@ -192,12 +203,12 @@ export default function ProductsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">产品类别</label>
+                <label className="block text-xs text-gray-500 mb-1">{isDeveloper ? '项目类别' : '产品类别'}</label>
                 <input
                   className={inputCls}
                   value={form.category}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  placeholder="如移动应用 / 网站服务"
+                  placeholder="如移动应用 / 网站服务 / 小程序"
                 />
               </div>
               <div>
@@ -210,7 +221,7 @@ export default function ProductsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">产品描述</label>
+                <label className="block text-xs text-gray-500 mb-1">{isDeveloper ? '项目描述' : '产品描述'}</label>
                 <textarea
                   className={inputCls}
                   rows={3}
