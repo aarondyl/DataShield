@@ -176,6 +176,45 @@ class TestCompanyProductCrud:
         assert resp.json()["has_privacy_policy"] is True
 
 
+class TestDeveloperWorkflow:
+    def test_scan_fix_and_policy_mismatch(self, client: TestClient):
+        company = client.post("/api/companies", json={"name": "独立开发者"}).json()
+        product = client.post(
+            "/api/products",
+            json={
+                "company_id": company["id"],
+                "name": "定位工具",
+                "category": "App",
+                "collects_location_data": True,
+                "uses_third_party_sdk": True,
+                "third_party_sdks": ["Firebase Analytics"],
+            },
+        ).json()
+        scanned = client.post(
+            "/api/developer/sdk-scan",
+            json={
+                "product_id": product["id"],
+                "filename": "AndroidManifest.xml",
+                "content": "android.permission.ACCESS_FINE_LOCATION Firebase Analytics",
+            },
+        )
+        assert scanned.status_code == 201, scanned.text
+        assert len(scanned.json()["findings"]) == 2
+
+        checked = client.post(
+            "/api/compliance/policy/check",
+            json={"product_id": product["id"], "text": "我们收集账号信息并提供删除方式。"},
+        )
+        assert checked.status_code == 200, checked.text
+        assert {item["key"] for item in checked.json()["mismatches"]} == {"location", "sdk"}
+
+        issues = client.get("/api/developer/issues", params={"product_id": product["id"]}).json()
+        assert issues
+        updated = client.patch(f"/api/developer/issues/{issues[0]['id']}", json={"status": "resolved"})
+        assert updated.status_code == 200
+        assert updated.json()["status"] == "resolved"
+
+
 class TestRegulations:
     def test_seed_regulations_listed(self, client: TestClient):
         """种子法规应已入库且带条款数。"""

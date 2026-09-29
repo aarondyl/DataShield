@@ -26,7 +26,10 @@ class Product(Base):
     collects_location_data: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否收集位置数据")
     children_related: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否涉及儿童/未成年人")
     third_party_data_sharing: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否与第三方共享数据")
+    uses_third_party_sdk: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否使用第三方 SDK")
+    third_party_sdks: Mapped[list] = mapped_column(JSON, default=list, comment="第三方 SDK 名称列表")
     has_privacy_policy: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否已有隐私政策")
+    privacy_policy_text: Mapped[str] = mapped_column(Text, default="", comment="当前隐私政策文本")
     cross_border_data_transfer: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否存在跨境数据传输")
 
     description: Mapped[str] = mapped_column(Text, default="", comment="产品描述")

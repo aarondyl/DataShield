@@ -15,6 +15,9 @@ import type {
   Assessment,
   PolicyCheckResult,
   Questionnaire,
+  DeveloperIssue,
+  IssueStatus,
+  SdkScanResult,
 } from '../types';
 
 export const getHealth = () => client.get<HealthStatus>('/health').then((r) => r.data);
@@ -59,6 +62,9 @@ export const getAnalysis = (id: number) =>
 
 // Actions
 export const listActions = () => client.get<ActionItem[]>('/actions').then((r) => r.data);
+export const listDeveloperIssues = (productId?: number) => client.get<DeveloperIssue[]>('/developer/issues', {params:productId?{product_id:productId}:undefined}).then((r)=>r.data);
+export const updateDeveloperIssue = (id:number,status:IssueStatus) => client.patch<DeveloperIssue>(`/developer/issues/${id}`,{status}).then((r)=>r.data);
+export const scanSdkPermissions = (data:{product_id:number;content:string;filename:string}) => client.post<SdkScanResult>('/developer/sdk-scan',data).then((r)=>r.data);
 
 // Deterministic compliance assessment and privacy tools
 export const getQuestionnaire = () =>
@@ -73,8 +79,8 @@ export const generatePolicy = (data: {
   company_name: string;
   contact: string;
 }) => client.post<{ text: string }>('/compliance/policy/generate', data).then((r) => r.data);
-export const checkPolicy = (text: string) =>
-  client.post<PolicyCheckResult>('/compliance/policy/check', { text }).then((r) => r.data);
+export const checkPolicy = (text: string, productId?:number) =>
+  client.post<PolicyCheckResult>('/compliance/policy/check', { text, product_id:productId }).then((r) => r.data);
 export const analyzeDocument = (text: string) =>
   client.post<{ suggestions: Record<string, unknown>; note: string }>('/compliance/documents/analyze', { text }).then((r) => r.data);
 export const uploadComplianceDocument = (file: File) => {

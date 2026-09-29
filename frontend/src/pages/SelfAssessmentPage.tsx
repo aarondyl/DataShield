@@ -57,6 +57,7 @@ export default function SelfAssessmentPage() {
   useEffect(() => { getQuestionnaire().then((data) => { setQuestionnaire(data); setAnswers(Object.fromEntries(data.questions.map((q) => [q.key, q.default]))); }).catch((e) => setError(e.message)).finally(() => setLoading(false)); }, []);
   useEffect(() => { listAssessments().then(setHistory).catch(() => undefined); }, []);
   useEffect(() => { if (productId === '' && products.data?.length) setProductId(products.data[0].id); }, [products.data, productId]);
+  useEffect(() => { const product=products.data?.find((p)=>p.id===productId); if(!product)return; setAnswers((a)=>({...a,collect_personal:product.collects_personal_data,collect_sensitive:product.collects_sensitive_data,minors_under_14:product.children_related,share_third_party:product.third_party_data_sharing||product.uses_third_party_sdk,privacy_policy:product.has_privacy_policy,storage_location:product.cross_border_data_transfer?'跨境传输到中国境外':a.storage_location})); }, [productId, products.data]);
   const grouped = useMemo(() => questionnaire ? questionnaire.modules.map((module) => ({ module, questions: questionnaire.questions.filter((q) => q.module === module && visible(q, answers)) })) : [], [questionnaire, answers]);
 
   const update = (key: string, value: unknown) => setAnswers((current) => ({ ...current, [key]: value }));

@@ -35,6 +35,7 @@ class PolicyGenerateRequest(BaseModel):
 
 class PolicyCheckRequest(BaseModel):
     text: str = Field(min_length=1)
+    product_id: int | None = None
 
 
 class DocumentAnalyzeRequest(BaseModel):

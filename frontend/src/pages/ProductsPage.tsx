@@ -15,6 +15,7 @@ const boolFields: { key: keyof ProductPayload; label: string }[] = [
   { key: 'collects_location_data', label: '收集位置数据' },
   { key: 'children_related', label: '儿童相关' },
   { key: 'third_party_data_sharing', label: '第三方数据共享' },
+  { key: 'uses_third_party_sdk', label: '使用第三方 SDK' },
   { key: 'has_privacy_policy', label: '已有隐私政策' },
   { key: 'cross_border_data_transfer', label: '跨境数据传输' },
 ];
@@ -25,6 +26,7 @@ interface FormState {
   category: string;
   target_markets: string;
   description: string;
+  third_party_sdks: string;
   flags: Record<string, boolean>;
 }
 
@@ -34,6 +36,7 @@ const emptyForm = (companyId: number | '' = ''): FormState => ({
   category: '',
   target_markets: '',
   description: '',
+  third_party_sdks: '',
   flags: Object.fromEntries(boolFields.map((f) => [f.key, false])),
 });
 
@@ -63,6 +66,7 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
       category: p.category,
       target_markets: p.target_markets.join(', '),
       description: p.description,
+      third_party_sdks: p.third_party_sdks.join(', '),
       flags: Object.fromEntries(boolFields.map((f) => [f.key, Boolean(p[f.key as keyof Product])])),
     });
   };
@@ -101,6 +105,8 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
           .map((s) => s.trim())
           .filter(Boolean),
         description: form.description.trim(),
+        third_party_sdks: form.third_party_sdks.split(/[,，]/).map((s) => s.trim()).filter(Boolean),
+        privacy_policy_text: editing?.privacy_policy_text ?? '',
         ...(form.flags as Record<string, boolean>),
       } as ProductPayload;
       if (editing) {
@@ -122,7 +128,7 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
 
   return (
     <div>
-      <PageHeader title={isDeveloper ? '项目画像' : '产品合规护照'} desc={isDeveloper ? '记录项目的市场、数据处理方式和隐私特征，供后续合规检查使用' : '集中记录产品市场、数据处理方式和合规风险'} />
+      <PageHeader title={isDeveloper ? 'Product Profile / 产品档案' : '产品合规护照'} desc={isDeveloper ? '一次描述产品，后续检查、修复和上线确认会默认读取这些信息' : '集中记录产品市场、数据处理方式和合规风险'} />
       {loading ? (
         <Spinner />
       ) : error ? (
@@ -174,7 +180,7 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
 
           <form onSubmit={onSubmit} className="bg-white border border-gray-200 rounded-lg p-5 h-fit">
             <div className="text-sm font-semibold text-slate-900 mb-4">
-              {editing ? `编辑${isDeveloper ? '项目' : '产品'} #${editing.id}` : `创建${isDeveloper ? '项目画像' : '产品'}`}
+              {editing ? `编辑产品 #${editing.id}` : `创建${isDeveloper ? '产品档案' : '产品'}`}
             </div>
             <div className="space-y-3">
               {!isDeveloper && <div>
@@ -204,12 +210,7 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">{isDeveloper ? '项目类别' : '产品类别'}</label>
-                <input
-                  className={inputCls}
-                  value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  placeholder="如移动应用 / 网站服务 / 小程序"
-                />
+                {isDeveloper ? <select required className={inputCls} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}><option value="">请选择</option>{['App','SaaS','Website','Mini Program','AI Product'].map((type)=><option key={type}>{type}</option>)}</select> : <input className={inputCls} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="如移动应用 / 网站服务 / 小程序"/>}
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">目标市场(逗号分隔)</label>
@@ -245,6 +246,7 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
                   ))}
                 </div>
               </div>
+              {isDeveloper && <div><label className="block text-xs text-gray-500 mb-1">第三方 SDK（逗号分隔）</label><input className={inputCls} value={form.third_party_sdks} onChange={(e)=>setForm({...form,third_party_sdks:e.target.value})} placeholder="Firebase Analytics, Sentry"/></div>}
             </div>
             {submitError && <div className="mt-3 text-xs text-red-600">{submitError}</div>}
             <div className="mt-4 flex gap-2">

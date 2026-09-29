@@ -28,7 +28,10 @@ export interface Product {
   collects_location_data: boolean;
   children_related: boolean;
   third_party_data_sharing: boolean;
+  uses_third_party_sdk: boolean;
+  third_party_sdks: string[];
   has_privacy_policy: boolean;
+  privacy_policy_text: string;
   cross_border_data_transfer: boolean;
   description: string;
   created_at: string;
@@ -187,4 +190,10 @@ export interface PolicyCheckResult {
   covered: number;
   coverage: number;
   items: { name: string; hint: string; covered: boolean; matched: string[] }[];
+  mismatches: { key:string; title:string; product_behavior:string; policy:string; advice:string }[];
 }
+
+export type IssueStatus = 'pending' | 'in_progress' | 'resolved';
+export interface DeveloperIssue { id:number; product_id:number; source:string; source_key:string; title:string; risk_level:RiskLevel; why:string; fix:string; recommended_text:string; placement:string; status:IssueStatus; created_at:string; }
+export interface ScanFinding { key:string; name:string; kind:'sdk'|'permission'; risk_level:RiskLevel; data:string; why:string; fix:string; policy_disclosed:boolean; }
+export interface SdkScanResult { id:number; product_id:number; filename:string; findings:ScanFinding[]; created_at:string; }

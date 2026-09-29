@@ -7,7 +7,7 @@
 
 from collections.abc import Generator
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
@@ -74,3 +74,18 @@ def init_db() -> None:
             connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
 
     Base.metadata.create_all(bind=engine)
+    # Vercel starts the ASGI app directly (without an Alembic command). Keep
+    # additive profile fields compatible with databases created by older builds.
+    product_columns = {column["name"] for column in inspect(engine).get_columns("products")}
+    additions = {
+        "uses_third_party_sdk": "BOOLEAN DEFAULT FALSE",
+        "third_party_sdks": "JSON",
+        "privacy_policy_text": "TEXT",
+    }
+    with engine.begin() as connection:
+        for name, sql_type in additions.items():
+            if name not in product_columns:
+                connection.execute(text(f"ALTER TABLE products ADD COLUMN {name} {sql_type}"))
+        connection.execute(text("UPDATE products SET uses_third_party_sdk = FALSE WHERE uses_third_party_sdk IS NULL"))
+        connection.execute(text("UPDATE products SET third_party_sdks = '[]' WHERE third_party_sdks IS NULL"))
+        connection.execute(text("UPDATE products SET privacy_policy_text = '' WHERE privacy_policy_text IS NULL"))

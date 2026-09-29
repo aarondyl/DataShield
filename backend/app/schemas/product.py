@@ -15,7 +15,10 @@ class _ProductBase(BaseModel):
     collects_location_data: bool = Field(False, description="是否收集位置数据")
     children_related: bool = Field(False, description="是否涉及儿童/未成年人")
     third_party_data_sharing: bool = Field(False, description="是否与第三方共享数据")
+    uses_third_party_sdk: bool = Field(False, description="是否使用第三方 SDK")
+    third_party_sdks: list[str] = Field(default_factory=list, description="第三方 SDK 名称列表")
     has_privacy_policy: bool = Field(False, description="是否已有隐私政策")
+    privacy_policy_text: str = Field("", description="当前隐私政策文本")
     cross_border_data_transfer: bool = Field(False, description="是否存在跨境数据传输")
     description: str = Field("", description="产品描述")
 
@@ -38,7 +41,10 @@ class ProductUpdate(BaseModel):
     collects_location_data: bool | None = None
     children_related: bool | None = None
     third_party_data_sharing: bool | None = None
+    uses_third_party_sdk: bool | None = None
+    third_party_sdks: list[str] | None = None
     has_privacy_policy: bool | None = None
+    privacy_policy_text: str | None = None
     cross_border_data_transfer: bool | None = None
     description: str | None = None
 

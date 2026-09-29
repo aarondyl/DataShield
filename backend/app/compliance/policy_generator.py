@@ -104,6 +104,8 @@ def generate_policy(answers, app_name="【产品名称】", company="【公司�
             "2. 与第三方签署数据处理协议，要求其在约定范围内处理并采取安全保护措施；",
             "3. 向第三方提供个人信息前，依法取得您的单独同意。",
         ]
+        for sdk in answers.get("third_party_sdks") or []:
+            lines.append(f"- **{sdk}**：【待核对】请补充该 SDK 的提供方、收集信息、使用目的和隐私政策链接。")
     else:
         lines.append("我们目前不向第三方共享您的个人信息。如未来接入第三方服务，"
                      "我们将提前在本政策中公示并依法取得您的同意。")

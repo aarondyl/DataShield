@@ -18,6 +18,7 @@ from app.compliance.roadmap import build_roadmap
 from app.compliance.rules import compute_dimension_scores, evaluate_rules
 from app.db.session import get_db
 from app.models import Assessment, Product
+from app.api.developer import upsert_issue
 from app.schemas.compliance import (
     AssessmentOut,
     AssessmentRequest,
@@ -121,6 +122,10 @@ def create_assessment(payload: AssessmentRequest, db: Session = Depends(get_db))
     db.add(item)
     db.commit()
     db.refresh(item)
+    levels = {"高": "high", "中": "medium", "低": "low"}
+    for hit in hits:
+        upsert_issue(db, payload.product_id, "quick-check", hit["rule_id"], hit["risk"], levels.get(hit["level"], "medium"), hit["risk"], hit["advice"])
+    db.commit()
     return _assessment_out(item)
 
 
@@ -147,8 +152,34 @@ def policy_generate(payload: PolicyGenerateRequest) -> dict[str, str]:
 
 
 @router.post("/policy/check")
-def policy_check(payload: PolicyCheckRequest) -> dict[str, Any]:
-    return check_policy(payload.text)
+def policy_check(payload: PolicyCheckRequest, db: Session = Depends(get_db)) -> dict[str, Any]:
+    result = check_policy(payload.text)
+    result["mismatches"] = []
+    if payload.product_id is None:
+        return result
+    product = db.get(Product, payload.product_id)
+    if product is None:
+        raise HTTPException(status_code=404, detail="产品不存在")
+    product.privacy_policy_text = payload.text
+    product.has_privacy_policy = True
+    comparisons = [
+        (product.collects_location_data, "location", ["位置", "定位"], "位置数据未披露", "产品档案显示会收集位置数据，但政策中未发现相关说明。", "补充位置数据的用途、处理方式、权限关闭方式和保存期限。", "位置数据处理"),
+        (product.uses_third_party_sdk, "sdk", ["sdk", "第三方服务"], "第三方 SDK 未披露", "产品档案显示使用第三方 SDK，但政策中未发现 SDK 或第三方服务说明。", "逐项披露 SDK 名称、提供方、数据类型、用途和隐私政策链接。", "第三方服务 / SDK 清单"),
+        (product.cross_border_data_transfer, "cross-border", ["跨境", "境外", "数据出境"], "跨境传输未披露", "产品档案显示存在跨境传输，但政策中未发现相关说明。", "补充境外接收方、处理目的、数据类型和适用的出境机制。", "信息存储与跨境传输"),
+        (product.children_related, "children", ["儿童", "未成年人", "监护人"], "未成年人处理未披露", "产品档案显示涉及未成年人，但政策中未发现专项说明。", "补充年龄范围、监护人同意和未成年人权利保障方式。", "未成年人保护"),
+    ]
+    lower = payload.text.lower()
+    for enabled, key, words, title, why, fix, placement in comparisons:
+        if enabled and not any(word.lower() in lower for word in words):
+            mismatch = {"key": key, "title": title, "product_behavior": why.split("，但")[0], "policy": "未发现相关说明", "advice": fix}
+            result["mismatches"].append(mismatch)
+            upsert_issue(db, product.id, "policy-check", key, title, "high" if key in {"location","children"} else "medium", why, fix, "请根据产品实际处理活动补充完整、准确的披露。", placement)
+    for item in result["items"]:
+        if not item["covered"]:
+            key = "element-" + item["name"]
+            upsert_issue(db, product.id, "policy-check", key, f'补充隐私政策要素：{item["name"]}', "medium", f'当前隐私政策未覆盖“{item["name"]}”，用户无法充分了解相关处理规则。', item["hint"], '', item["name"])
+    db.commit()
+    return result
 
 
 def _analyze_text(text: str) -> dict[str, Any]:
