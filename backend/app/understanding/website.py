@@ -39,6 +39,8 @@ def public_url(url):
     if SECRET.search(unquote(p.path)) or re.search(r"[A-Za-z0-9_-]{48,}", unquote(p.path)):
         raise ValueError("Sensitive URL path")
     host = p.hostname.encode("idna").decode("ascii").lower()
+    if SECRET.search(host) or re.search(r"[A-Za-z0-9_-]{48,}", host):
+        raise ValueError("Sensitive hostname")
     if host == "localhost" or host.endswith((".localhost", ".local", ".internal")):
         raise ValueError("Non-public host")
     try:
@@ -220,6 +222,9 @@ def analyze_website(request, fetch=fetch_page):
             except ValueError:
                 continue
             if urlsplit(target).netloc != origin or target in seen:
+                continue
+            target_path = urlsplit(target).path
+            if re.search(r"logout|signout|unsubscribe|delete|remove|checkout", target_path, re.I) and not re.search(r"/(?:help|docs|support|guides|faq)/", target_path, re.I):
                 continue
             if IMPORTANT.search(target + " " + label):
                 if depth >= request.max_depth or len(queue) >= 100:
