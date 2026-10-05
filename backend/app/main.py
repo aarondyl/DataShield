@@ -17,11 +17,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import actions, analysis, companies, compliance, developer, health, products, regulations
+from app.api import actions, analysis, companies, compliance, developer, health, products, regintel, regulations
 from app.core.config import get_settings
 from app.db.session import SessionLocal, init_db, is_sqlite
 from app.rag.retrieval import rebuild_local_store_from_db
+from app.regintel.retrieval import rebuild_legal_chunk_store_from_db
 from app.services.seed import seed_if_empty
+from app.services.scheduler import start_scheduler
 
 
 @asynccontextmanager
@@ -31,10 +33,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if is_sqlite():
         # 覆盖重启场景：把库里已有的条款向量重新加载进内存索引
         rebuild_local_store_from_db()
+        rebuild_legal_chunk_store_from_db()
     if get_settings().run_seed:
         with SessionLocal() as db:
             seed_if_empty(db)
+    # 可选：法规来源定时轮询（SCHEDULER_ENABLED=true 时启动）
+    scheduler = start_scheduler()
     yield
+    if scheduler is not None:
+        scheduler.shutdown(wait=False)
 
 
 app = FastAPI(title="DataShield API", version="3.0.0", lifespan=lifespan)
@@ -59,7 +66,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (health, companies, products, regulations, analysis, actions, compliance, developer):
+for module in (health, companies, products, regulations, regintel, analysis, actions, compliance, developer):
     app.include_router(module.router, prefix="/api")
 
 # The production image serves the compiled React frontend from the same origin.

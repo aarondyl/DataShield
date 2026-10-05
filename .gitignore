@@ -23,3 +23,7 @@ node_modules/
 # 系统文件
 .DS_Store
 Thumbs.db
+
+# 全局法规智能层运行时产物（种子入库时自动生成）
+backend/data/sources/
+backend/data/snapshots/

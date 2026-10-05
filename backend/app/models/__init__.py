@@ -10,6 +10,11 @@ from app.models.product import Product
 from app.models.developer_issue import DeveloperIssue
 from app.models.sdk_scan import SdkScan
 from app.models.regulation import Regulation, RegulationArticle
+from app.models.regulatory_source import IngestionRun, RegulatorySource, SourceSnapshot
+from app.models.regulation_version import LegalUnit, RegulationVersion
+from app.models.requirement import Requirement
+from app.models.regulation_change import RegulationChange, RegulationEvent
+from app.models.legal_chunk import LegalChunk
 
 __all__ = [
     "AgentMemory",
@@ -25,4 +30,13 @@ __all__ = [
     "SdkScan",
     "Regulation",
     "RegulationArticle",
+    "RegulatorySource",
+    "SourceSnapshot",
+    "IngestionRun",
+    "RegulationVersion",
+    "LegalUnit",
+    "Requirement",
+    "RegulationChange",
+    "RegulationEvent",
+    "LegalChunk",
 ]
