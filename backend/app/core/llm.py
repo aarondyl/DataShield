@@ -31,6 +31,7 @@ class BaseLLMClient(ABC):
 
     #: provider 标识，写入分析结果的 llm_mode 字段
     provider_name: str = "base"
+    model_name: str = ""
 
     @abstractmethod
     def chat_json(
@@ -69,6 +70,7 @@ class ApiLLMClient(BaseLLMClient):
 
         self._client = OpenAI(api_key=settings.llm_api_key, base_url=settings.llm_base_url)
         self._model = settings.llm_model
+        self.model_name = settings.llm_model
 
     def chat_json(
         self,
@@ -403,10 +405,91 @@ def mock_actions(context: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def mock_remediation_code(context: dict[str, Any]) -> dict[str, Any]:
+    """Deterministic grounded code proposal for offline tests and demos."""
+
+    finding = context.get("finding") or {}
+    requirements = context.get("requirements") or []
+    allowed_paths = context.get("allowed_paths") or []
+    target_components = context.get("target_components") or []
+    requirement = requirements[0] if requirements else {}
+    target = (
+        allowed_paths[0]
+        if allowed_paths
+        else target_components[0]
+        if target_components
+        else f"{requirement.get('object_type') or 'affected product'} component"
+    )
+    potential = finding.get("gap_status") == "POTENTIAL"
+    change = (
+        "Verify the current implementation. If evidence confirms that a change is needed, "
+        "add or adjust the control described by the validated requirement."
+        if potential
+        else "Implement the control described by the validated requirement for the confirmed gap."
+    )
+    constraints = list(dict.fromkeys([
+        *(context.get("user_constraints") or []),
+        "Use only the supplied legal requirements and product evidence.",
+        "Preserve unrelated behavior.",
+    ]))
+    return {
+        "requested_changes": [{
+            "target": target,
+            "change": change,
+            "rationale": (
+                "Address the potential gap while preserving its uncertainty."
+                if potential else "Address the confirmed product gap."
+            ),
+        }],
+        "affected_files_or_components": [target],
+        "constraints": constraints,
+        "acceptance_criteria": [
+            "The implemented behavior satisfies the supplied required state and is covered by tests."
+        ],
+        "tests": [{
+            "name": "remediation behavior",
+            "purpose": "Verify the requested control using the supplied Finding context.",
+            "expected_result": "The required behavior is observable without changing unrelated behavior.",
+        }],
+        "do_not_modify": ["Unrelated product behavior and legal requirements"],
+    }
+
+
+def mock_remediation_document(context: dict[str, Any]) -> dict[str, Any]:
+    """Deterministic grounded document draft using only allowed evidence references."""
+
+    finding = context.get("finding") or {}
+    potential = finding.get("gap_status") == "POTENTIAL"
+    has_unknown = bool(context.get("has_unknown_facts"))
+    qualifier = "potentially required" if potential else "required"
+    placeholder = " [TO CONFIRM: verify product-specific details before publication.]" if has_unknown else ""
+    return {
+        "document_type": context.get("document_type") or "PRODUCT_DOCUMENTATION",
+        "proposed_changes": [{
+            "section": "Relevant product disclosure",
+            "change": f"Add a human-reviewed draft describing the {qualifier} product behavior.",
+            "rationale": (
+                "Reflect the potential gap without asserting that an unverified control is absent."
+                if potential else "Address the confirmed product documentation gap."
+            ),
+        }],
+        "draft_text": (
+            "DRAFT — REQUIRES HUMAN REVIEW. Describe the applicable product behavior using only "
+            f"verified product facts and the supplied legal requirement.{placeholder}"
+        ),
+        "draft_status": "DRAFT_REQUIRES_HUMAN_REVIEW",
+        "evidence": context.get("allowed_evidence_references") or [],
+        "acceptance_criteria": [
+            "A human reviewer confirms every product-specific statement before publication."
+        ],
+    }
+
+
 class MockLLMClient(BaseLLMClient):
     """离线 mock 客户端：根据 context["task"] 分发到确定性生成函数。"""
 
     provider_name = "mock"
+    model_name = "deterministic"
 
     def chat_json(
         self,
@@ -421,6 +504,10 @@ class MockLLMClient(BaseLLMClient):
             return mock_impact(context)
         if task == "actions":
             return mock_actions(context)
+        if task == "remediation-code":
+            return mock_remediation_code(context)
+        if task == "remediation-document":
+            return mock_remediation_document(context)
         # 未识别的任务类型：返回空对象，由调用方按"证据不足"降级处理
         return {}
 

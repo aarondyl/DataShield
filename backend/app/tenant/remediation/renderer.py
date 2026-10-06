@@ -8,6 +8,8 @@ from app.tenant.remediation.schemas import (
     AuthoritativeProblemFields,
     CodeChangePlan,
     CodeChangeProposal,
+    DocumentChangePlan,
+    DocumentChangeProposal,
     RemediationEvidenceReference,
     RemediationPlanningInput,
 )
@@ -158,4 +160,19 @@ def build_code_change_plan(
         **authoritative.model_dump(),
         **proposal.model_dump(),
         coding_prompt=render_coding_prompt(planning_input, proposal),
+    )
+
+
+def build_document_change_plan(
+    planning_input: RemediationPlanningInput,
+    proposal: DocumentChangeProposal,
+) -> DocumentChangePlan:
+    """Inject Finding/Gap facts into a validated document proposal."""
+
+    authoritative = build_authoritative_problem_fields(planning_input)
+    return DocumentChangePlan(
+        **proposal.model_dump(),
+        issue=authoritative.problem,
+        current_state=authoritative.current_state,
+        required_state=authoritative.required_state,
     )

@@ -170,18 +170,23 @@ class ProposedDocumentChange(Contract):
     rationale: str = Field(min_length=1, max_length=4000)
 
 
-class DocumentChangePlan(Contract):
-    """A draft recommendation. It is never an approved or applied document."""
+class DocumentChangeProposal(Contract):
+    """Planner-editable document fields without authoritative Finding facts."""
 
     document_type: str = Field(min_length=1, max_length=100)
-    issue: str = Field(min_length=1, max_length=4000)
-    current_state: str = Field(min_length=1, max_length=4000)
-    required_state: str = Field(min_length=1, max_length=4000)
     proposed_changes: list[ProposedDocumentChange] = Field(min_length=1, max_length=100)
     draft_text: str = Field(min_length=1, max_length=50000)
     draft_status: Literal["DRAFT_REQUIRES_HUMAN_REVIEW"] = "DRAFT_REQUIRES_HUMAN_REVIEW"
     evidence: list[RemediationEvidenceReference] = Field(min_length=1)
     acceptance_criteria: list[str] = Field(min_length=1, max_length=100)
+
+
+class DocumentChangePlan(DocumentChangeProposal):
+    """A draft recommendation. It is never an approved or applied document."""
+
+    issue: str = Field(min_length=1, max_length=4000)
+    current_state: str = Field(min_length=1, max_length=4000)
+    required_state: str = Field(min_length=1, max_length=4000)
 
 
 RemediationPlan = Annotated[CodeChangePlan | DocumentChangePlan, Field(union_mode="left_to_right")]

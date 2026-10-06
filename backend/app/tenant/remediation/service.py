@@ -208,7 +208,7 @@ def load_authoritative_gap_context(
     return results[0]
 
 
-def _load_authoritative_applicability(
+def load_authoritative_applicability_context(
     db: Session, finding: Finding, requirement_id: int
 ) -> ApplicabilityResult:
     run = _run_for_finding(db, finding)
@@ -347,7 +347,7 @@ def _create_remediation(
     validate_remediation_grounding(plan, requested_requirement_ids, requested_unit_ids)
 
     gap = load_authoritative_gap_context(db, finding)
-    applicability = _load_authoritative_applicability(db, finding, gap.requirement_id)
+    applicability = load_authoritative_applicability_context(db, finding, gap.requirement_id)
     _validate_planning_input(db, finding, planning_input, gap)
     if len(requested_requirement_ids) != len(planning_input.requirements):
         raise RemediationPersistenceError("Duplicate Requirement context is not allowed")

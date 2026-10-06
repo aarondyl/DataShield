@@ -3,7 +3,13 @@
 from app.tenant.remediation.renderer import (
     build_authoritative_problem_fields,
     build_code_change_plan,
+    build_document_change_plan,
     render_coding_prompt,
+)
+from app.tenant.remediation.planner import (
+    RemediationPlanningError,
+    plan_remediation,
+    select_relevant_product_facts,
 )
 from app.tenant.remediation.service import (
     RemediationConflictError,
@@ -13,6 +19,7 @@ from app.tenant.remediation.service import (
     create_remediation,
     get_remediation,
     list_remediations_for_finding,
+    load_authoritative_applicability_context,
     load_authoritative_gap_context,
     reject_remediation,
 )
@@ -22,6 +29,7 @@ from app.tenant.remediation.schemas import (
     CodeChangeProposal,
     CodeTestInstruction,
     DocumentChangePlan,
+    DocumentChangeProposal,
     ProposedDocumentChange,
     RemediationCreateRequest,
     RemediationDecisionRequest,
@@ -45,6 +53,7 @@ __all__ = [
     "CodeChangeProposal",
     "CodeTestInstruction",
     "DocumentChangePlan",
+    "DocumentChangeProposal",
     "ProposedDocumentChange",
     "RemediationCreateRequest",
     "RemediationDecisionRequest",
@@ -54,6 +63,7 @@ __all__ = [
     "RemediationInputSnapshot",
     "RemediationListItem",
     "RemediationPlanningInput",
+    "RemediationPlanningError",
     "RemediationProductTwinVersionReference",
     "RemediationRecord",
     "RemediationStatus",
@@ -65,11 +75,15 @@ __all__ = [
     "approve_remediation",
     "build_authoritative_problem_fields",
     "build_code_change_plan",
+    "build_document_change_plan",
     "create_remediation",
     "get_remediation",
     "list_remediations_for_finding",
+    "load_authoritative_applicability_context",
     "load_authoritative_gap_context",
     "reject_remediation",
+    "plan_remediation",
+    "select_relevant_product_facts",
     "render_coding_prompt",
     "validate_remediation_grounding",
 ]
