@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import actions, analysis, companies, compliance, developer, health, products, regintel, regulations
+from app.api import repository_understanding
 from app.core.config import get_settings
 from app.db.session import SessionLocal, init_db, is_sqlite
 from app.rag.retrieval import rebuild_local_store_from_db
@@ -68,6 +69,9 @@ app.add_middleware(
 
 for module in (health, companies, products, regulations, regintel, analysis, actions, compliance, developer):
     app.include_router(module.router, prefix="/api")
+
+app.include_router(repository_understanding.router)
+app.include_router(repository_understanding.router, prefix="/api", include_in_schema=False)
 
 # The production image serves the compiled React frontend from the same origin.
 # During development Vite runs separately and proxies /api to this service.
