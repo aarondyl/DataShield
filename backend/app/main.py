@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import actions, analysis, companies, compliance, developer, health, products, regintel, regulations
-from app.api import repository_understanding, website_understanding
+from app.api import product_twin, repository_understanding, website_understanding
 from app.core.config import get_settings
 from app.db.session import SessionLocal, init_db, is_sqlite
 from app.rag.retrieval import rebuild_local_store_from_db
@@ -74,6 +74,8 @@ app.include_router(website_understanding.router)
 app.include_router(website_understanding.router, prefix="/api", include_in_schema=False)
 app.include_router(repository_understanding.router)
 app.include_router(repository_understanding.router, prefix="/api", include_in_schema=False)
+app.include_router(product_twin.router)
+app.include_router(product_twin.router, prefix="/api", include_in_schema=False)
 
 # The production image serves the compiled React frontend from the same origin.
 # During development Vite runs separately and proxies /api to this service.

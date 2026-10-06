@@ -109,6 +109,8 @@ class AnalysisConflict(Contract):
 
 
 class RepositoryRequest(Contract):
+    company_id: int | None = Field(default=None, ge=1)
+    product_id: int | None = Field(default=None, ge=1)
     repository_path: str | None = Field(default=None, max_length=4096)
     analysis_mode: AccessMode = AccessMode.METADATA_ONLY
     selected_paths: list[str] = Field(default_factory=list, max_length=100)
@@ -116,6 +118,8 @@ class RepositoryRequest(Contract):
 
     @model_validator(mode="after")
     def validate_mode(self):
+        if (self.company_id is None) != (self.product_id is None):
+            raise ValueError("company_id and product_id must be supplied together")
         if self.analysis_mode != AccessMode.NO_REPOSITORY and not self.repository_path:
             raise ValueError("repository_path is required for this analysis mode")
         if self.analysis_mode == AccessMode.SELECTED_PATHS and not self.selected_paths:
@@ -124,14 +128,23 @@ class RepositoryRequest(Contract):
 
 
 class WebsiteRequest(Contract):
+    company_id: int | None = Field(default=None, ge=1)
+    product_id: int | None = Field(default=None, ge=1)
     url: str = Field(max_length=2048)
     max_depth: int = Field(default=2, ge=0, le=2)
     max_pages: int = Field(default=30, ge=1, le=30)
     product_description: str | None = Field(default=None, max_length=10000)
 
+    @model_validator(mode="after")
+    def validate_product(self):
+        if (self.company_id is None) != (self.product_id is None):
+            raise ValueError("company_id and product_id must be supplied together")
+        return self
+
 
 class AnalysisJob(Contract):
     analysis_id: str
+    product_id: int | None = None
     kind: Literal["repository", "website"]
     status: AnalysisStatus
     created_at: str
