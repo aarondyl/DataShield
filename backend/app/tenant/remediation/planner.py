@@ -46,6 +46,10 @@ class RemediationPlanningError(RuntimeError):
     """Raised when trusted planning input or structured model output is invalid."""
 
 
+class RemediationProviderError(RemediationPlanningError):
+    """Raised when the configured model provider cannot produce a response."""
+
+
 _SYSTEM_PROMPT = """You generate implementation recommendations grounded only in supplied evidence.
 
 Rules:
@@ -340,20 +344,19 @@ def _structured_proposal(
                 references=references,
             ),
         )
-        if not isinstance(raw, dict):
-            raise RemediationPlanningError("LLM remediation output is not a JSON object")
-        contract = (
-            CodeChangeProposal
-            if planning_input.planner_request.remediation_type == RemediationType.CODE_CHANGE
-            else DocumentChangeProposal
-        )
+    except Exception as exc:
+        raise RemediationProviderError(f"LLM remediation generation failed: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise RemediationPlanningError("LLM remediation output is not a JSON object")
+    contract = (
+        CodeChangeProposal
+        if planning_input.planner_request.remediation_type == RemediationType.CODE_CHANGE
+        else DocumentChangeProposal
+    )
+    try:
         return contract.model_validate(raw)
-    except RemediationPlanningError:
-        raise
     except ValidationError as exc:
         raise RemediationPlanningError(f"LLM remediation output failed schema validation: {exc}") from exc
-    except Exception as exc:
-        raise RemediationPlanningError(f"LLM remediation generation failed: {exc}") from exc
 
 
 def plan_remediation(
@@ -422,7 +425,7 @@ def plan_remediation(
     try:
         client = llm_client or get_llm_client()
     except Exception as exc:
-        raise RemediationPlanningError(f"LLM remediation client is unavailable: {exc}") from exc
+        raise RemediationProviderError(f"LLM remediation client is unavailable: {exc}") from exc
     proposal = _structured_proposal(
         client,
         planning_input,

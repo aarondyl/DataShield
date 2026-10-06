@@ -8,6 +8,7 @@ from app.tenant.remediation.renderer import (
 )
 from app.tenant.remediation.planner import (
     RemediationPlanningError,
+    RemediationProviderError,
     plan_remediation,
     select_relevant_product_facts,
 )
@@ -64,6 +65,7 @@ __all__ = [
     "RemediationListItem",
     "RemediationPlanningInput",
     "RemediationPlanningError",
+    "RemediationProviderError",
     "RemediationProductTwinVersionReference",
     "RemediationRecord",
     "RemediationStatus",
