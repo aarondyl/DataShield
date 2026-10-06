@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.models import Feedback, FeedbackCandidate, FeedbackCandidateRequirement, Finding, FindingRequirement, Remediation, ProductTwinFact, ProductTwinVersion
 from app.tenant.context.ownership import resolve_tenant_product
-from app.tenant.feedback.schemas import CandidateRecord, CandidateStatus, FactCorrectionProposal, FeedbackCreateRequest, validate_candidate_transition
+from app.tenant.feedback.schemas import CandidateRecord, CandidateStatus, FactCorrectionProposal, FeedbackCreateRequest, FeedbackRecord, validate_candidate_transition
 
 class FeedbackNotFoundError(RuntimeError): pass
 class FeedbackConflictError(RuntimeError): pass
@@ -65,6 +65,9 @@ def requirement_ids(db,candidate_id):
 
 def candidate_record(db,row):
     return CandidateRecord(id=row.id,feedback_id=row.feedback_id,tenant_id=row.tenant_id,product_id=row.product_id,candidate_type=row.candidate_type,status=row.status,target_fact_id=row.target_fact_id,proposed_name=row.proposed_name,proposed_value=row.proposed_value,proposed_status=row.proposed_status,reasoning_summary=row.reasoning_summary,confidence=row.confidence,clarification_question=row.clarification_question,clarification_answer=row.clarification_answer,applied_fact_id=row.applied_fact_id,applied_twin_version_id=row.applied_twin_version_id,reanalysis_run_id=row.reanalysis_run_id,last_error=row.last_error,requirement_ids=requirement_ids(db,row.id),created_at=row.created_at,updated_at=row.updated_at)
+
+def feedback_record(row):
+    return FeedbackRecord.model_validate({key:getattr(row,key) for key in FeedbackRecord.model_fields})
 
 def get_feedback(db: Session, tenant_id: int, feedback_id: int):
     row = db.scalar(select(Feedback).where(Feedback.id == feedback_id, Feedback.tenant_id == tenant_id))
