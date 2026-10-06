@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import actions, analysis, companies, compliance, developer, feedback, findings, health, products, regintel, regulations, remediations, tenant_agent
+from app.api import actions, analysis, companies, compliance, developer, feedback, findings, health, products, regintel, regulations, remediations, tenant_agent, ui_understanding
 from app.api import product_twin, repository_understanding, website_understanding
 from app.core.config import get_settings
 from app.db.session import SessionLocal, init_db, is_sqlite
@@ -70,7 +70,7 @@ app.add_middleware(
 for module in (health, companies, products, regulations, regintel, analysis, actions, compliance, developer):
     app.include_router(module.router, prefix="/api")
 
-for module in (tenant_agent, findings, remediations, feedback):
+for module in (tenant_agent, findings, remediations, feedback, ui_understanding):
     app.include_router(module.router, prefix="/api")
 
 app.include_router(website_understanding.router)
