@@ -17,13 +17,16 @@ from app.tenant.findings.service import (
     FindingPersistenceError,
     build_input_snapshot,
     create_agent_run,
+    create_pending_agent_run,
     load_finding,
+    list_findings,
     mark_run_completed,
     mark_run_failed,
     mark_run_needs_user_input,
     mark_run_running,
     persist_findings,
     persist_missing_context,
+    set_run_input_snapshot,
 )
 
 __all__ = [
@@ -41,11 +44,14 @@ __all__ = [
     "TenantTriggerType",
     "build_input_snapshot",
     "create_agent_run",
+    "create_pending_agent_run",
     "load_finding",
+    "list_findings",
     "mark_run_completed",
     "mark_run_failed",
     "mark_run_needs_user_input",
     "mark_run_running",
     "persist_findings",
     "persist_missing_context",
+    "set_run_input_snapshot",
 ]

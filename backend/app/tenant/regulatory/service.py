@@ -19,6 +19,7 @@ from app.regintel.service import (
 )
 from app.tenant.regulatory.schemas import (
     LegalEvidence,
+    ManualScanContext,
     RegulationSourceContext,
     RegulationTrigger,
     RequirementContext,
@@ -183,6 +184,30 @@ def load_requirement_contexts(
     """Load canonical Requirement rows as tenant-facing DTOs."""
 
     return [_requirement_context(db, item) for item in load_requirements(db, requirement_ids)]
+
+
+def resolve_requirements_for_manual_scan(
+    db: Session, scan: ManualScanContext
+) -> list[RequirementContext]:
+    """Resolve explicit ids first, then use the regintel search facade."""
+
+    if scan.requirement_ids:
+        items = load_requirements(db, scan.requirement_ids)
+        loaded_ids = {item.id for item in items}
+        missing_ids = [item for item in scan.requirement_ids if item not in loaded_ids]
+        if missing_ids:
+            raise InvalidRegulationTriggerError(
+                f"Manual scan references missing requirements: {missing_ids}"
+            )
+    elif scan.query.strip():
+        items = search_legal_requirements(
+            db,
+            scan.query,
+            regulation_ids=[scan.regulation_id] if scan.regulation_id else None,
+        )
+    else:
+        items = []
+    return [_requirement_context(db, item) for item in items]
 
 
 def resolve_requirements_for_trigger(

@@ -21,6 +21,15 @@ class TenantProductMismatchError(TenantOwnershipError):
     pass
 
 
+def resolve_tenant(db: Session, tenant_id: int) -> Company:
+    """Resolve the current Company-backed tenant compatibility identity."""
+
+    tenant = db.get(Company, tenant_id)
+    if tenant is None:
+        raise TenantNotFoundError(f"Tenant {tenant_id} does not exist")
+    return tenant
+
+
 def resolve_tenant_product(db: Session, tenant_id: int, product_id: int) -> Product:
     """Resolve a tenant-owned product through the current Company mapping.
 
@@ -28,8 +37,7 @@ def resolve_tenant_product(db: Session, tenant_id: int, product_id: int) -> Prod
     here lets a future Tenant model replace it without changing agent nodes.
     """
 
-    if db.get(Company, tenant_id) is None:
-        raise TenantNotFoundError(f"Tenant {tenant_id} does not exist")
+    resolve_tenant(db, tenant_id)
     product = db.get(Product, product_id)
     if product is None:
         raise ProductNotFoundError(f"Product {product_id} does not exist")

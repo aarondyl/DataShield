@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -19,12 +19,13 @@ from app.models import (
     TenantMissingContextItem,
 )
 from app.tenant.applicability.schemas import MissingContextItem
-from app.tenant.context.ownership import resolve_tenant_product
+from app.tenant.context.ownership import resolve_tenant, resolve_tenant_product
 from app.tenant.context.schemas import ProductContext
 from app.tenant.findings.schemas import (
     EvidenceSnapshot,
     FindingCandidate,
     FindingDetail,
+    FindingListItem,
     FindingEvidenceRecord,
     FindingRecord,
     TenantAgentInputSnapshot,
@@ -34,7 +35,7 @@ from app.tenant.findings.schemas import (
     TenantTriggerType,
 )
 from app.tenant.gap.schemas import GapStatus
-from app.tenant.regulatory.schemas import LegalEvidence, RegulationTrigger, RequirementContext
+from app.tenant.regulatory.schemas import LegalEvidence, ManualScanContext, RegulationTrigger, RequirementContext
 from app.tenant.regulatory.service import load_legal_evidence, load_requirement_contexts
 
 
@@ -68,7 +69,7 @@ def _sanitize(value):
 
 def build_input_snapshot(
     product_context: ProductContext,
-    trigger: RegulationTrigger,
+    trigger: RegulationTrigger | ManualScanContext,
     requirements: list[RequirementContext],
     legal_evidence: list[LegalEvidence],
 ) -> TenantAgentInputSnapshot:
@@ -82,6 +83,55 @@ def build_input_snapshot(
         legal_evidence=legal_evidence,
     ).model_dump(mode="json")
     return TenantAgentInputSnapshot.model_validate(_sanitize(raw))
+
+
+def create_pending_agent_run(
+    db: Session,
+    *,
+    tenant_id: int,
+    product_id: int,
+    trigger_type: TenantTriggerType,
+    trigger_id: str | None,
+    model_provider: str = "",
+    model_name: str = "",
+    prompt_version: str = "",
+) -> TenantAgentRun:
+    """Create a traceable run before its immutable analysis input is available."""
+
+    resolve_tenant_product(db, tenant_id, product_id)
+    run = TenantAgentRun(
+        tenant_id=tenant_id,
+        product_id=product_id,
+        trigger_type=trigger_type.value,
+        trigger_id=trigger_id,
+        status=TenantAgentRunStatus.PENDING.value,
+        model_provider=model_provider,
+        model_name=model_name,
+        prompt_version=prompt_version,
+        input_snapshot_json={},
+        output_json={},
+        error="",
+    )
+    db.add(run)
+    db.commit()
+    db.refresh(run)
+    return run
+
+
+def set_run_input_snapshot(
+    db: Session, run_id: int, input_snapshot: TenantAgentInputSnapshot
+) -> TenantAgentRun:
+    """Set the complete input once; later business logic cannot overwrite it."""
+
+    run = _owned_run(db, run_id)
+    if run.input_snapshot_json:
+        raise FindingPersistenceError("Tenant Agent input snapshot is immutable once set")
+    if input_snapshot.tenant_id != run.tenant_id or input_snapshot.product_id != run.product_id:
+        raise FindingPersistenceError("Input snapshot tenant/product does not match the run")
+    run.input_snapshot_json = _sanitize(input_snapshot.model_dump(mode="json"))
+    db.commit()
+    db.refresh(run)
+    return run
 
 
 def _owned_run(db: Session, run_id: int) -> TenantAgentRun:
@@ -309,6 +359,8 @@ def persist_findings(
     candidates: list[FindingCandidate],
     *,
     missing_context: list[MissingContextItem] | None = None,
+    applicability_results=None,
+    gap_results=None,
 ) -> list[Finding]:
     run = _owned_run(db, run_id)
     derived_missing = [
@@ -331,8 +383,10 @@ def persist_findings(
             if missing_context else TenantAgentRunStatus.COMPLETED
         )
         output = TenantAgentOutputSnapshot(
-            applicability_results=[item.applicability for item in candidates],
-            gap_results=[item.gap for item in candidates if item.gap is not None],
+            applicability_results=(applicability_results if applicability_results is not None
+                                   else [item.applicability for item in candidates]),
+            gap_results=(gap_results if gap_results is not None
+                         else [item.gap for item in candidates if item.gap is not None]),
             finding_ids=[item.id for item in findings],
             missing_context=missing_context,
             status=status,
@@ -430,3 +484,39 @@ def load_finding(db: Session, tenant_id: int, finding_id: int) -> FindingDetail 
         legal_evidence=canonical_evidence,
         evidence_snapshots=snapshots,
     )
+
+
+def list_findings(
+    db: Session,
+    tenant_id: int,
+    *,
+    product_id: int | None = None,
+    status: str | None = None,
+) -> list[FindingListItem]:
+    """List findings within one tenant boundary."""
+
+    resolve_tenant(db, tenant_id)
+    if product_id is not None:
+        resolve_tenant_product(db, tenant_id, product_id)
+    stmt = select(Finding).where(Finding.tenant_id == tenant_id)
+    if product_id is not None:
+        stmt = stmt.where(Finding.product_id == product_id)
+    if status is not None:
+        stmt = stmt.where(Finding.status == status)
+    rows = db.scalars(stmt.order_by(Finding.created_at.desc(), Finding.id.desc())).all()
+    result = []
+    for row in rows:
+        requirement_count = db.scalar(
+            select(func.count()).select_from(FindingRequirement)
+            .where(FindingRequirement.finding_id == row.id)
+        ) or 0
+        evidence_count = db.scalar(
+            select(func.count()).select_from(FindingEvidence)
+            .where(FindingEvidence.finding_id == row.id)
+        ) or 0
+        result.append(FindingListItem(
+            **_finding_record(row).model_dump(),
+            requirement_count=requirement_count,
+            evidence_count=evidence_count,
+        ))
+    return result

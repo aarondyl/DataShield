@@ -9,7 +9,7 @@ from pydantic import Field
 from app.tenant.applicability.schemas import ApplicabilityResult, MissingContextItem
 from app.tenant.context.schemas import ProductContext
 from app.tenant.gap.schemas import GapAnalysisResult
-from app.tenant.regulatory.schemas import LegalEvidence, RegulationTrigger, RequirementContext
+from app.tenant.regulatory.schemas import LegalEvidence, ManualScanContext, RegulationTrigger, RequirementContext
 from app.understanding.schemas import Confidence, Contract
 
 
@@ -47,7 +47,7 @@ class TenantAgentInputSnapshot(Contract):
     product_id: int = Field(ge=1)
     product_twin_version_id: int | None = None
     product_context: ProductContext
-    trigger: RegulationTrigger
+    trigger: RegulationTrigger | ManualScanContext
     requirements: list[RequirementContext] = Field(default_factory=list)
     legal_evidence: list[LegalEvidence] = Field(default_factory=list)
 

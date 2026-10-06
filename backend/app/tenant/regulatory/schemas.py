@@ -32,6 +32,14 @@ class RegulationTrigger(Contract):
     source: RegulationSourceContext
 
 
+class ManualScanContext(Contract):
+    """Explicit manual scan input; it is not represented as a fake event."""
+
+    regulation_id: int | None = Field(default=None, ge=1)
+    requirement_ids: list[int] = Field(default_factory=list)
+    query: str = Field(default="", max_length=2000)
+
+
 class RequirementContext(Contract):
     id: int
     regulation_id: int
