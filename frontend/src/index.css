@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --ds-ink:#17211b; --ds-muted:#69756d; --ds-subtle:#f4f6f2; --ds-paper:#fbfcfa;
+  --ds-line:#dde3dd; --ds-accent:#245d43; --ds-accent-soft:#e8f1ec; --ds-white:#fff;
+  --ds-shadow:0 18px 50px rgba(28,45,35,.08);
+}
+.ds-shell,.ds-public { color:var(--ds-ink); background:var(--ds-paper); font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif; }
+.ds-shell { min-height:100vh; display:grid; grid-template-columns:232px minmax(0,1fr); }
+.ds-sidebar { position:sticky; top:0; height:100vh; padding:28px 20px 20px; display:flex; flex-direction:column; border-right:1px solid var(--ds-line); background:rgba(255,255,255,.88); }
+.ds-brand { display:flex; align-items:center; gap:10px; color:var(--ds-ink); font-weight:680; letter-spacing:-.02em; }
+.ds-logo { width:30px; height:30px; display:grid; place-items:center; border-radius:9px; color:white; background:var(--ds-accent); font-size:13px; }
+.ds-workspace { margin:32px 0 25px; padding:14px; border:1px solid var(--ds-line); border-radius:12px; display:flex; flex-direction:column; gap:3px; background:var(--ds-paper); }
+.ds-workspace span,.ds-workspace small,.ds-profile small { color:var(--ds-muted); font-size:11px; }.ds-workspace strong { font-size:13px; }
+.ds-sidebar nav { display:flex; flex-direction:column; gap:4px; }
+.ds-nav-link { display:flex; align-items:center; gap:11px; padding:10px 11px; border-radius:9px; color:#536158; font-size:14px; }
+.ds-nav-link svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.ds-nav-link:hover { background:var(--ds-subtle); color:var(--ds-ink); }.ds-nav-link.active { color:var(--ds-accent); background:var(--ds-accent-soft); font-weight:600; }
+.ds-sidebar-bottom { margin-top:auto; border-top:1px solid var(--ds-line); padding-top:12px; }.ds-profile { display:flex; align-items:center; gap:10px; padding:14px 10px 3px; }.ds-profile>span { width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:#e4e8e3;font-size:12px; }.ds-profile div { display:flex;flex-direction:column;font-size:12px; }
+.ds-main { min-width:0; }.ds-page { max-width:1120px; margin:0 auto; padding:64px 56px 90px; }.ds-page-header { max-width:700px; }.ds-eyebrow { color:var(--ds-accent); font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; }.ds-page h1 { margin:12px 0 10px; font-size:38px; line-height:1.12; letter-spacing:-.035em; font-weight:620; }.ds-page-header p,.ds-empty p { color:var(--ds-muted); line-height:1.65; }
+.ds-empty { margin-top:70px; min-height:300px; display:grid; place-items:center; align-content:center; text-align:center; padding:50px; border:1px solid var(--ds-line); border-radius:18px; background:var(--ds-white); box-shadow:var(--ds-shadow); }.ds-empty-mark { width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:var(--ds-accent-soft);color:var(--ds-accent);font-weight:700; }.ds-empty h2 { margin:18px 0 4px;font-size:18px; }
+.ds-public { min-height:100vh; padding:0 6vw; }.ds-public nav { height:82px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--ds-line); }.ds-text-link { color:var(--ds-muted);font-size:14px; }.ds-public section { max-width:900px; min-height:calc(100vh - 82px); display:flex; flex-direction:column; justify-content:center; align-items:flex-start; padding:80px 0 13vh; }.ds-public h1 { max-width:800px;margin:19px 0;font-size:clamp(46px,6vw,82px);line-height:1.02;letter-spacing:-.055em;font-weight:580; }.ds-public p { max-width:620px;margin:0 0 34px;color:var(--ds-muted);font-size:18px;line-height:1.65; }.ds-button { display:inline-flex;align-items:center;gap:30px;padding:13px 18px;border-radius:10px;font-size:14px;font-weight:600; }.ds-button.primary { background:var(--ds-accent);color:white; }.ds-button:hover { transform:translateY(-1px); }
+@media(max-width:1100px){.ds-shell{grid-template-columns:200px minmax(0,1fr)}.ds-page{padding:48px 36px}.ds-sidebar{padding-inline:14px}}
+@media(max-width:760px){.ds-shell{display:block}.ds-sidebar{position:relative;height:auto;border-right:0;border-bottom:1px solid var(--ds-line)}.ds-sidebar nav{flex-direction:row;overflow:auto}.ds-workspace,.ds-sidebar-bottom{display:none}.ds-nav-link{white-space:nowrap}.ds-page{padding:36px 20px}.ds-page h1{font-size:32px}.ds-public{padding:0 22px}}
+
 body {
   @apply antialiased;
   margin: 0;
