@@ -197,3 +197,12 @@ def load_product_context(db: Session, tenant_id: int, product_id: int) -> Produc
     return _context(
         tenant_id, product_id, _legacy_facts(product, company), version=None, legacy=True
     )
+
+
+def load_product_context_version(db: Session, tenant_id: int, product_id: int, version_id: int) -> ProductContext:
+    resolve_tenant_product(db, tenant_id, product_id)
+    version = db.get(ProductTwinVersion, version_id)
+    if not version or version.product_id != product_id:
+        raise ValueError("Product Twin version does not belong to product")
+    rows = db.scalars(select(ProductTwinFact).where(ProductTwinFact.version_id == version.id).order_by(ProductTwinFact.id)).all()
+    return _context(tenant_id, product_id, [_twin_fact(row) for row in rows], version=version, legacy=False)

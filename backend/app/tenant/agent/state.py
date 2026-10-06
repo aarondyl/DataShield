@@ -22,6 +22,7 @@ class TenantAgentState(TypedDict, total=False):
     regulation_id: int | None
     requirement_ids: list[int]
     query: str
+    feedback_twin_version_id: int | None
     run_id: int | None
     product_context: ProductContext | None
     product_twin_version_id: int | None
