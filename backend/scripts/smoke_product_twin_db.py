@@ -1,6 +1,13 @@
 """Exercise Product Twin writes against an Alembic-migrated database."""
 
+from pathlib import Path
+import sys
+
 from sqlalchemy.orm import Session
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 from app.db.session import engine
 from app.models import Company, Product, ProductTwinVersion
