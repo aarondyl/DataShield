@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.models import Feedback, FeedbackCandidate, FeedbackCandidateRequirement, Finding, FindingRequirement, Remediation, ProductTwinFact, ProductTwinVersion
 from app.tenant.context.ownership import resolve_tenant_product
-from app.tenant.feedback.schemas import CandidateRecord, CandidateStatus, FactCorrectionProposal, FeedbackCreateRequest
+from app.tenant.feedback.schemas import CandidateRecord, CandidateStatus, FactCorrectionProposal, FeedbackCreateRequest, validate_candidate_transition
 
 class FeedbackNotFoundError(RuntimeError): pass
 class FeedbackConflictError(RuntimeError): pass
@@ -76,3 +76,9 @@ def get_feedback(db: Session, tenant_id: int, feedback_id: int):
 def list_feedback(db: Session, tenant_id: int, product_id: int):
     resolve_tenant_product(db, tenant_id, product_id)
     return list(db.scalars(select(Feedback).where(Feedback.tenant_id == tenant_id, Feedback.product_id == product_id).order_by(Feedback.id.desc())).all())
+
+def set_candidate_status(db: Session, tenant_id: int, candidate_id: int, target: CandidateStatus):
+    row=owned_candidate(db,tenant_id,candidate_id)
+    try: validate_candidate_transition(CandidateStatus(row.status),target)
+    except ValueError as exc: raise FeedbackConflictError(str(exc)) from exc
+    row.status=target.value; db.commit(); db.refresh(row); return row
