@@ -15,7 +15,9 @@ from typing import Annotated, Literal
 from pydantic import Field, model_validator
 
 from app.tenant.context.schemas import ProductFactContext
-from app.tenant.findings.schemas import ImpactLevel
+from app.tenant.applicability.schemas import ApplicabilityResult
+from app.tenant.findings.schemas import FindingRecord, ImpactLevel
+from app.tenant.gap.schemas import GapAnalysisResult
 from app.tenant.regulatory.schemas import LegalEvidence, RequirementContext
 from app.understanding.schemas import Confidence, Contract
 
@@ -120,6 +122,19 @@ class AuthoritativeProblemFields(Contract):
     required_state: str = Field(min_length=1, max_length=4000)
 
 
+class RemediationInputSnapshot(Contract):
+    """Minimal immutable input actually used to produce a remediation plan."""
+
+    finding: FindingRecord
+    applicability_result: ApplicabilityResult
+    gap_result: GapAnalysisResult
+    requirements: list[RequirementContext] = Field(min_length=1)
+    legal_evidence: list[LegalEvidence] = Field(min_length=1)
+    relevant_product_facts: list[ProductFactContext] = Field(default_factory=list)
+    planner_request: RemediationCreateRequest
+    product_twin_version_id: int | None = Field(default=None, ge=1)
+
+
 class RequestedCodeChange(Contract):
     target: str = Field(min_length=1, max_length=500)
     change: str = Field(min_length=1, max_length=4000)
@@ -184,7 +199,7 @@ class RemediationRecord(Contract):
     title: str = Field(min_length=1, max_length=300)
     summary: str = Field(min_length=1, max_length=4000)
     plan: RemediationPlan
-    input_snapshot: RemediationPlanningInput
+    input_snapshot: RemediationInputSnapshot
     product_twin_version_id: int | None = Field(default=None, ge=1)
     model_provider: str = Field(default="", max_length=50)
     model_name: str = Field(default="", max_length=100)
@@ -222,9 +237,16 @@ class RemediationListItem(Contract):
 
 class RemediationDetail(Contract):
     remediation: RemediationRecord
+    finding: FindingRecord
     requirements: list[RequirementContext] = Field(default_factory=list)
     legal_evidence: list[LegalEvidence] = Field(default_factory=list)
     evidence_references: list[RemediationEvidenceReference] = Field(default_factory=list)
+    product_twin_version: "RemediationProductTwinVersionReference | None" = None
+
+
+class RemediationProductTwinVersionReference(Contract):
+    id: int = Field(ge=1)
+    version_number: int = Field(ge=1)
 
 
 class RemediationGroundingError(ValueError):

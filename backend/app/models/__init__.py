@@ -23,6 +23,7 @@ from app.models.tenant_intelligence import (
     TenantAgentRun,
     TenantMissingContextItem,
 )
+from app.models.remediation import Remediation, RemediationEvidence, RemediationRequirement
 
 __all__ = [
     "AgentMemory",
@@ -56,4 +57,7 @@ __all__ = [
     "FindingRequirement",
     "TenantAgentRun",
     "TenantMissingContextItem",
+    "Remediation",
+    "RemediationEvidence",
+    "RemediationRequirement",
 ]

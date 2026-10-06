@@ -6,7 +6,9 @@ import pytest
 from pydantic import ValidationError
 
 from app.tenant.context.schemas import ProductFactContext
-from app.tenant.findings.schemas import ImpactLevel
+from app.tenant.applicability.schemas import ApplicabilityResult, DecisionSource
+from app.tenant.findings.schemas import FindingRecord, FindingRecordStatus, ImpactLevel
+from app.tenant.gap.schemas import GapAnalysisResult, GapStatus, GapType
 from app.tenant.regulatory.schemas import LegalEvidence, RequirementContext
 from app.tenant.remediation import (
     CodeChangePlan,
@@ -18,6 +20,7 @@ from app.tenant.remediation import (
     RemediationDecisionRequest,
     RemediationEvidenceReference,
     RemediationGroundingError,
+    RemediationInputSnapshot,
     RemediationPlanningInput,
     RemediationRecord,
     RemediationStatus,
@@ -166,6 +169,53 @@ def document_plan(reference: RemediationEvidenceReference | None = None) -> Docu
         draft_text="Draft: Users may request account deletion through the verified process.",
         evidence=[reference or evidence_reference()],
         acceptance_criteria=["A human reviewer verifies the draft against product behavior."],
+    )
+
+
+def remediation_snapshot(context: RemediationPlanningInput) -> RemediationInputSnapshot:
+    now = datetime(2026, 1, 1)
+    applicability = ApplicabilityResult(
+        requirement_id=7,
+        applies=True,
+        confidence=.9,
+        reasoning_summary=context.applicability_summary,
+        decision_source=DecisionSource.DETERMINISTIC,
+    )
+    gap = GapAnalysisResult(
+        requirement_id=7,
+        gap_status=GapStatus.POTENTIAL,
+        gap_type=GapType.INSUFFICIENT_EVIDENCE,
+        current_state=context.gap_current_state,
+        required_state=context.gap_required_state,
+        confidence=.72,
+        reasoning_summary=context.gap_summary,
+    )
+    return RemediationInputSnapshot(
+        finding=FindingRecord(
+            id=context.finding_id,
+            run_id=4,
+            tenant_id=context.tenant_id,
+            product_id=context.product_id,
+            trigger_type="MANUAL_SCAN",
+            title=context.finding_title,
+            status=FindingRecordStatus.OPEN,
+            impact_level=context.impact_level,
+            confidence=context.finding_confidence,
+            applicability_summary=context.applicability_summary,
+            gap_status=context.gap_status,
+            gap_type=context.gap_type,
+            gap_summary=context.gap_summary,
+            product_twin_version_id=context.product_twin_version_id,
+            created_at=now,
+            updated_at=now,
+        ),
+        applicability_result=applicability,
+        gap_result=gap,
+        requirements=context.requirements,
+        legal_evidence=context.legal_evidence,
+        relevant_product_facts=context.relevant_product_facts,
+        planner_request=context.planner_request,
+        product_twin_version_id=context.product_twin_version_id,
     )
 
 
@@ -325,7 +375,7 @@ def test_approved_means_accepted_recommendation_without_execution_state():
         title="Implement account deletion",
         summary="Approved recommendation; execution is outside this contract.",
         plan=build_code_change_plan(context, code_proposal()),
-        input_snapshot=context,
+        input_snapshot=remediation_snapshot(context),
         product_twin_version_id=context.product_twin_version_id,
         decision_note="Recommendation reviewed",
         decided_at=now,
