@@ -16,6 +16,13 @@ from app.models.regulation_version import LegalUnit, RegulationVersion
 from app.models.requirement import Requirement
 from app.models.regulation_change import RegulationChange, RegulationEvent
 from app.models.legal_chunk import LegalChunk
+from app.models.tenant_intelligence import (
+    Finding,
+    FindingEvidence,
+    FindingRequirement,
+    TenantAgentRun,
+    TenantMissingContextItem,
+)
 
 __all__ = [
     "AgentMemory",
@@ -44,4 +51,9 @@ __all__ = [
     "RegulationChange",
     "RegulationEvent",
     "LegalChunk",
+    "Finding",
+    "FindingEvidence",
+    "FindingRequirement",
+    "TenantAgentRun",
+    "TenantMissingContextItem",
 ]

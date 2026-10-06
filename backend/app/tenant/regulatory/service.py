@@ -177,6 +177,14 @@ def _requirement_context(db: Session, item: RequirementOut) -> RequirementContex
     )
 
 
+def load_requirement_contexts(
+    db: Session, requirement_ids: list[int]
+) -> list[RequirementContext]:
+    """Load canonical Requirement rows as tenant-facing DTOs."""
+
+    return [_requirement_context(db, item) for item in load_requirements(db, requirement_ids)]
+
+
 def resolve_requirements_for_trigger(
     db: Session, trigger: RegulationTrigger
 ) -> list[RequirementContext]:

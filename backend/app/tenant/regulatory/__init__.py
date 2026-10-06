@@ -13,6 +13,7 @@ from app.tenant.regulatory.service import (
     TriggerDataConflictError,
     UnsupportedRegulationEventError,
     load_legal_evidence,
+    load_requirement_contexts,
     load_regulation_trigger,
     resolve_requirements_for_trigger,
 )
@@ -28,6 +29,7 @@ __all__ = [
     "TriggerDataConflictError",
     "UnsupportedRegulationEventError",
     "load_legal_evidence",
+    "load_requirement_contexts",
     "load_regulation_trigger",
     "resolve_requirements_for_trigger",
 ]
