@@ -236,9 +236,11 @@ class TestRegulations:
         detail = resp.json()
         assert detail["articles"], "详情应含条款数组"
         numbers = {a["article_number"] for a in detail["articles"]}
-        assert "第9条" in numbers and "第44条" in numbers
-        # 种子内容带 DEMO 标注
-        assert "[DEMO SUMMARY]" in detail["articles"][0]["content"]
+        assert "Article 9" in numbers and "Article 44" in numbers
+        # 种子内容为真实法条全文（全局法规智能层入库；长条款按片段多行存放）
+        article9 = next(a for a in detail["articles"] if a["article_number"] == "Article 9")
+        assert len(article9["content"]) > 100
+        assert "基因" in article9["content"] or "genetic" in article9["content"].lower()
 
     def test_upload_regulation_text(self, client: TestClient):
         """上传 txt 法规 → 解析 → 切分 → 入库。"""
