@@ -7,6 +7,7 @@ from app.models.chat import ChatMessage, ChatThread
 from app.models.company import Company
 from app.models.memory import AgentMemory
 from app.models.product import Product
+from app.models.product_twin import ProductTwinAnalysisRef, ProductTwinDecision, ProductTwinFact, ProductTwinVersion
 from app.models.developer_issue import DeveloperIssue
 from app.models.sdk_scan import SdkScan
 from app.models.regulation import Regulation, RegulationArticle
@@ -26,6 +27,10 @@ __all__ = [
     "Assessment",
     "ImpactResult",
     "Product",
+    "ProductTwinAnalysisRef",
+    "ProductTwinDecision",
+    "ProductTwinFact",
+    "ProductTwinVersion",
     "DeveloperIssue",
     "SdkScan",
     "Regulation",

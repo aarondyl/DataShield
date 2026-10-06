@@ -74,6 +74,14 @@ def init_db() -> None:
             connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
 
     Base.metadata.create_all(bind=engine)
+    # Existing Vercel databases may have the pre-Alembic understanding job table.
+    # Migration 0005 owns the schema; retain the established startup compatibility
+    # path for deployments that start the ASGI app without invoking Alembic.
+    if "product_understanding_jobs" in inspect(engine).get_table_names():
+        job_columns = {column["name"] for column in inspect(engine).get_columns("product_understanding_jobs")}
+        if "product_id" not in job_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE product_understanding_jobs ADD COLUMN product_id INTEGER"))
     # Vercel starts the ASGI app directly (without an Alembic command). Keep
     # additive profile fields compatible with databases created by older builds.
     product_columns = {column["name"] for column in inspect(engine).get_columns("products")}
