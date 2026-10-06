@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     embedding_dim: int = 384
     retrieval_top_k: int = 5
     run_seed: bool = True
+    # 全局法规智能层定时轮询（MVP 可选，默认关闭）
+    scheduler_enabled: bool = False
+    scheduler_interval_hours: int = 24
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

@@ -89,3 +89,19 @@ def init_db() -> None:
         connection.execute(text("UPDATE products SET uses_third_party_sdk = FALSE WHERE uses_third_party_sdk IS NULL"))
         connection.execute(text("UPDATE products SET third_party_sdks = '[]' WHERE third_party_sdks IS NULL"))
         connection.execute(text("UPDATE products SET privacy_policy_text = '' WHERE privacy_policy_text IS NULL"))
+        # 全局法规智能层：regulations 扩展列兼容旧库
+        regulation_columns = {column["name"] for column in inspect(engine).get_columns("regulations")}
+        regulation_additions = {
+            "official_identifier": "VARCHAR(200) DEFAULT ''",
+            "title": "VARCHAR(500) DEFAULT ''",
+            "short_name": "VARCHAR(100) DEFAULT ''",
+            "authority": "VARCHAR(200) DEFAULT ''",
+            "document_type": "VARCHAR(50) DEFAULT ''",
+            "status": "VARCHAR(20) DEFAULT 'in_force'",
+            "original_language": "VARCHAR(20) DEFAULT ''",
+            "canonical_source_url": "VARCHAR(500) DEFAULT ''",
+            "current_version_id": "INTEGER",
+        }
+        for name, sql_type in regulation_additions.items():
+            if name not in regulation_columns:
+                connection.execute(text(f"ALTER TABLE regulations ADD COLUMN {name} {sql_type}"))
