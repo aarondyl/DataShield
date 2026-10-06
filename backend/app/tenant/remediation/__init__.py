@@ -1,0 +1,51 @@
+"""Grounded remediation planning contracts and deterministic renderers."""
+
+from app.tenant.remediation.renderer import (
+    build_authoritative_problem_fields,
+    build_code_change_plan,
+    render_coding_prompt,
+)
+from app.tenant.remediation.schemas import (
+    AuthoritativeProblemFields,
+    CodeChangePlan,
+    CodeChangeProposal,
+    CodeTestInstruction,
+    DocumentChangePlan,
+    ProposedDocumentChange,
+    RemediationCreateRequest,
+    RemediationDecisionRequest,
+    RemediationDetail,
+    RemediationEvidenceReference,
+    RemediationGroundingError,
+    RemediationListItem,
+    RemediationPlanningInput,
+    RemediationRecord,
+    RemediationStatus,
+    RemediationType,
+    RequestedCodeChange,
+    validate_remediation_grounding,
+)
+
+__all__ = [
+    "AuthoritativeProblemFields",
+    "CodeChangePlan",
+    "CodeChangeProposal",
+    "CodeTestInstruction",
+    "DocumentChangePlan",
+    "ProposedDocumentChange",
+    "RemediationCreateRequest",
+    "RemediationDecisionRequest",
+    "RemediationDetail",
+    "RemediationEvidenceReference",
+    "RemediationGroundingError",
+    "RemediationListItem",
+    "RemediationPlanningInput",
+    "RemediationRecord",
+    "RemediationStatus",
+    "RemediationType",
+    "RequestedCodeChange",
+    "build_authoritative_problem_fields",
+    "build_code_change_plan",
+    "render_coding_prompt",
+    "validate_remediation_grounding",
+]
