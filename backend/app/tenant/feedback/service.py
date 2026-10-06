@@ -39,6 +39,22 @@ def create_feedback(db: Session, request: FeedbackCreateRequest, proposal: FactC
         return row,candidate
     except Exception: db.rollback(); raise
 
+def attach_candidate(db: Session, feedback: Feedback, proposal: FactCorrectionProposal, *, model_provider="", model_name="", prompt_version=""):
+    request = FeedbackCreateRequest(tenant_id=feedback.tenant_id, product_id=feedback.product_id,
+        finding_id=feedback.finding_id, remediation_id=feedback.remediation_id,
+        feedback_type=feedback.feedback_type, raw_text=feedback.raw_text, created_by=feedback.created_by,
+        useful=feedback.useful, negative_reason=feedback.negative_reason)
+    finding = _target(db, request)
+    if proposal.target_fact_id:
+        fact=db.get(ProductTwinFact,proposal.target_fact_id); version=db.get(ProductTwinVersion,fact.version_id) if fact else None
+        if not fact or not version or version.product_id != feedback.product_id: raise FeedbackGroundingError("Target fact is outside this product")
+    candidate=FeedbackCandidate(feedback_id=feedback.id,tenant_id=feedback.tenant_id,product_id=feedback.product_id,candidate_type=proposal.candidate_type.value,status=(CandidateStatus.NEEDS_CLARIFICATION if proposal.needs_clarification else CandidateStatus.PROPOSED).value,target_fact_id=proposal.target_fact_id,proposed_name=proposal.proposed_name,proposed_value=proposal.proposed_value,proposed_status=proposal.proposed_status.value if proposal.proposed_status else None,reasoning_summary=proposal.reasoning_summary,confidence=proposal.confidence,clarification_question=proposal.clarification_question,model_provider=model_provider,model_name=model_name,prompt_version=prompt_version)
+    try:
+        db.add(candidate); db.flush()
+        for rid in _requirements(db,finding.id if finding else 0): db.add(FeedbackCandidateRequirement(candidate_id=candidate.id,requirement_id=rid))
+        db.commit(); db.refresh(candidate); return candidate
+    except Exception: db.rollback(); raise
+
 def owned_candidate(db,tenant_id,candidate_id):
     row=db.scalar(select(FeedbackCandidate).where(FeedbackCandidate.id==candidate_id,FeedbackCandidate.tenant_id==tenant_id))
     if not row: raise FeedbackNotFoundError("Candidate does not exist for this tenant")

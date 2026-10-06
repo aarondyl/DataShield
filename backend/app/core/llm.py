@@ -508,6 +508,16 @@ class MockLLMClient(BaseLLMClient):
             return mock_remediation_code(context)
         if task == "remediation-document":
             return mock_remediation_document(context)
+        if task == "feedback-candidate":
+            facts = context.get("facts") or []
+            target = next((f for f in facts if "deletion" in f.get("name", "").lower()), facts[0] if facts else None)
+            raw = (context.get("clarification_answer") or context.get("raw_feedback") or "").lower()
+            ambiguous = not target or any(word in raw for word in ("maybe", "planning", "计划"))
+            return {"candidate_type":"FACT_CORRECTION","target_fact_id":target.get("fact_id") if target else None,
+                "proposed_name":target.get("name") if target else None,"proposed_value":True if not ambiguous else None,
+                "proposed_status":"PRESENT" if not ambiguous else None,"confidence":0.85 if not ambiguous else 0.4,
+                "reasoning_summary":"User feedback indicates an existing capability." if not ambiguous else "The feedback does not establish whether the capability is currently available.",
+                "needs_clarification":ambiguous,"clarification_question":"Is this capability currently available to users?" if ambiguous else None}
         # 未识别的任务类型：返回空对象，由调用方按"证据不足"降级处理
         return {}
 
