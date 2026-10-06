@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import {readSession} from '../features/auth/session'; import {readSetup} from '../features/onboarding/state';
 
 const nav = [
   { to: '/app/today', label: 'Today', icon: 'sun' },
@@ -20,14 +21,15 @@ function Icon({ name }: { name: string }) {
 }
 
 export default function AppShell() {
+  const session=readSession(),setup=readSetup();
   return <div className="ds-shell">
     <aside className="ds-sidebar">
       <NavLink to="/app/today" className="ds-brand"><span className="ds-logo">D</span><span>DataShield</span></NavLink>
-      <div className="ds-workspace"><span>Workspace</span><strong>My product</strong><small>Developer edition</small></div>
+      <div className="ds-workspace"><span>Workspace</span><strong>{setup?.productName||session?.companyName||'My product'}</strong><small>{session?.edition==='enterprise'?'Enterprise edition':'Developer edition'}</small></div>
       <nav aria-label="Primary navigation">{nav.map(item => <NavLink key={item.to} to={item.to} className={({isActive}) => `ds-nav-link${isActive ? ' active' : ''}`}><Icon name={item.icon}/><span>{item.label}</span></NavLink>)}</nav>
       <div className="ds-sidebar-bottom">
         <NavLink to="/app/settings" className="ds-nav-link"><Icon name="cube"/><span>Settings</span></NavLink>
-        <div className="ds-profile"><span>A</span><div><strong>Aaron</strong><small>Local workspace</small></div></div>
+        <div className="ds-profile"><span>{session?.name?.[0]?.toUpperCase()||'L'}</span><div><strong>{session?.name||'Local user'}</strong><small>Local evaluation session</small></div></div>
       </div>
     </aside>
     <main className="ds-main"><Outlet/></main>
