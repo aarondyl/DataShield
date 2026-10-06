@@ -24,6 +24,7 @@ from app.models.tenant_intelligence import (
     TenantMissingContextItem,
 )
 from app.models.remediation import Remediation, RemediationEvidence, RemediationRequirement
+from app.models.feedback import Feedback, FeedbackCandidate, FeedbackCandidateRequirement
 
 __all__ = [
     "AgentMemory",
@@ -60,4 +61,5 @@ __all__ = [
     "Remediation",
     "RemediationEvidence",
     "RemediationRequirement",
+    "Feedback", "FeedbackCandidate", "FeedbackCandidateRequirement",
 ]

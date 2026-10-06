@@ -9,7 +9,7 @@ def load_trigger(state: TenantAgentState) -> dict:
         with SessionLocal() as db:
             trigger = load_regulation_trigger(db, state.get("trigger_id") or "")
         return {"regulation_trigger": trigger, "manual_scan": None}
-    if state["trigger_type"] == "MANUAL_SCAN":
+    if state["trigger_type"] in {"MANUAL_SCAN", "FEEDBACK_REANALYSIS"}:
         scan = ManualScanContext(
             regulation_id=state.get("regulation_id"),
             requirement_ids=state.get("requirement_ids", []),
