@@ -1,5 +1,8 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import {readSession} from '../features/auth/session'; import {readSetup} from '../features/onboarding/state';
+import { useEffect, useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { fetchMe, type MeResponse } from '../api/auth';
+import { readSession, writeSession, type LocalSession } from '../features/auth/session'; import { readSetup } from '../features/onboarding/state';
+import Spinner from './Spinner';
 
 const nav = [
   { to: '/app/today', label: 'Today', icon: 'sun' },
@@ -21,7 +24,23 @@ function Icon({ name }: { name: string }) {
 }
 
 export default function AppShell() {
-  const session=readSession(),setup=readSetup();
+  const navigate=useNavigate();
+  const [session,setSession]=useState<LocalSession|null>(readSession());
+  const [me,setMe]=useState<MeResponse|null>(null);
+  const [checking,setChecking]=useState(true);
+  useEffect(()=>{let stopped=false;
+    fetchMe().then(result=>{if(stopped)return;setMe(result);
+      const previous=readSession();
+      const next:LocalSession='user_id' in result
+        ?{name:previous?.name||result.email.split('@')[0],email:result.email,edition:result.edition,companyName:previous?.companyName,companyId:result.company_id}
+        :{name:previous?.name||'Demo',email:previous?.email||'demo@datashield.local',edition:previous?.edition||(result.edition==='enterprise'?'enterprise':'developer'),companyName:previous?.companyName||'Demo workspace',companyId:result.company_id};
+      writeSession(next);setSession(next);
+    }).catch(err=>{if(err?.response?.status===401)navigate('/login');
+    }).finally(()=>{if(!stopped)setChecking(false)});
+    return()=>{stopped=true}},[navigate]);
+  const setup=readSetup();
+  const isDemo=me!==null&&!('user_id' in me);
+  if(checking)return <Spinner text="Loading workspace…"/>;
   return <div className="ds-shell">
     <aside className="ds-sidebar">
       <NavLink to="/app/today" className="ds-brand"><span className="ds-logo">D</span><span>DataShield</span></NavLink>
@@ -29,7 +48,7 @@ export default function AppShell() {
       <nav aria-label="Primary navigation">{nav.map(item => <NavLink key={item.to} to={item.to} className={({isActive}) => `ds-nav-link${isActive ? ' active' : ''}`}><Icon name={item.icon}/><span>{item.label}</span></NavLink>)}</nav>
       <div className="ds-sidebar-bottom">
         <NavLink to="/app/settings" className="ds-nav-link"><Icon name="cube"/><span>Settings</span></NavLink>
-        <div className="ds-profile"><span>{session?.name?.[0]?.toUpperCase()||'L'}</span><div><strong>{session?.name||'Local user'}</strong><small>Local evaluation session</small></div></div>
+        <div className="ds-profile"><span>{(session?.name||session?.email||'D')[0].toUpperCase()}</span><div><strong>{session?.name||session?.email||'Demo'}</strong><small>{isDemo?'Demo workspace':session?.email||'Local evaluation session'}</small></div></div>
       </div>
     </aside>
     <main className="ds-main"><Outlet/></main>
