@@ -56,7 +56,7 @@ def signout(response:Response,principal:CurrentPrincipal=Depends(require_princip
 def demo(request: Request, response: Response, db: Session = Depends(get_db)):
     """Create an isolated, deterministic workspace whose findings use the real domain pipeline."""
     suffix = uuid.uuid4().hex[:10]
-    company = Company(name="Acme AI Labs", industry="Software", country="", target_markets=["EU", "US", "UK"], business_model="SaaS")
+    company = Company(name="Acme AI Labs", industry="Software", country="", target_markets=["EU", "US", "UK"], business_model="evaluation")
     db.add(company); db.flush()
     product = Product(company_id=company.id, name="Acme Research Assistant", description="AI-powered SaaS research assistant for uploaded documents.", target_markets=["EU", "US", "UK"], category="AI SaaS")
     db.add(product); db.flush()

@@ -75,6 +75,13 @@ export default {
       regulations: '法规中心',
     },
   },
+  legacyDisabled: {
+    eyebrow: '旧版工作区',
+    title: '旧版工作区已停用',
+    body: '企业版 / 开发者版旧工作区依赖的旧版接口在当前环境已关闭，页面数据无法加载。请前往新版体验完整的合规工作流。',
+    cta: '前往新版',
+    back: '返回首页',
+  },
   dashboard: {
     eyebrow: 'DATASHIELD 企业版 / {{name}}',
     yourCompany: '你的企业',

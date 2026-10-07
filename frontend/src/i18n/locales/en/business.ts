@@ -75,6 +75,13 @@ export default {
       regulations: 'Regulation center',
     },
   },
+  legacyDisabled: {
+    eyebrow: 'LEGACY WORKSPACE',
+    title: 'The legacy workspace is retired',
+    body: 'The classic Business / Developer workspaces rely on legacy APIs that are disabled in this environment, so this page cannot load its data. Open the new experience for the full compliance workflow.',
+    cta: 'Open the new experience',
+    back: 'Back to home',
+  },
   dashboard: {
     eyebrow: 'DATASHIELD ENTERPRISE / {{name}}',
     yourCompany: 'Your company',

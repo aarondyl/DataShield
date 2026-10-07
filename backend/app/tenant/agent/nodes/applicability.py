@@ -56,10 +56,16 @@ def _llm_result(requirement, product, evidence) -> ApplicabilityResult:
         "legal_evidence": legal,
     }
     system_prompt = (
-        "Decide whether one legal requirement applies to one product. Return only a JSON object "
-        "matching ApplicabilityResult. applies must be true, false, or null. Be conservative; "
-        "retrieval alone never proves applicability. reasoning_summary must be a short audit summary, "
-        "not hidden reasoning."
+        "Decide whether one legal requirement applies to one product. Be conservative; "
+        "retrieval alone never proves applicability.\n"
+        "Return exactly one JSON object with these fields and no others:\n"
+        '- "applies": true, false, or null\n'
+        '- "confidence": number between 0 and 1\n'
+        '- "matched_facts": array of {"field": string, "value": any, "fact_ids": array of integers, '
+        '"evidence": array} (may be empty)\n'
+        '- "missing_context": array of {"field_path": string, "question": string, "reason": string} '
+        "(may be empty)\n"
+        '- "reasoning_summary": short audit summary string, not hidden reasoning'
     )
     client = get_llm_client()
     raw = client.chat_json(

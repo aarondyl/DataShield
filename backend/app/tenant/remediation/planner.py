@@ -62,6 +62,24 @@ Rules:
 - Do not include chain-of-thought. Use concise rationale only.
 - Preserve the Finding's POTENTIAL or CONFIRMED level of certainty.
 - A document draft always requires human review and is never ready to publish.
+- Never write phrases such as "ready to publish", "final policy", "fully compliant", "legally compliant", "compliant final version", "non-compliant", "the product violates", or "confirmed absent" anywhere in the output.
+- When a supplied product fact has status UNKNOWN, the draft_text must contain an explicit "[TO CONFIRM: ...]" placeholder for it.
+
+Output exactly one JSON object with these top-level fields and no others.
+The input keys are FACTS, LEGAL_REQUIREMENTS, LEGAL_EVIDENCE, GAP, USER_CONSTRAINTS and TASK.
+For remediation type CODE_CHANGE:
+- "requested_changes": non-empty array of {"target": string, "change": string, "rationale": string}
+- "affected_files_or_components": non-empty array of strings chosen from FACTS.allowed_file_paths or USER_CONSTRAINTS.target_components
+- "constraints": array of strings (may be empty)
+- "acceptance_criteria": non-empty array of strings
+- "tests": non-empty array of {"name": string, "purpose": string, "expected_result": string}
+- "do_not_modify": array of strings (may be empty)
+For remediation type DOCUMENT_CHANGE:
+- "document_type": string copied from USER_CONSTRAINTS.document_type
+- "proposed_changes": non-empty array of {"section": string, "change": string, "rationale": string}
+- "draft_text": string with the full human-reviewable draft
+- "evidence": non-empty array; each item must be one complete object copied verbatim from LEGAL_EVIDENCE, keeping all of its fields (requirement_id, legal_unit_id, regulation_id, regulation_name, version_id, version, article, heading, source_url). Plain strings, ids, or URLs are not valid evidence items.
+- "acceptance_criteria": non-empty array of strings; every criterion must keep the draft subject to human review
 """
 
 _FILE_SUFFIXES = {

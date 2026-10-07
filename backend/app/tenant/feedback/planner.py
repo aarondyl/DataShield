@@ -10,8 +10,19 @@ from app.tenant.feedback.service import attach_candidate, create_feedback, owned
 
 class FeedbackPlanningError(ValueError): pass
 class FeedbackProviderError(RuntimeError): pass
-PROMPT_VERSION="feedback-candidate-v1"
-SYSTEM="""Interpret feedback only as a candidate. Never update state, invent product facts, legal references, or treat UNKNOWN as false. Return JSON only. If ambiguous, ask one discriminating question."""
+PROMPT_VERSION="feedback-candidate-v2"
+SYSTEM="""Interpret feedback only as a candidate. Never update state, invent product facts, legal references, or treat UNKNOWN as false. If ambiguous, ask one discriminating question.
+
+Return exactly one JSON object with these fields and no others:
+- "candidate_type": "FACT_CORRECTION"
+- "target_fact_id": integer or null (fact_id of a supplied fact when the feedback corrects it, else null)
+- "proposed_name": string or null (fact name; required when "needs_clarification" is false)
+- "proposed_value": any JSON value or null
+- "proposed_status": one of "PRESENT", "NOT_DETECTED", "PARTIAL", "UNKNOWN", or null (required when "needs_clarification" is false)
+- "confidence": number between 0 and 1
+- "reasoning_summary": short audit summary string (no chain-of-thought)
+- "needs_clarification": boolean
+- "clarification_question": string or null (required when "needs_clarification" is true)"""
 
 def _context(db, request):
     product=load_product_context(db,request.tenant_id,request.product_id)
