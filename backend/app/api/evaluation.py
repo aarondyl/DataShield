@@ -72,7 +72,7 @@ def demo(request: Request, response: Response, db: Session = Depends(get_db)):
     for group, name, fact_status in facts:
         db.add(ProductTwinFact(version_id=twin.id, group_name=group, name=name, status=fact_status, confidence=.95 if fact_status == "PRESENT" else .8, source_kind="USER", evidence=[{"type":"USER_DESCRIPTION","reason":"Provided during isolated demo setup"}], scan_scope={"type":"demo_seed"}, confirmation_status="CONFIRMED" if fact_status == "PRESENT" else "UNREVIEWED"))
     requirement = _demo_requirement(db); db.commit()
-    session, raw = issue_session(db, company.id, "developer")
+    session, raw = issue_session(db, company.id, "demo")
     response.set_cookie(COOKIE, raw, httponly=True, samesite="lax", secure=secure(request), path="/", max_age=7*86400)
     principal = CurrentPrincipal(session.id, session.evaluation_user_id, company.id, session.edition)
     result = run_tenant_analysis(TenantAnalyzeRequest(tenant_id=company.id, product_id=product.id, trigger_type="MANUAL_SCAN", requirement_ids=[requirement.id]), db, principal)

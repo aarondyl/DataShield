@@ -3,6 +3,7 @@ from fastapi import APIRouter,Depends,HTTPException,Query,status
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.evaluation_auth import CurrentPrincipal, require_company_access, require_principal, require_product_access, validate_browser_origin
+from app.core.llm import MockLLMClient
 from app.tenant.feedback.planner import FeedbackPlanningError,FeedbackProviderError,clarify_candidate,submit_feedback
 from app.tenant.feedback.product_twin import apply_confirmed_feedback_candidate
 from app.tenant.feedback.reanalysis import reanalyze_confirmed_candidate
@@ -21,7 +22,7 @@ def fail(exc):
 def create(payload:FeedbackCreateRequest,db:Session=Depends(get_db),principal:CurrentPrincipal=Depends(require_principal)):
     require_company_access(payload.tenant_id,principal); require_product_access(db,payload.product_id,principal)
     try:
-        row,candidate=submit_feedback(db,payload)
+        row,candidate=submit_feedback(db,payload,llm=MockLLMClient() if principal.edition=="demo" else None)
         return FeedbackSubmission(feedback=feedback_record(row),candidates=[candidate_record(db,candidate)])
     except Exception as exc: raise fail(exc) from exc
 
@@ -42,7 +43,7 @@ def candidate_detail(candidate_id:int,tenant_id:int=Query(ge=1),db:Session=Depen
 @router.post("/feedback-candidates/{candidate_id}/clarify",response_model=CandidateRecord)
 def clarify(candidate_id:int,payload:ClarificationRequest,db:Session=Depends(get_db),principal:CurrentPrincipal=Depends(require_principal)):
     require_company_access(payload.tenant_id,principal)
-    try: return candidate_record(db,clarify_candidate(db,payload.tenant_id,candidate_id,payload.answer))
+    try: return candidate_record(db,clarify_candidate(db,payload.tenant_id,candidate_id,payload.answer,llm=MockLLMClient() if principal.edition=="demo" else None))
     except Exception as exc: raise fail(exc) from exc
 
 def decide(candidate_id,payload,db,target):

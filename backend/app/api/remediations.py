@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.core.evaluation_auth import CurrentPrincipal, require_company_access, require_principal, validate_browser_origin
+from app.core.llm import MockLLMClient
 from app.tenant.remediation import (
     RemediationConflictError,
     RemediationCreateRequest,
@@ -54,7 +55,7 @@ def create_finding_remediation(
 ) -> RemediationDetail:
     require_company_access(request.tenant_id, principal)
     try:
-        return plan_remediation(db, request.tenant_id, finding_id, request)
+        return plan_remediation(db, request.tenant_id, finding_id, request, llm_client=MockLLMClient() if principal.edition == "demo" else None)
     except (
         RemediationNotFoundError,
         RemediationConflictError,
