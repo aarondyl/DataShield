@@ -22,7 +22,7 @@ from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
@@ -31,6 +31,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import actions, analysis, auth, companies, compliance, developer, evaluation, feedback, findings, health, products, regintel, regulations, remediations, tenant_agent, today, ui_understanding
 from app.api import product_twin, repository_understanding, website_understanding
 from app.core.config import get_settings
+from app.core.evaluation_auth import verify_runtime_token
 from app.db.session import SessionLocal, init_db, is_sqlite
 from app.rag.retrieval import rebuild_local_store_from_db
 from app.regintel.retrieval import rebuild_legal_chunk_store_from_db
@@ -81,6 +82,22 @@ async def prevent_stale_frontend_cache(request, call_next):
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
     return response
+
+
+@app.middleware("http")
+async def enforce_desktop_runtime_token(request, call_next):
+    """桌面模式下校验 Electron 主进程注入的运行时 token，防止本机进程盗用内嵌后端。
+
+    仅 desktop_mode 且环境变量 DATASHIELD_RUNTIME_TOKEN 存在时生效；
+    /api/health（主进程轮询就绪）与非 /api 路径（前端静态资源）放行。
+    """
+    path = request.url.path
+    if path.startswith("/api") and path != "/api/health":
+        try:
+            verify_runtime_token(request)
+        except HTTPException as exc:
+            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+    return await call_next(request)
 
 # 前端开发服务器（Vite 默认 5173）；桌面模式下渲染进程 Origin 不固定（dev 为
 # http://localhost:5173，生产 file:// 页面常为 null），放开为正则匹配。

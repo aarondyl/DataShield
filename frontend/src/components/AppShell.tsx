@@ -9,6 +9,7 @@ import LanguageSwitcher from './LanguageSwitcher';
 const nav = [
   { to: '/app/today', labelKey: 'today', icon: 'sun' },
   { to: '/app/monitor', labelKey: 'monitor', icon: 'pulse' },
+  { to: '/app/regulations', labelKey: 'regulations', icon: 'book' },
   { to: '/app/findings', labelKey: 'findings', icon: 'finding' },
   { to: '/app/actions', labelKey: 'actions', icon: 'check' },
   { to: '/app/product', labelKey: 'product', icon: 'cube' },
@@ -21,6 +22,7 @@ function Icon({ name }: { name: string }) {
     finding: <><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5M11 8v4M11 15h.01"/></>,
     check: <><rect x="3" y="3" width="18" height="18" rx="4"/><path d="m8 12 2.5 2.5L16 9"/></>,
     cube: <><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 7 9 5 9-5M12 12v10M3 7v10l9 5 9-5V7"/></>,
+    book: <><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></>,
   };
   return <svg viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>;
 }

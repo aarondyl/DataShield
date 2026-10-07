@@ -4,12 +4,17 @@
 //   后端由 `npm run dev:backend` 用系统 Python 启动（desktop_entry.py），
 //   preload 注入的 apiBase 指向 http://127.0.0.1:18321/api（可用 DESKTOP_DEV_API 覆盖）。
 // - 生产模式：spawn resources/datashield-backend/datashield-backend.exe
-//   （env 带 DATASHIELD_DATA_DIR=userData、DATASHIELD_FRONTEND_DIR=resources/frontend-dist），
-//   轮询 /api/health 就绪后加载 http://127.0.0.1:18321/（后端同源提供前端静态文件，
-//   避免 file:// 下 ES module 被 CORS 拦截导致的白屏）；退出时杀掉后端进程树。
+//   （env 带 DATASHIELD_DATA_DIR=%APPDATA%/DataShield、DATASHIELD_FRONTEND_DIR=resources/frontend-dist、
+//   DATASHIELD_RUNTIME_TOKEN=每次启动随机生成），轮询 /api/health 就绪后加载
+//   http://127.0.0.1:18321/（后端同源提供前端静态文件，避免 file:// 下 ES module 被
+//   CORS 拦截导致的白屏）；退出时杀掉后端进程树。
+// - 运行时 token：后端仅接受带 X-Runtime-Token 的 /api 请求（/api/health 除外），
+//   防止本机其他进程盗用 127.0.0.1:18321；渲染进程经 preload 的 IPC 拿 token。
 
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const { spawn, exec } = require('child_process');
+const crypto = require('crypto');
+const fs = require('fs');
 const path = require('path');
 const http = require('http');
 
@@ -17,8 +22,13 @@ const BACKEND_PORT = 18321;
 const HEALTH_URL = `http://127.0.0.1:${BACKEND_PORT}/api/health`;
 const isDev = !!process.env.DESKTOP_DEV;
 
+// 每次启动随机生成，只存于主进程内存并走进程环境变量，不落盘
+const runtimeToken = crypto.randomBytes(32).toString('hex');
+
 let mainWindow = null;
 let backendProcess = null;
+
+ipcMain.handle('datashield:runtime-token', () => runtimeToken);
 
 // 单例锁：重复启动时聚焦已有窗口
 if (!app.requestSingleInstanceLock()) {
@@ -55,8 +65,9 @@ function startBackend() {
   backendProcess = spawn(exe, [], {
     env: {
       ...process.env,
-      DATASHIELD_DATA_DIR: app.getPath('userData'),
+      DATASHIELD_DATA_DIR: resolveDataDir(),
       DATASHIELD_FRONTEND_DIR: path.join(process.resourcesPath, 'frontend-dist'),
+      DATASHIELD_RUNTIME_TOKEN: runtimeToken,
     },
     stdio: 'ignore',
     windowsHide: true,
@@ -65,6 +76,30 @@ function startBackend() {
     console.log(`后端进程退出，code=${code}`);
     backendProcess = null;
   });
+}
+
+// 数据目录统一为 <appData>/DataShield（Windows 即 %APPDATA%/DataShield），不再跟随
+// Electron 默认 userData（%APPDATA%/datashield-desktop）。旧目录里已有 datashield.db 时
+// 首次启动把它移动过去（跨盘失败则复制），其余工作数据（data/ 法规副本等）由后端自行重建。
+function resolveDataDir() {
+  const newDir = path.join(app.getPath('appData'), 'DataShield');
+  const oldDir = app.getPath('userData');
+  try {
+    const oldDb = path.join(oldDir, 'datashield.db');
+    const newDb = path.join(newDir, 'datashield.db');
+    if (oldDir !== newDir && fs.existsSync(oldDb) && !fs.existsSync(newDb)) {
+      fs.mkdirSync(newDir, { recursive: true });
+      try {
+        fs.renameSync(oldDb, newDb);
+      } catch {
+        fs.copyFileSync(oldDb, newDb);
+        fs.rmSync(oldDb, { force: true });
+      }
+    }
+  } catch (err) {
+    console.error('旧数据目录迁移失败（使用新目录重新初始化）:', err);
+  }
+  return newDir;
 }
 
 function waitForBackend(maxAttempts, intervalMs) {

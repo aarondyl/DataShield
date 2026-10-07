@@ -6,6 +6,8 @@ declare global {
     datashieldDesktop?: {
       /** 桌面模式下直连内嵌 FastAPI 的 API 根地址，如 http://127.0.0.1:18321/api */
       apiBase: string;
+      /** 向主进程取本次启动的运行时 token，请求头 X-Runtime-Token 使用 */
+      getToken: () => Promise<string>;
     };
   }
 }

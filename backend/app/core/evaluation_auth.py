@@ -1,5 +1,7 @@
 """Server-enforced identity and lightweight Origin validation for evaluation UI."""
 import hashlib
+import hmac
+import os
 import secrets
 from dataclasses import dataclass
 from datetime import datetime,timedelta
@@ -46,3 +48,13 @@ def validate_browser_origin(request:Request):
         if urlparse(origin).hostname in {"127.0.0.1","localhost"}: return
     allowed={x.strip() for x in get_settings().application_origins.split(",") if x.strip()}
     if origin not in allowed: raise HTTPException(403,"Request origin is not allowed")
+def expected_runtime_token()->str|None:
+    # token 只走进程环境变量（由 Electron 主进程 spawn 时注入），不入配置文件
+    if not get_settings().desktop_mode: return None
+    return os.environ.get("DATASHIELD_RUNTIME_TOKEN") or None
+def verify_runtime_token(request:Request):
+    """FastAPI 依赖：桌面模式且注入 token 时，要求 X-Runtime-Token 匹配，否则 401。"""
+    expected=expected_runtime_token()
+    if expected is None: return
+    provided=request.headers.get("x-runtime-token","")
+    if not hmac.compare_digest(provided,expected): raise HTTPException(401,"Invalid runtime token")
