@@ -6,6 +6,7 @@ from pydantic import BaseModel,Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.db.session import get_db
+from app.core.evaluation_auth import CurrentPrincipal, require_company_access, require_principal
 from app.models import FeedbackCandidate,Finding,Remediation,TenantAgentRun,TenantMissingContextItem
 from app.tenant.context.ownership import resolve_tenant_product
 router=APIRouter(prefix="/v1/today",tags=["Tenant Today"])
@@ -14,7 +15,8 @@ class AttentionItem(BaseModel):
 class TodayResponse(BaseModel):
     needs_review:list[AttentionItem]=Field(default_factory=list); waiting_for_you:list[AttentionItem]=Field(default_factory=list); recently_completed:list[AttentionItem]=Field(default_factory=list)
 @router.get("",response_model=TodayResponse)
-def today(tenant_id:int=Query(ge=1),product_id:int=Query(ge=1),db:Session=Depends(get_db)):
+def today(tenant_id:int=Query(ge=1),product_id:int=Query(ge=1),db:Session=Depends(get_db),principal:CurrentPrincipal=Depends(require_principal)):
+    require_company_access(tenant_id, principal)
     resolve_tenant_product(db,tenant_id,product_id); out=TodayResponse()
     for f in db.scalars(select(Finding).where(Finding.tenant_id==tenant_id,Finding.product_id==product_id).order_by(Finding.created_at.desc())).all():
         item=AttentionItem(id=f"finding:{f.id}",type="FINDING",title=f.title,summary=f.gap_summary,severity=f.impact_level,status=f.status,product_id=product_id,created_at=f.created_at,target_route=f"/app/findings/{f.id}",target={"finding_id":f.id})

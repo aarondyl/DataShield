@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.core.evaluation_auth import CurrentPrincipal, require_company_access, require_principal, validate_browser_origin
 from app.tenant.remediation import (
     RemediationConflictError,
     RemediationCreateRequest,
@@ -22,7 +23,7 @@ from app.tenant.remediation import (
     reject_remediation,
 )
 
-router = APIRouter(prefix="/v1", tags=["Tenant Intelligence Remediations"])
+router = APIRouter(prefix="/v1", tags=["Tenant Intelligence Remediations"], dependencies=[Depends(validate_browser_origin)])
 
 
 def _domain_error(exc: Exception) -> HTTPException:
@@ -49,7 +50,9 @@ def create_finding_remediation(
     finding_id: int,
     request: RemediationCreateRequest,
     db: Session = Depends(get_db),
+    principal: CurrentPrincipal = Depends(require_principal),
 ) -> RemediationDetail:
+    require_company_access(request.tenant_id, principal)
     try:
         return plan_remediation(db, request.tenant_id, finding_id, request)
     except (
@@ -71,7 +74,9 @@ def list_finding_remediations(
     finding_id: int,
     tenant_id: int = Query(ge=1),
     db: Session = Depends(get_db),
+    principal: CurrentPrincipal = Depends(require_principal),
 ) -> list[RemediationListItem]:
+    require_company_access(tenant_id, principal)
     try:
         return list_remediations_for_finding(db, tenant_id, finding_id)
     except (RemediationNotFoundError, RemediationPersistenceError) as exc:
@@ -83,7 +88,9 @@ def remediation_detail(
     remediation_id: int,
     tenant_id: int = Query(ge=1),
     db: Session = Depends(get_db),
+    principal: CurrentPrincipal = Depends(require_principal),
 ) -> RemediationDetail:
+    require_company_access(tenant_id, principal)
     try:
         return get_remediation(db, tenant_id, remediation_id)
     except (RemediationNotFoundError, RemediationPersistenceError) as exc:
@@ -114,7 +121,9 @@ def approve(
     remediation_id: int,
     request: RemediationDecisionRequest,
     db: Session = Depends(get_db),
+    principal: CurrentPrincipal = Depends(require_principal),
 ) -> RemediationDetail:
+    require_company_access(request.tenant_id, principal)
     return _decide(remediation_id, request, db, approve=True)
 
 
@@ -123,5 +132,7 @@ def reject(
     remediation_id: int,
     request: RemediationDecisionRequest,
     db: Session = Depends(get_db),
+    principal: CurrentPrincipal = Depends(require_principal),
 ) -> RemediationDetail:
+    require_company_access(request.tenant_id, principal)
     return _decide(remediation_id, request, db, approve=False)

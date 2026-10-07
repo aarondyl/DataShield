@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.evaluation_auth import CurrentPrincipal, require_company_access, require_principal, require_product_access, validate_browser_origin
 from app.db.session import get_db
 from app.tenant.agent.graph import get_tenant_graph
 from app.tenant.agent.schemas import TenantAnalyzeRequest, TenantAnalyzeResponse
@@ -25,7 +26,7 @@ from app.tenant.regulatory.service import (
     UnsupportedRegulationEventError,
 )
 
-router = APIRouter(prefix="/v1/tenant-agent", tags=["Tenant Intelligence"])
+router = APIRouter(prefix="/v1/tenant-agent", tags=["Tenant Intelligence"], dependencies=[Depends(validate_browser_origin)])
 
 
 def _deduplicate_questions(items):
@@ -33,7 +34,9 @@ def _deduplicate_questions(items):
 
 
 @router.post("/analyze", response_model=TenantAnalyzeResponse, status_code=201)
-def analyze(payload: TenantAnalyzeRequest, db: Session = Depends(get_db)) -> TenantAnalyzeResponse:
+def analyze(payload: TenantAnalyzeRequest, db: Session = Depends(get_db), principal: CurrentPrincipal = Depends(require_principal)) -> TenantAnalyzeResponse:
+    require_company_access(payload.tenant_id, principal)
+    require_product_access(db, payload.product_id, principal)
     settings = get_settings()
     try:
         run = create_pending_agent_run(
