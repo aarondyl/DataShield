@@ -15,6 +15,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api import actions, analysis, companies, compliance, developer, evaluation, feedback, findings, health, products, regintel, regulations, remediations, tenant_agent, today, ui_understanding
@@ -47,6 +48,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(title="DataShield API", version="3.0.0", lifespan=lifespan)
 
+_LEGACY_TENANT_PREFIXES = (
+    "/api/companies", "/api/products", "/api/analysis", "/api/actions",
+    "/api/compliance", "/api/developer",
+)
+
+
+@app.middleware("http")
+async def guard_legacy_tenant_apis(request, call_next):
+    """Keep old routes available for trusted deployments but closed in shared previews."""
+    if not get_settings().legacy_tenant_api_enabled and request.url.path.startswith(_LEGACY_TENANT_PREFIXES):
+        return JSONResponse({"detail": "Legacy tenant API is disabled"}, status_code=404)
+    return await call_next(request)
+
 
 @app.middleware("http")
 async def prevent_stale_frontend_cache(request, call_next):
@@ -61,7 +75,7 @@ async def prevent_stale_frontend_cache(request, call_next):
 # 前端开发服务器（Vite 默认 5173）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=[origin.strip() for origin in get_settings().application_origins.split(",") if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

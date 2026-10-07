@@ -5,7 +5,17 @@ from sqlalchemy import select
 
 from app.db.session import SessionLocal
 from app.main import app
+from app.core.config import get_settings
 from app.models import EvaluationSession
+
+import pytest
+
+@pytest.fixture(autouse=True)
+def enforce_auth(monkeypatch):
+    monkeypatch.setenv("EVALUATION_AUTH_BYPASS", "false")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def _start(client: TestClient, company_name: str = "Isolated workspace"):
