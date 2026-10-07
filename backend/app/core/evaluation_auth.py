@@ -9,7 +9,7 @@ from fastapi import Cookie,Depends,HTTPException,Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.db.session import get_db
-from app.models import EvaluationSession,Product
+from app.models import EvaluationSession,Product,User
 from app.core.config import get_settings
 COOKIE="datashield_evaluation"
 @dataclass(frozen=True)
@@ -24,10 +24,13 @@ def get_current_principal(datashield_evaluation:str|None=Cookie(default=None),db
     row=db.scalar(select(EvaluationSession).where(EvaluationSession.token_hash==token_hash(datashield_evaluation)))
     if not row or row.revoked_at or row.expires_at<=datetime.utcnow(): return None
     return CurrentPrincipal(row.id,row.evaluation_user_id,row.company_id,row.edition)
-def require_principal(principal:CurrentPrincipal|None=Depends(get_current_principal)):
+def require_principal(principal:CurrentPrincipal|None=Depends(get_current_principal),db:Session=Depends(get_db)):
     if principal is None and get_settings().evaluation_auth_bypass:
         return CurrentPrincipal(0, "automated-test", 0, "developer")
     if principal is None: raise HTTPException(401,"Evaluation session required")
+    if principal.session_id:
+        disabled=db.scalar(select(User.disabled).join(EvaluationSession,EvaluationSession.user_id==User.id).where(EvaluationSession.id==principal.session_id))
+        if disabled: raise HTTPException(403,"Account disabled")
     return principal
 def require_company_access(requested:int,principal:CurrentPrincipal):
     if principal.session_id == 0 and get_settings().evaluation_auth_bypass: return

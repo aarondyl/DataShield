@@ -20,3 +20,55 @@
 .ds-legal-note{max-width:none;margin:0 0 80px;padding:15px 18px;border:1px solid var(--ds-line);border-radius:12px;background:var(--ds-subtle);color:var(--ds-muted);font-size:13px;line-height:1.6}
 @media(max-width:900px){.ds-feature-grid,.ds-plans-grid{grid-template-columns:1fr}.ds-flow{grid-template-columns:1fr 1fr}.ds-feature-sec{grid-template-columns:1fr;gap:26px}.ds-shot{min-height:200px}}
 @media(max-width:600px){.ds-flow{grid-template-columns:1fr}.ds-sec-head h2{font-size:28px}}
+/* Admin console (/admin): standalone page, gate + tabs + tables + dialogs */
+.ds-admin{min-height:100vh;background:var(--ds-paper);color:var(--ds-ink)}
+.ds-admin-nav{height:72px;padding:0 5vw;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--ds-line);background:white}
+.ds-admin-nav-actions{display:flex;align-items:center;gap:10px}
+.ds-admin-nav-actions .ds-button{padding:9px 14px;gap:10px}
+.ds-admin-body{max-width:1120px;margin:0 auto;padding:48px 5vw 90px}
+.ds-admin-body>header{max-width:700px}
+.ds-admin-body h1{margin:12px 0 10px;font-size:36px;letter-spacing:-.035em;font-weight:620}
+.ds-admin-body>header p{color:var(--ds-muted);line-height:1.65}
+.ds-admin-tabs{display:flex;gap:6px;margin:32px 0 24px;border-bottom:1px solid var(--ds-line)}
+.ds-admin-tabs button{padding:10px 14px;border:0;border-bottom:2px solid transparent;background:none;color:var(--ds-muted);font-size:14px;font-weight:600}
+.ds-admin-tabs button.active{color:var(--ds-accent);border-bottom-color:var(--ds-accent)}
+.ds-admin-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.ds-admin-card{padding:22px;border:1px solid var(--ds-line);border-radius:14px;background:white}
+.ds-admin-card span{color:var(--ds-muted);font-size:11px;text-transform:uppercase;letter-spacing:.08em}
+.ds-admin-card strong{display:block;margin-top:10px;font-size:30px;letter-spacing:-.03em}
+.ds-admin-table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--ds-line);border-radius:14px;overflow:hidden;background:white}
+.ds-admin-table th,.ds-admin-table td{padding:12px 14px;border-bottom:1px solid var(--ds-line);text-align:left;font-size:13px;vertical-align:top}
+.ds-admin-table tr:last-child td{border-bottom:0}
+.ds-admin-table th{background:var(--ds-subtle);color:var(--ds-muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.ds-admin-table td small{display:block;color:var(--ds-muted);font-size:11px}
+.ds-admin-status{display:inline-flex;padding:4px 8px;border-radius:6px;background:var(--ds-accent-soft);color:var(--ds-accent);font-size:10px;font-weight:700}
+.ds-admin-status.off{background:#f9ebe8;color:#9c4438}
+.ds-admin-actions{display:flex;gap:8px;flex-wrap:wrap}
+.ds-admin-actions button,.ds-admin-danger button{padding:8px 11px;border:1px solid var(--ds-line);border-radius:8px;background:white;color:var(--ds-ink);font-size:12px;font-weight:600}
+.ds-admin-actions button:hover{border-color:var(--ds-accent);color:var(--ds-accent)}
+.ds-admin-actions button.danger:hover,.ds-admin-danger button:hover{border-color:#c0867c;color:#9c4438}
+.ds-admin-notice{margin:0 0 18px;padding:12px 14px;border-radius:9px;background:var(--ds-accent-soft);color:var(--ds-accent);font-size:13px}
+.ds-admin-danger{margin-top:30px;padding:24px;border:1px solid #e5c7c0;border-radius:14px;background:#fdf6f4}
+.ds-admin-danger h2{margin:0 0 6px;font-size:17px;color:#9c4438}
+.ds-admin-danger p{margin:0 0 16px;color:var(--ds-muted);font-size:13px}
+.ds-admin-gate{min-height:100vh;display:grid;place-items:center;padding:24px;background:var(--ds-paper)}
+.ds-admin-gate form{width:100%;max-width:420px;padding:44px;border:1px solid var(--ds-line);border-radius:18px;background:white;box-shadow:var(--ds-shadow)}
+.ds-admin-gate h1{margin:18px 0 6px;font-size:26px;letter-spacing:-.03em}
+.ds-admin-gate p{margin:0 0 24px;color:var(--ds-muted);font-size:13px;line-height:1.6}
+.ds-admin-gate label{font-size:13px;font-weight:600}
+.ds-admin-gate input{display:block;width:100%;margin-top:7px;padding:12px 13px;border:1px solid var(--ds-line);border-radius:9px;background:var(--ds-paper);outline:none}
+.ds-admin-gate input:focus{border-color:var(--ds-accent);box-shadow:0 0 0 3px var(--ds-accent-soft)}
+.ds-admin-gate .ds-button{width:100%;justify-content:center;margin-top:16px;gap:10px}
+.ds-admin-gate-home{display:block;margin-top:16px;text-align:center;color:var(--ds-muted);font-size:12px}
+.ds-admin-gate-home:hover{color:var(--ds-accent)}
+.ds-admin-modal{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:24px;background:rgba(23,33,27,.4)}
+.ds-admin-dialog{width:100%;max-width:440px;padding:30px;border-radius:16px;background:white;box-shadow:var(--ds-shadow)}
+.ds-admin-dialog h2{margin:0 0 10px;font-size:19px}
+.ds-admin-dialog p{margin:0 0 20px;color:var(--ds-muted);font-size:13px;line-height:1.6}
+.ds-admin-dialog-actions{display:flex;justify-content:flex-end;gap:10px}
+.ds-admin-dialog-actions button{padding:10px 14px;border:1px solid var(--ds-line);border-radius:9px;background:white;font-size:13px;font-weight:600}
+.ds-admin-dialog-actions button.primary{background:var(--ds-accent);border-color:var(--ds-accent);color:white}
+.ds-admin-dialog-actions button.danger{background:#9c4438;border-color:#9c4438;color:white}
+.ds-admin-password{display:flex;align-items:center;gap:10px;margin:0 0 20px;padding:13px 14px;border:1px dashed var(--ds-line);border-radius:9px;background:var(--ds-subtle);font:16px/1.4 ui-monospace,monospace;word-break:break-all}
+@media(max-width:900px){.ds-admin-cards{grid-template-columns:1fr 1fr}.ds-admin-table{display:block;overflow-x:auto}}
+@media(max-width:600px){.ds-admin-cards{grid-template-columns:1fr}.ds-admin-body{padding-top:34px}.ds-admin-body h1{font-size:30px}}

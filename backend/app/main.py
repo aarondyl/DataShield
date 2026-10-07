@@ -28,7 +28,7 @@ from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import actions, analysis, auth, companies, compliance, developer, evaluation, feedback, findings, health, products, regintel, regulations, remediations, tenant_agent, today, ui_understanding
+from app.api import actions, admin, analysis, auth, companies, compliance, developer, evaluation, feedback, findings, health, products, regintel, regulations, remediations, tenant_agent, today, ui_understanding
 from app.api import product_twin, repository_understanding, website_understanding
 from app.core.config import get_settings
 from app.core.evaluation_auth import verify_runtime_token
@@ -117,7 +117,7 @@ app.add_middleware(
 for module in (health, companies, products, regulations, regintel, analysis, actions, compliance, developer):
     app.include_router(module.router, prefix="/api")
 
-for module in (evaluation, auth, tenant_agent, findings, remediations, feedback, today, ui_understanding):
+for module in (evaluation, auth, admin, tenant_agent, findings, remediations, feedback, today, ui_understanding):
     app.include_router(module.router, prefix="/api")
 
 app.include_router(website_understanding.router)

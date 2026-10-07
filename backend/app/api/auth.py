@@ -79,6 +79,8 @@ def login(payload: Login, request: Request, response: Response, db: Session = De
     user = db.scalar(select(User).where(User.email == payload.email))
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(401, "Invalid email or password")
+    if user.disabled:
+        raise HTTPException(403, "Account disabled")
     user.last_login_at = datetime.utcnow()
     db.commit(); db.refresh(user)
     _set_session_cookie(request, response, db, user)

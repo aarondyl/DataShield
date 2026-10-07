@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     desktop_mode: bool = False
     mailer_provider: str = "console"
     auth_require_email_verify: bool = False
+    # 管理后台 API 密钥（X-Admin-Key 请求头）；为空时 /v1/admin 端点返回 503
+    admin_api_key: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

@@ -117,3 +117,7 @@ def init_db() -> None:
         evaluation_columns = {column["name"] for column in inspect(engine).get_columns("evaluation_sessions")}
         if "user_id" not in evaluation_columns:
             connection.execute(text("ALTER TABLE evaluation_sessions ADD COLUMN user_id INTEGER"))
+        # 账户体系：users.disabled 禁用标记（旧库补列）
+        user_columns = {column["name"] for column in inspect(engine).get_columns("users")}
+        if "disabled" not in user_columns:
+            connection.execute(text("ALTER TABLE users ADD COLUMN disabled BOOLEAN DEFAULT FALSE"))
