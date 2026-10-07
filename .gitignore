@@ -28,3 +28,9 @@ Thumbs.db
 # 全局法规智能层运行时产物（种子入库时自动生成）
 backend/data/sources/
 backend/data/snapshots/
+
+# Electron / PyInstaller 预留
+desktop/dist/
+desktop/node_modules/
+backend/dist/
+backend/build/

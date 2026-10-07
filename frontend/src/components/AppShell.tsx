@@ -52,7 +52,7 @@ export default function AppShell() {
       <div className="ds-sidebar-bottom">
         <NavLink to="/app/settings" className="ds-nav-link"><Icon name="cube"/><span>{t('appnew.shell.settings')}</span></NavLink>
         <LanguageSwitcher/>
-        <div className="ds-profile"><span>{(session?.name||session?.email||'D')[0].toUpperCase()}</span><div><strong>{session?.name||session?.email||t('appnew.shell.demo')}</strong><small>{isDemo?t('appnew.shell.demoWorkspace'):session?.email||t('appnew.shell.localSession')}</small></div></div>
+        <div className="ds-profile" title={session?.email||undefined}><span>{(session?.name||session?.email||'D')[0].toUpperCase()}</span><div><strong>{session?.name||session?.email||t('appnew.shell.demo')}</strong><small>{isDemo?t('appnew.shell.demoWorkspace'):session?.email||t('appnew.shell.localSession')}</small></div></div>
       </div>
     </aside>
     <main className="ds-main"><Outlet/></main>

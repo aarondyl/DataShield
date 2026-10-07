@@ -1,5 +1,15 @@
 """FastAPI 应用入口：CORS、路由注册、启动时建表 + 种子数据 + 向量索引重建。
 
+当前路由分组（路由模块均位于 ``app.api``）：
+
+- ``auth``：注册 / 登录 / 会话（邮箱验证码、Bearer token），新版 AppShell 依赖 ``/api/auth/me``；
+- ``evaluation``：评估工作区（``evaluation``、``today``、``findings``、``remediations``、``feedback``、
+  ``ui_understanding``，以及 website / repository / product_twin 产品理解链路）；
+- ``tenant``：旧版租户 API（``companies``、``products``、``analysis``、``actions``、``compliance``、
+  ``developer``），共享预览环境可通过 ``LEGACY_TENANT_API_ENABLED=false`` 整体关闭；
+- ``regintel``：法规智能层（``regulations``、``regintel``，条文级法规库、版本追踪与检索）；
+- ``health``：健康检查。
+
 本地开发启动::
 
     DATABASE_URL=sqlite:///./datashield.db LLM_PROVIDER=mock EMBEDDING_PROVIDER=local \
