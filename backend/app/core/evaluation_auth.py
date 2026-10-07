@@ -39,5 +39,8 @@ def validate_browser_origin(request:Request):
     if request.method in {"GET","HEAD","OPTIONS"}: return
     if get_settings().evaluation_auth_bypass: return
     origin=request.headers.get("origin")
+    if get_settings().desktop_mode:
+        # Electron 渲染进程（file:// 页面或直连 127.0.0.1）发出的请求常无 Origin 或为 null
+        if origin is None or origin in {"null",""} or origin.startswith("file://"): return
     allowed={x.strip() for x in get_settings().application_origins.split(",") if x.strip()}
     if origin not in allowed: raise HTTPException(403,"Request origin is not allowed")

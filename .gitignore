@@ -34,3 +34,4 @@ desktop/dist/
 desktop/node_modules/
 backend/dist/
 backend/build/
+desktop/release/

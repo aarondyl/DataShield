@@ -6,6 +6,7 @@ from fastapi import APIRouter,Depends,HTTPException,Request,Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from app.core.config import get_settings
 from app.core.evaluation_auth import COOKIE,CurrentPrincipal,issue_session,require_principal,require_product_access,validate_browser_origin
 from app.db.session import get_db
 from app.models import Company,EvaluationSession,Product,ProductTwinFact,ProductTwinVersion,Regulation,RegulationVersion,LegalUnit,Requirement
@@ -18,7 +19,7 @@ class Start(BaseModel):
     company_name: str = Field(min_length=1, max_length=200)
     edition: Literal["developer", "enterprise"] = "developer"
 class ProductInput(BaseModel): name:str=Field(min_length=1,max_length=200);description:str=Field(default="",max_length=10000);markets:list[str]=Field(default_factory=list);category:str=Field(default="",max_length=100)
-def secure(request:Request): return request.url.scheme=="https" and request.url.hostname not in {"localhost","127.0.0.1"}
+def secure(request:Request): return not get_settings().desktop_mode and request.url.scheme=="https" and request.url.hostname not in {"localhost","127.0.0.1"}
 @router.post("/start",status_code=201,dependencies=[Depends(validate_browser_origin)])
 def start(payload:Start,request:Request,response:Response,db:Session=Depends(get_db)):
     company=Company(name=payload.company_name,industry="",country="",target_markets=[],business_model="evaluation");db.add(company);db.commit();db.refresh(company);session,raw=issue_session(db,company.id,payload.edition);response.set_cookie(COOKIE,raw,httponly=True,samesite="lax",secure=secure(request),path="/",max_age=7*86400);return {"company_id":company.id,"edition":session.edition,"name":payload.name,"email":payload.email,"expires_at":session.expires_at}

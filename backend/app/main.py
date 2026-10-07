@@ -82,13 +82,19 @@ async def prevent_stale_frontend_cache(request, call_next):
         response.headers["Expires"] = "0"
     return response
 
-# 前端开发服务器（Vite 默认 5173）
+# 前端开发服务器（Vite 默认 5173）；桌面模式下渲染进程 Origin 不固定（dev 为
+# http://localhost:5173，生产 file:// 页面常为 null），放开为正则匹配。
+_cors_kwargs = (
+    {"allow_origin_regex": ".*", "allow_origins": []}
+    if get_settings().desktop_mode
+    else {"allow_origins": [origin.strip() for origin in get_settings().application_origins.split(",") if origin.strip()]}
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[origin.strip() for origin in get_settings().application_origins.split(",") if origin.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    **_cors_kwargs,
 )
 
 for module in (health, companies, products, regulations, regintel, analysis, actions, compliance, developer):

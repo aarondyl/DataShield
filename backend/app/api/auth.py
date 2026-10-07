@@ -23,6 +23,8 @@ _verification_codes: dict[int, tuple[str, datetime]] = {}
 
 
 def secure(request: Request):
+    if get_settings().desktop_mode:
+        return False
     return request.url.scheme == "https" and request.url.hostname not in {"localhost", "127.0.0.1"}
 
 

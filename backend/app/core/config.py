@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     application_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     legacy_tenant_api_enabled: bool = False
     evaluation_auth_bypass: bool = False
+    # 桌面（Electron 内嵌后端）模式：放宽 Origin 校验、禁用 secure cookie
+    desktop_mode: bool = False
     mailer_provider: str = "console"
     auth_require_email_verify: bool = False
 

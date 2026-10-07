@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const client = axios.create({
-  baseURL: '/api',
+  baseURL: window.datashieldDesktop?.apiBase ?? '/api',
   timeout: 120000,
   withCredentials: true,
 });
