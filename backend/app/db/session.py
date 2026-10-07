@@ -113,3 +113,7 @@ def init_db() -> None:
         for name, sql_type in regulation_additions.items():
             if name not in regulation_columns:
                 connection.execute(text(f"ALTER TABLE regulations ADD COLUMN {name} {sql_type}"))
+        # 账户体系：evaluation_sessions 关联 users（旧库补列，users 表由 create_all 建）
+        evaluation_columns = {column["name"] for column in inspect(engine).get_columns("evaluation_sessions")}
+        if "user_id" not in evaluation_columns:
+            connection.execute(text("ALTER TABLE evaluation_sessions ADD COLUMN user_id INTEGER"))

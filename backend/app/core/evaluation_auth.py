@@ -13,9 +13,9 @@ COOKIE="datashield_evaluation"
 @dataclass(frozen=True)
 class CurrentPrincipal: session_id:int; user_id:str; company_id:int; edition:str
 def token_hash(token:str)->str:return hashlib.sha256(token.encode()).hexdigest()
-def issue_session(db:Session,company_id:int,edition:str):
+def issue_session(db:Session,company_id:int,edition:str,user_id:int|None=None):
     raw=secrets.token_urlsafe(48)
-    row=EvaluationSession(token_hash=token_hash(raw),evaluation_user_id=secrets.token_hex(16),company_id=company_id,edition=edition,expires_at=datetime.utcnow()+timedelta(days=get_settings().evaluation_session_days))
+    row=EvaluationSession(token_hash=token_hash(raw),evaluation_user_id=secrets.token_hex(16),company_id=company_id,edition=edition,user_id=user_id,expires_at=datetime.utcnow()+timedelta(days=get_settings().evaluation_session_days))
     db.add(row);db.commit();db.refresh(row);return row,raw
 def get_current_principal(datashield_evaluation:str|None=Cookie(default=None),db:Session=Depends(get_db)):
     if not datashield_evaluation: return None

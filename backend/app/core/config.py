@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     application_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     legacy_tenant_api_enabled: bool = False
     evaluation_auth_bypass: bool = False
+    mailer_provider: str = "console"
+    auth_require_email_verify: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

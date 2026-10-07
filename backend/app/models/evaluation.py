@@ -13,3 +13,4 @@ class EvaluationSession(Base):
     created_at:Mapped[datetime]=mapped_column(DateTime,server_default=func.now(),nullable=False)
     expires_at:Mapped[datetime]=mapped_column(DateTime,nullable=False,index=True)
     revoked_at:Mapped[datetime|None]=mapped_column(DateTime)
+    user_id:Mapped[int|None]=mapped_column(ForeignKey("users.id"),nullable=True)
