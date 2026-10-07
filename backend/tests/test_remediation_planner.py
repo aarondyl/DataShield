@@ -499,9 +499,9 @@ def test_potential_language_preserves_uncertainty(planner_db):
 def test_confirmed_gap_uses_clear_product_gap_language(planner_db):
     finding = _scenario(planner_db, gap_status=GapStatus.CONFIRMED)
     detail = plan_remediation(planner_db, 1, finding.id, _request())
-    assert "confirmed gap" in detail.remediation.summary
-    assert "confirmed product gap" in json.dumps(
-        detail.remediation.plan.model_dump(mode="json")
+    assert "已确认缺口" in detail.remediation.summary
+    assert "已确认的产品缺口" in json.dumps(
+        detail.remediation.plan.model_dump(mode="json"), ensure_ascii=False
     ).casefold()
 
 

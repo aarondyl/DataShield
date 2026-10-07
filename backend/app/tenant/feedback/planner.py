@@ -12,6 +12,7 @@ class FeedbackPlanningError(ValueError): pass
 class FeedbackProviderError(RuntimeError): pass
 PROMPT_VERSION="feedback-candidate-v2"
 SYSTEM="""Interpret feedback only as a candidate. Never update state, invent product facts, legal references, or treat UNKNOWN as false. If ambiguous, ask one discriminating question.
+All user-facing text in the JSON values (reasoning_summary, clarification_question) must be written in Simplified Chinese; keep field names and enum values in English.
 
 Return exactly one JSON object with these fields and no others:
 - "candidate_type": "FACT_CORRECTION"

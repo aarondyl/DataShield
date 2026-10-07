@@ -66,7 +66,7 @@ class JobStore:
         job.product_id = row.product_id
         if job.status in ("PENDING", "RUNNING") and datetime.fromisoformat(job.updated_at) < datetime.now(timezone.utc) - timedelta(minutes=15):
             job.status = "FAILED"
-            job.error = "Analysis interrupted or expired; submit a new request."
+            job.error = "分析已中断或超时，请重新提交请求。"
             self.save(job)
         return job
 
@@ -80,7 +80,7 @@ class JobStore:
         except Exception:
             # Exceptions can contain local paths, URL credentials, and source excerpts.
             job.status = "FAILED"
-            job.error = "Analysis could not complete safely. Check access and input, then retry."
+            job.error = "分析未能安全完成。请检查访问权限与输入后重试。"
         self.save(job)
 
 

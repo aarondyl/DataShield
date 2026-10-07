@@ -6,9 +6,11 @@
 """
 
 import hmac
+import platform
 import secrets
 import string
-from datetime import datetime
+import time
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy import delete, func, select, text, update
@@ -16,7 +18,8 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.passwords import hash_password
-from app.db.session import get_db
+from app.core.runtime import STARTED_AT
+from app.db.session import db_kind, get_db
 from app.models import (
     AnalysisRun,
     Assessment,
@@ -378,3 +381,97 @@ def reset_demo_data(db: Session = Depends(get_db)):
         "deleted_findings": len(finding_ids),
         "deleted_sessions": session_count,
     }
+
+
+# ---------------------------------------------------------------------------
+# System / RegIntel 运行状态
+# ---------------------------------------------------------------------------
+
+
+@router.get("/system")
+def system_info():
+    """后端运行时信息（版本 / 数据库 / LLM / 调度器 / 环境开关，均为非敏感字段）。"""
+    from app.main import app as fastapi_app  # 延迟导入，避免与 main 的循环依赖
+
+    settings = get_settings()
+    return {
+        "version": fastapi_app.version,
+        "db_kind": db_kind(),
+        "llm_provider": settings.llm_provider,
+        "llm_model": settings.llm_model,
+        "embedding_provider": settings.embedding_provider,
+        "scheduler_enabled": settings.scheduler_enabled,
+        "scheduler_interval_hours": settings.scheduler_interval_hours,
+        "started_at": datetime.fromtimestamp(STARTED_AT, tz=timezone.utc).isoformat(),
+        "uptime_seconds": round(time.time() - STARTED_AT, 3),
+        "python_version": platform.python_version(),
+        "env": {
+            "desktop_mode": settings.desktop_mode,
+            "legacy_tenant_api_enabled": settings.legacy_tenant_api_enabled,
+            "evaluation_auth_bypass": settings.evaluation_auth_bypass,
+            "run_seed": settings.run_seed,
+            "mailer_provider": settings.mailer_provider,
+        },
+    }
+
+
+def _ingestion_run_row(run: IngestionRun) -> dict:
+    return {
+        "id": run.id,
+        "source_id": run.source_id,
+        "regulation_id": run.regulation_id,
+        "status": run.status,
+        "started_at": run.started_at,
+        "finished_at": run.finished_at,
+        "from_version_id": run.from_version_id,
+        "to_version_id": run.to_version_id,
+        "changes_count": run.changes_count,
+        "requirements_count": run.requirements_count,
+        "chunks_count": run.chunks_count,
+        "error": run.error,
+        "event_id": run.event_id,
+    }
+
+
+@router.get("/regintel/status")
+def regintel_status(db: Session = Depends(get_db)):
+    """法规智能层运行状态：来源列表 / 最近入库运行 / 事件计数 / 调度器状态。"""
+    settings = get_settings()
+    latest_runs = db.scalars(
+        select(IngestionRun).order_by(IngestionRun.id.desc()).limit(10)
+    ).all()
+    latest_status_by_source: dict[int, str] = {}
+    for run in db.scalars(select(IngestionRun).order_by(IngestionRun.id.desc())).all():
+        if run.source_id is not None and run.source_id not in latest_status_by_source:
+            latest_status_by_source[run.source_id] = run.status
+    sources = [
+        {
+            "id": source.id,
+            "name": source.source_name,
+            "regulation_id": source.regulation_id,
+            "jurisdiction": source.jurisdiction,
+            "source_type": source.source_type,
+            "enabled": source.is_active,
+            "last_checked_at": source.last_checked_at,
+            "last_success_at": source.last_success_at,
+            "last_run_status": latest_status_by_source.get(source.id),
+        }
+        for source in db.scalars(select(RegulatorySource).order_by(RegulatorySource.priority)).all()
+    ]
+    return {
+        "sources": sources,
+        "recent_ingestion_runs": [_ingestion_run_row(run) for run in latest_runs],
+        "events_count": _count(db, RegulationEvent),
+        "scheduler": {
+            "enabled": settings.scheduler_enabled,
+            "interval_hours": settings.scheduler_interval_hours,
+        },
+    }
+
+
+@router.post("/regintel/sources/{source_id}/ingest", status_code=201)
+def ingest_source_admin(source_id: int, db: Session = Depends(get_db)):
+    """触发一次来源抓取 + 入库流水线（复用 regintel 公共端点的同一逻辑）。"""
+    from app.api.regintel import ingest_source
+
+    return ingest_source(source_id, db)

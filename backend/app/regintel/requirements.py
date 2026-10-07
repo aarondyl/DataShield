@@ -88,6 +88,47 @@ _EN_OBJECTS = [
     "health data", "data subject", "processing",
 ]
 
+#: 英文提取结果 → 中文展示词（summary 面向用户展示，一律输出中文；条文原文保留在 LegalUnit.text）
+_EN_REQ_TYPE_VERB = {
+    "obligation": "应当",
+    "prohibition": "不得",
+    "right": "有权",
+    "permission": "可以",
+}
+
+_EN_SUBJECT_ZH = {
+    "controller": "数据控制者", "processor": "数据处理者", "data subject": "数据主体",
+    "supervisory authority": "监管机构", "member state": "成员国", "recipient": "接收方",
+    "third party": "第三方", "person": "个人",
+}
+
+_EN_ACTION_ZH = {
+    "inform": "告知", "obtain_consent": "取得同意", "delete": "删除", "rectify": "更正",
+    "retain": "留存", "store": "存储", "assess": "评估", "audit": "审计",
+    "provide": "提供", "disclose": "披露", "encrypt": "加密", "pseudonymize": "假名化",
+    "notify": "通知", "record": "记录", "transfer": "传输", "collect": "收集",
+    "monitor": "监测", "designate": "指定", "document": "形成文档", "restrict": "限制",
+    "other": "履行相关义务",
+}
+
+_EN_OBJECT_ZH = {
+    "personal data": "个人数据", "special categories": "特殊类别数据",
+    "biometric data": "生物识别数据", "genetic data": "基因数据",
+    "health data": "健康数据", "data subject": "数据主体", "processing": "处理活动",
+}
+
+
+def _en_summary_zh(requirement_type: str, subject: str, action: str, obj: str) -> str:
+    """把英文规则提取结果组装成一句中文摘要（条文原文见证据，摘要面向展示）。"""
+    verb = _EN_REQ_TYPE_VERB.get(requirement_type, "应当")
+    action_zh = _EN_ACTION_ZH.get(action, "履行相关义务")
+    subject_zh = _EN_SUBJECT_ZH.get(subject, subject)
+    obj_zh = _EN_OBJECT_ZH.get(obj, obj)
+    parts = f"{subject_zh}{verb}{action_zh}"
+    if obj_zh and obj_zh != subject_zh:
+        parts += obj_zh if obj_zh in _EN_OBJECT_ZH.values() else f"「{obj_zh}」"
+    return f"{parts}（详见条文原文）"
+
 _CN_SENTENCE_SPLIT = re.compile(r"[。；;\n]+")
 _EN_SENTENCE_SPLIT = re.compile(r"(?<=[.;:])\s+|\n+")
 
@@ -177,7 +218,7 @@ def extract_requirements_rule(
                         "object_type": obj,
                         "conditions": conditions,
                         "exceptions": [],
-                        "summary": sentence[:160],
+                        "summary": _en_summary_zh(req_type, subject, action, obj),
                         "confidence": round(min(confidence, 0.95), 2),
                     }
                 )
@@ -222,6 +263,7 @@ _SYSTEM_PROMPT = (
     "只输出 JSON：{\"requirements\": [{\"requirement_type\": obligation|prohibition|right|permission,"
     " \"subject_type\": 主体, \"action_type\": 动作, \"object_type\": 对象,"
     " \"conditions\": [...], \"exceptions\": [...], \"summary\": 一句话摘要, \"confidence\": 0-1}]}。"
+    "所有面向用户展示的文本（含 summary）一律使用简体中文，条文原文不摘录进 summary；"
     "不确定的义务给低置信度；不做任何关于具体公司适用性的判断。"
 )
 

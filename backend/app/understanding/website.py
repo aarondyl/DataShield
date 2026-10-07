@@ -169,9 +169,9 @@ def analyze_website(request, fetch=fetch_page):
     documents = {}
     deadline = time.monotonic() + 60
     limited, requests = False, 0
-    limitations = ["Public statements and static HTML do not verify backend behavior; confidence is heuristic.",
-        "Market clues do not determine jurisdiction or legal applicability.",
-        "Only public same-origin pages are fetched; JavaScript, logins and forms are not executed."]
+    limitations = ["公开声明与静态 HTML 无法验证后端行为；置信度为启发式估计。",
+        "市场线索不能判定法域或法律适用性。",
+        "仅抓取公开的同源页面；不执行 JavaScript、登录与表单。"]
     while queue and len(analyzed) < request.max_pages and requests < request.max_pages * 3:
         if time.monotonic() >= deadline:
             limited = True
@@ -235,10 +235,10 @@ def analyze_website(request, fetch=fetch_page):
         raise ValueError("No public pages could be analyzed")
     limited |= bool(queue)
     if limited:
-        limitations.append("Some pages were unavailable or outside crawl limits; missing findings remain UNKNOWN.")
+        limitations.append("部分页面不可用或超出抓取范围；未发现的项保持 UNKNOWN。")
     c.description(request.product_description)
     c.evidence.append(Evidence(evidence_id="scope", type="SCAN_SCOPE", url=start,
-        reason=f"Analyzed {len(analyzed)} public pages; page limit {request.max_pages}, depth limit {request.max_depth}. Non-detection is limited to these pages."))
+        reason=f"已分析 {len(analyzed)} 个公开页面；页面数上限 {request.max_pages}，深度上限 {request.max_depth}。未检测的结论仅限这些页面。"))
     for name in DOCUMENTS:
         documents.setdefault(name, PublicDocument(status="UNKNOWN" if limited else "NOT_DETECTED", confidence=0 if limited else .5, evidence_ids=["scope"]))
     category_facts = c.facts.get("category", {})

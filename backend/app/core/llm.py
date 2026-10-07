@@ -418,40 +418,39 @@ def mock_remediation_code(context: dict[str, Any]) -> dict[str, Any]:
         if allowed_paths
         else target_components[0]
         if target_components
-        else f"{requirement.get('object_type') or 'affected product'} component"
+        else f"{requirement.get('object_type') or '受影响产品'}相关组件"
     )
     potential = finding.get("gap_status") == "POTENTIAL"
     change = (
-        "Verify the current implementation. If evidence confirms that a change is needed, "
-        "add or adjust the control described by the validated requirement."
+        "核查当前实现；如证据表明确需修改，再按照已验证的法规要求补充或调整相应控制。"
         if potential
-        else "Implement the control described by the validated requirement for the confirmed gap."
+        else "针对已确认的缺口，实现已验证法规要求所描述的控制。"
     )
     constraints = list(dict.fromkeys([
         *(context.get("user_constraints") or []),
-        "Use only the supplied legal requirements and product evidence.",
-        "Preserve unrelated behavior.",
+        "仅使用所提供的法规要求与产品证据。",
+        "保持无关行为不变。",
     ]))
     return {
         "requested_changes": [{
             "target": target,
             "change": change,
             "rationale": (
-                "Address the potential gap while preserving its uncertainty."
-                if potential else "Address the confirmed product gap."
+                "在保留不确定性的前提下处理潜在缺口。"
+                if potential else "处理已确认的产品缺口。"
             ),
         }],
         "affected_files_or_components": [target],
         "constraints": constraints,
         "acceptance_criteria": [
-            "The implemented behavior satisfies the supplied required state and is covered by tests."
+            "实现后的行为满足所提供的要求状态，并有相应测试覆盖。"
         ],
         "tests": [{
-            "name": "remediation behavior",
-            "purpose": "Verify the requested control using the supplied Finding context.",
-            "expected_result": "The required behavior is observable without changing unrelated behavior.",
+            "name": "整改行为验证",
+            "purpose": "使用所提供的 Finding 上下文验证所要求的控制。",
+            "expected_result": "在不改变无关行为的前提下，可观察到要求的行为。",
         }],
-        "do_not_modify": ["Unrelated product behavior and legal requirements"],
+        "do_not_modify": ["无关的产品行为与法规要求"],
     }
 
 
@@ -461,26 +460,26 @@ def mock_remediation_document(context: dict[str, Any]) -> dict[str, Any]:
     finding = context.get("finding") or {}
     potential = finding.get("gap_status") == "POTENTIAL"
     has_unknown = bool(context.get("has_unknown_facts"))
-    qualifier = "potentially required" if potential else "required"
-    placeholder = " [TO CONFIRM: verify product-specific details before publication.]" if has_unknown else ""
+    qualifier = "可能要求的" if potential else "要求的"
+    placeholder = " [TO CONFIRM：发布前请核实产品具体细节。]" if has_unknown else ""
     return {
         "document_type": context.get("document_type") or "PRODUCT_DOCUMENTATION",
         "proposed_changes": [{
-            "section": "Relevant product disclosure",
-            "change": f"Add a human-reviewed draft describing the {qualifier} product behavior.",
+            "section": "相关产品披露",
+            "change": f"新增一份需人工审核的草稿，说明{qualifier}产品行为。",
             "rationale": (
-                "Reflect the potential gap without asserting that an unverified control is absent."
-                if potential else "Address the confirmed product documentation gap."
+                "反映潜在缺口，不断言未经验证的控制缺失。"
+                if potential else "处理已确认的产品文档缺口。"
             ),
         }],
         "draft_text": (
-            "DRAFT — REQUIRES HUMAN REVIEW. Describe the applicable product behavior using only "
-            f"verified product facts and the supplied legal requirement.{placeholder}"
+            "草稿——需人工审核。仅使用已验证的产品事实与所提供的法规要求，"
+            f"描述适用的产品行为。{placeholder}"
         ),
         "draft_status": "DRAFT_REQUIRES_HUMAN_REVIEW",
         "evidence": context.get("allowed_evidence_references") or [],
         "acceptance_criteria": [
-            "A human reviewer confirms every product-specific statement before publication."
+            "发布前由人工审核者逐条确认所有与产品相关的表述。"
         ],
     }
 
@@ -517,8 +516,8 @@ class MockLLMClient(BaseLLMClient):
             return {"candidate_type":"FACT_CORRECTION","target_fact_id":target.get("fact_id") if target else None,
                 "proposed_name":target.get("name") if target else None,"proposed_value":True if not ambiguous else None,
                 "proposed_status":"PRESENT" if not ambiguous else None,"confidence":0.85 if not ambiguous else 0.4,
-                "reasoning_summary":"User feedback indicates an existing capability." if not ambiguous else "The feedback does not establish whether the capability is currently available.",
-                "needs_clarification":ambiguous,"clarification_question":"Is this capability currently available to users?" if ambiguous else None}
+                "reasoning_summary":"用户反馈表明该能力已存在。" if not ambiguous else "该反馈无法确定该能力当前是否可用。",
+                "needs_clarification":ambiguous,"clarification_question":"该能力当前是否已向用户提供？" if ambiguous else None}
         # 未识别的任务类型：返回空对象，由调用方按"证据不足"降级处理
         return {}
 

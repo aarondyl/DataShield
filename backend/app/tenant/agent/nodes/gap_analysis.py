@@ -10,6 +10,21 @@ from app.tenant.regulatory.schemas import RequirementContext
 from app.understanding.schemas import FindingStatus
 
 
+#: 内部控制键 → 面向用户的中文展示名（Finding 标题 / 缺口描述使用）
+CONTROL_DISPLAY_NAMES = {
+    "ai_disclosure": "AI 交互披露",
+    "privacy_notice": "隐私告知",
+    "privacy_policy": "隐私政策",
+    "account_deletion": "账号删除能力",
+    "consent_management": "同意管理",
+}
+
+
+def control_display_name(control: str) -> str:
+    """把内部控制键（如 ai_disclosure）转成中文展示名；未知键回退为可读英文。"""
+    return CONTROL_DISPLAY_NAMES.get(control, control.replace("_", " "))
+
+
 def required_control_name(requirement: RequirementContext) -> str:
     text = " ".join((requirement.action_type, requirement.object_type, requirement.summary)).casefold()
     if any(word in text for word in ("transparen", "disclos", "inform", "透明", "披露", "告知")):
@@ -69,7 +84,7 @@ def analyze_gaps(state: TenantAgentState) -> dict:
             RequirementControlContext(
                 requirement_id=requirement.id,
                 required_control=control,
-                required_state=requirement.summary or f"Implement {control}",
+                required_state=requirement.summary or f"实现{control_display_name(control)}控制",
             ),
             observations,
         ))

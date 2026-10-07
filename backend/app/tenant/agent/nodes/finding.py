@@ -1,6 +1,6 @@
 """Build conservative, traceable Finding candidates."""
 
-from app.tenant.agent.nodes.gap_analysis import required_control_name
+from app.tenant.agent.nodes.gap_analysis import control_display_name, required_control_name
 from app.tenant.agent.state import TenantAgentState
 from app.tenant.findings.schemas import FindingCandidate, ImpactLevel
 from app.tenant.gap.schemas import GapStatus
@@ -36,11 +36,11 @@ def build_findings(state: TenantAgentState) -> dict:
             confidence = min(confidence, 0.69)
         if product and product.conflicts:
             confidence = min(confidence, 0.69)
-        control = required_control_name(requirement).replace("_", " ")
+        control = control_display_name(required_control_name(requirement))
         title = (
-            f"{control.capitalize()} is missing"
+            f"缺少{control}"
             if gap.gap_status == GapStatus.CONFIRMED
-            else f"{control.capitalize()} may be insufficient"
+            else f"{control}可能不完善"
         )
         candidates.append(FindingCandidate(
             title=title,

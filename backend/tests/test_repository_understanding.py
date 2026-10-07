@@ -37,7 +37,7 @@ def test_facts_evidence_and_read_only(repository):
     assert result.capabilities["cookie_consent"].status == "NOT_DETECTED"
     assert any(e.file == "main.py" and e.line_start == 2 for e in result.evidence)
     assert "sk-private" not in result.model_dump_json()
-    assert "Potential secret/configuration detected." in result.limitations
+    assert "检测到疑似密钥/配置信息。" in result.limitations
     ids = {e.evidence_id for e in result.evidence}
     assert all(set(f.evidence_ids) <= ids for f in result.features + result.stack_facts + result.vendors)
     assert before == {p: p.read_bytes() for p in before}

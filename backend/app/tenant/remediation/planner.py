@@ -64,6 +64,7 @@ Rules:
 - A document draft always requires human review and is never ready to publish.
 - Never write phrases such as "ready to publish", "final policy", "fully compliant", "legally compliant", "compliant final version", "non-compliant", "the product violates", or "confirmed absent" anywhere in the output.
 - When a supplied product fact has status UNKNOWN, the draft_text must contain an explicit "[TO CONFIRM: ...]" placeholder for it.
+- All user-facing text in the JSON values (change, rationale, constraints, acceptance_criteria, tests, section, draft_text, etc.) must be written in Simplified Chinese; keep field names, enum values and file paths unchanged.
 
 Output exactly one JSON object with these top-level fields and no others.
 The input keys are FACTS, LEGAL_REQUIREMENTS, LEGAL_EVIDENCE, GAP, USER_CONSTRAINTS and TASK.
@@ -463,23 +464,23 @@ def plan_remediation(
             planning_input, proposal
         )
         prompt_version = "remediation-code-v1"
-        title = f"Implement remediation for: {detail.finding.title}"
+        title = f"实施整改：{detail.finding.title}"
     else:
         if proposal.document_type != request.document_type:
             raise RemediationPlanningError("Document proposal type does not match the request")
         plan = build_document_change_plan(planning_input, proposal)
         prompt_version = "remediation-document-v1"
-        title = f"Update documentation for: {detail.finding.title}"
+        title = f"更新文档：{detail.finding.title}"
 
     validate_remediation_grounding(
         plan,
         {item.id for item in detail.requirements},
         {item.legal_unit_id for item in detail.legal_evidence},
     )
-    qualifier = "potential gap" if gap.gap_status == GapStatus.POTENTIAL else "confirmed gap"
+    qualifier = "潜在缺口" if gap.gap_status == GapStatus.POTENTIAL else "已确认缺口"
     summary = (
-        f"Grounded {request.remediation_type.value} proposal for the {qualifier}; "
-        "human review is required before execution."
+        f"针对{qualifier}的 {request.remediation_type.value} 整改方案（基于所提供的法规与产品证据）；"
+        "执行前需人工审核。"
     )
     record = create_remediation(
         db,

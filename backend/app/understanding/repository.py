@@ -59,7 +59,7 @@ def analyze_repository(request: RepositoryRequest, allowed_roots=None):
     root = validate_root(request, allowed_roots)
     collector = Collector()
     collector.description(request.product_description)
-    limitations = ["Static clues do not prove runtime behavior; confidence values are heuristic, not calibrated probabilities."]
+    limitations = ["静态线索不能证明运行时行为；置信度为启发式估计，非校准概率。"]
     complete = request.analysis_mode in (AccessMode.FULL, AccessMode.SELECTED_PATHS)
     count = total = entries = 0
     started = time.monotonic()
@@ -71,7 +71,7 @@ def analyze_repository(request: RepositoryRequest, allowed_roots=None):
         while pending:
             if entries >= MAX_ENTRIES or count >= MAX_FILES or total >= MAX_TOTAL or time.monotonic() - started > 30:
                 complete = False
-                limitations.append("Scan limit reached; unexamined content remains unknown.")
+                limitations.append("已达扫描上限；未检查的内容保持未知。")
                 break
             path = pending.pop()
             entries += 1
@@ -87,7 +87,7 @@ def analyze_repository(request: RepositoryRequest, allowed_roots=None):
                         for child in children:
                             if len(pending) + entries >= MAX_ENTRIES:
                                 complete = False
-                                limitations.append("Directory entry limit reached.")
+                                limitations.append("已达目录条目上限。")
                                 break
                             if not ignored(child.name):
                                 pending.append(Path(child.path))
@@ -156,19 +156,19 @@ def analyze_repository(request: RepositoryRequest, allowed_roots=None):
             except (OSError, UnicodeError):
                 complete = False
         if request.analysis_mode == AccessMode.METADATA_ONLY:
-            limitations.append("Only allowlisted metadata files were read; implementation capabilities remain unknown.")
+            limitations.append("仅读取了白名单元数据文件；实现能力保持未知。")
         if request.analysis_mode == AccessMode.SELECTED_PATHS:
-            limitations.append("Findings and non-detections apply only to selected paths.")
+            limitations.append("发现与未发现结论仅适用于所选路径。")
     else:
-        limitations.append("NO_REPOSITORY: no filesystem access; only optional user-described clues.")
+        limitations.append("NO_REPOSITORY: 无文件系统访问权限；仅使用可选的用户描述线索。")
     if secret_seen:
-        limitations.append("Potential secret/configuration detected.")
+        limitations.append("检测到疑似密钥/配置信息。")
     complete = complete and count > 0
     collector.evidence.append(Evidence(evidence_id="scope", type="SCAN_SCOPE",
-        reason=f"Examined {count} eligible files under {request.analysis_mode.value}; ignored sensitive/generated files. Non-detection is limited to this scope."))
+        reason=f"在 {request.analysis_mode.value} 模式下检查了 {count} 个符合条件的文件；已忽略敏感/生成文件。未检测的结论仅限此范围。"))
     stack = list(collector.facts.get("stack", {}).values())
     return RepoAnalysisResult(repository_id=uuid4().hex, analysis_mode=request.analysis_mode,
-        project_summary="Static product clues: " + ", ".join(collector.facts.get("features", {})) if collector.facts.get("features") else "UNKNOWN",
+        project_summary="静态产品线索：" + "、".join(collector.facts.get("features", {})) if collector.facts.get("features") else "UNKNOWN",
         detected_stack=[f.name for f in stack], stack_facts=stack,
         features=collector.complete("features", FEATURES, complete), data_types=list(collector.facts.get("data_types", {}).values()),
         vendors=list(collector.facts.get("vendors", {}).values()),

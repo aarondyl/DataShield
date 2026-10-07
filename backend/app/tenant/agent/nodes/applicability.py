@@ -65,7 +65,9 @@ def _llm_result(requirement, product, evidence) -> ApplicabilityResult:
         '"evidence": array} (may be empty)\n'
         '- "missing_context": array of {"field_path": string, "question": string, "reason": string} '
         "(may be empty)\n"
-        '- "reasoning_summary": short audit summary string, not hidden reasoning'
+        '- "reasoning_summary": short audit summary string, not hidden reasoning\n'
+        "All user-facing text in the JSON values (question, reason, reasoning_summary) must be "
+        "written in Simplified Chinese; keep field names and enum keys in English."
     )
     client = get_llm_client()
     raw = client.chat_json(

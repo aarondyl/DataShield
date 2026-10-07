@@ -29,17 +29,40 @@ def me(principal:CurrentPrincipal=Depends(require_principal)): return {"company_
 def product(payload:ProductInput,principal:CurrentPrincipal=Depends(require_principal),db:Session=Depends(get_db)):
     row=Product(company_id=principal.company_id,name=payload.name,description=payload.description,target_markets=payload.markets,category=payload.category);db.add(row);db.commit();db.refresh(row);return row
 
+_DEMO_REGULATION_NAME = "欧盟 AI 法案（演示条款）"
+_DEMO_REGULATION_SHORT_NAME = "欧盟 AI 法案"
+_DEMO_REGULATION_AUTHORITY = "欧盟"
+_DEMO_UNIT_HEADING = "透明度义务"
+_DEMO_REQUIREMENT_SUMMARY = "向用户明确告知其正在与 AI 系统交互"
+
+
 def _demo_requirement(db: Session) -> Requirement:
     existing = db.scalar(select(Requirement).join(Regulation).where(Regulation.official_identifier == "DATASHIELD-DEMO-AI-TRANSPARENCY"))
-    if existing is not None: return existing
-    regulation = Regulation(name="EU AI Transparency Demo Requirement", short_name="EU AI Act", jurisdiction="EU", authority="European Union", official_identifier="DATASHIELD-DEMO-AI-TRANSPARENCY", canonical_source_url="https://eur-lex.europa.eu/eli/reg/2024/1689/oj")
+    if existing is not None:
+        # 旧库中的演示数据可能是英文：命中时同步更新为中文展示文案
+        regulation = db.get(Regulation, existing.regulation_id)
+        if regulation is not None and (
+            regulation.name != _DEMO_REGULATION_NAME
+            or regulation.short_name != _DEMO_REGULATION_SHORT_NAME
+            or existing.summary != _DEMO_REQUIREMENT_SUMMARY
+        ):
+            regulation.name = _DEMO_REGULATION_NAME
+            regulation.short_name = _DEMO_REGULATION_SHORT_NAME
+            regulation.authority = _DEMO_REGULATION_AUTHORITY
+            existing.summary = _DEMO_REQUIREMENT_SUMMARY
+            unit = db.get(LegalUnit, existing.legal_unit_id) if existing.legal_unit_id else None
+            if unit is not None:
+                unit.heading = _DEMO_UNIT_HEADING
+            db.flush()
+        return existing
+    regulation = Regulation(name=_DEMO_REGULATION_NAME, short_name=_DEMO_REGULATION_SHORT_NAME, jurisdiction="EU", authority=_DEMO_REGULATION_AUTHORITY, official_identifier="DATASHIELD-DEMO-AI-TRANSPARENCY", canonical_source_url="https://eur-lex.europa.eu/eli/reg/2024/1689/oj")
     db.add(regulation); db.flush()
     text = "Providers shall ensure that persons are informed when they are interacting with an AI system."
     version = RegulationVersion(regulation_id=regulation.id, version_number=1, normalized_text=text, content_hash=hashlib.sha256(text.encode()).hexdigest(), source_url=regulation.canonical_source_url, is_current=True)
     db.add(version); db.flush(); regulation.current_version_id=version.id
-    unit = LegalUnit(version_id=version.id, unit_type="article", unit_number="Article 50", heading="Transparency obligations", text=text)
+    unit = LegalUnit(version_id=version.id, unit_type="article", unit_number="Article 50", heading=_DEMO_UNIT_HEADING, text=text)
     db.add(unit); db.flush()
-    requirement = Requirement(regulation_id=regulation.id, version_id=version.id, legal_unit_id=unit.id, requirement_type="obligation", subject_type="provider", action_type="inform", object_type="AI system", conditions_json=[], exceptions_json=[], summary="Provide clear AI interaction transparency information", confidence=.95, status="ACTIVE")
+    requirement = Requirement(regulation_id=regulation.id, version_id=version.id, legal_unit_id=unit.id, requirement_type="obligation", subject_type="provider", action_type="inform", object_type="AI system", conditions_json=[], exceptions_json=[], summary=_DEMO_REQUIREMENT_SUMMARY, confidence=.95, status="ACTIVE")
     db.add(requirement); db.flush(); return requirement
 
 @router.post("/products/{product_id}/initial-review", status_code=201, dependencies=[Depends(validate_browser_origin)])
@@ -71,7 +94,7 @@ def demo(request: Request, response: Response, db: Session = Depends(get_db)):
         ("controls", "ai_disclosure", "NOT_DETECTED"),
     ]
     for group, name, fact_status in facts:
-        db.add(ProductTwinFact(version_id=twin.id, group_name=group, name=name, status=fact_status, confidence=.95 if fact_status == "PRESENT" else .8, source_kind="USER", evidence=[{"type":"USER_DESCRIPTION","reason":"Provided during isolated demo setup"}], scan_scope={"type":"demo_seed"}, confirmation_status="CONFIRMED" if fact_status == "PRESENT" else "UNREVIEWED"))
+        db.add(ProductTwinFact(version_id=twin.id, group_name=group, name=name, status=fact_status, confidence=.95 if fact_status == "PRESENT" else .8, source_kind="USER", evidence=[{"type":"USER_DESCRIPTION","reason":"演示工作区初始化时由用户提供"}], scan_scope={"type":"demo_seed"}, confirmation_status="CONFIRMED" if fact_status == "PRESENT" else "UNREVIEWED"))
     requirement = _demo_requirement(db); db.commit()
     session, raw = issue_session(db, company.id, "demo")
     response.set_cookie(COOKIE, raw, httponly=True, samesite="lax", secure=secure(request), path="/", max_age=7*86400)
