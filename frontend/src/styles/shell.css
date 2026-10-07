@@ -73,3 +73,24 @@
 .ds-twin-groups article .ds-feedback{grid-column:1/-1;margin-top:12px}
 .ds-twin-groups details b{color:var(--ds-ink);font-weight:600}
 @media(max-width:760px){.ds-product-intro{display:block}.ds-product-intro .ds-button{margin-top:12px}}
+
+/* Actions: AI draft result card + empty-state CTA */
+.ds-action-created{display:flex;align-items:center;gap:18px;margin:0 0 26px;padding:22px;border:1px solid var(--ds-accent);border-radius:14px;background:var(--ds-accent-soft);box-shadow:var(--ds-shadow)}
+.ds-action-created>div{margin-right:auto;min-width:0}
+.ds-action-created h2{margin:4px 0 6px;font-size:20px;letter-spacing:-.02em}
+.ds-action-created p{margin:0;color:var(--ds-muted);font-size:13px;line-height:1.6}
+.ds-action-created .ds-button{flex:none;gap:12px}
+.ds-state .ds-button{margin-top:20px;gap:14px}
+@media(max-width:760px){.ds-action-created{align-items:stretch;flex-direction:column}}
+
+/* Today: first-visit guide card */
+.ds-guide{margin-top:55px;padding:34px;border:1px solid var(--ds-line);border-radius:18px;background:var(--ds-white);box-shadow:var(--ds-shadow)}
+.ds-guide h2{margin:10px 0 14px;font-size:22px;letter-spacing:-.02em}
+.ds-guide>p{margin:0 0 7px;color:var(--ds-muted);line-height:1.7}
+.ds-guide-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:20px 0 16px}
+.ds-guide-steps>a{display:flex;gap:10px;align-items:flex-start;padding:15px;border:1px solid var(--ds-line);border-radius:12px;background:var(--ds-paper);color:var(--ds-ink);font-size:13px;line-height:1.5}
+.ds-guide-steps>a:hover{border-color:var(--ds-accent);transform:translateY(-1px)}
+.ds-guide-steps b{flex:none;width:20px;height:20px;display:grid;place-items:center;border-radius:50%;background:var(--ds-accent-soft);color:var(--ds-accent);font-size:10px}
+.ds-guide-safe{margin:0;padding-top:14px;border-top:1px solid var(--ds-line);color:var(--ds-muted);font-size:12px;line-height:1.6}
+.ds-guide-safe b{color:var(--ds-ink)}
+@media(max-width:760px){.ds-guide{padding:24px}.ds-guide-steps{grid-template-columns:1fr}}
