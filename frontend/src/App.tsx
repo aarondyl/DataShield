@@ -1,3 +1,5 @@
+import {useEffect} from 'react';
+import {useTranslation} from 'react-i18next';
 import {BrowserRouter,Navigate,Route,Routes} from 'react-router-dom';
 import AppShell from './components/AppShell'; import Layout from './components/Layout';
 import ProductSelectorPage from './pages/ProductSelectorPage'; import DashboardPage from './pages/DashboardPage'; import DeveloperHomePage from './pages/DeveloperHomePage'; import CompanyPage from './pages/CompanyPage'; import ProductsPage from './pages/ProductsPage'; import RegulationsPage from './pages/RegulationsPage'; import AnalyzePage from './pages/AnalyzePage'; import ImpactReportPage from './pages/ImpactReportPage'; import SelfAssessmentPage from './pages/SelfAssessmentPage'; import PrivacyToolsPage from './pages/PrivacyToolsPage'; import RiskCenterPage from './pages/RiskCenterPage'; import ActionsPage from './pages/ActionsPage'; import SdkScanPage from './pages/SdkScanPage'; import DeveloperIssuesPage from './pages/DeveloperIssuesPage'; import ReadyToShipPage from './pages/ReadyToShipPage';
@@ -10,7 +12,7 @@ import ProductTwinPage from './pages/new/ProductTwinPage';
 import MonitorPage from './pages/new/MonitorPage';
 import SettingsPage from './pages/new/SettingsPage';
 
-export default function App(){return <BrowserRouter future={{v7_startTransition:true,v7_relativeSplatPath:true}}><Routes>
+export default function App(){const {t,i18n}=useTranslation();useEffect(()=>{document.title=t('misc.appTitle')},[t,i18n.language]);return <BrowserRouter future={{v7_startTransition:true,v7_relativeSplatPath:true}}><Routes>
   <Route path="/" element={<LandingPage/>}/><Route path="/choose" element={<ChooseEditionPage/>}/><Route path="/login" element={<AuthPage mode="login"/>}/><Route path="/signup" element={<AuthPage mode="signup"/>}/>
   <Route path="/onboarding" element={<Navigate to="/onboarding/understand" replace/>}/><Route path="/onboarding/understand" element={<UnderstandPage/>}/><Route path="/onboarding/confirm" element={<ConfirmPage/>}/><Route path="/onboarding/review" element={<ReviewPage/>}/>
   <Route path="/app" element={<AppShell/>}><Route index element={<Navigate to="today" replace/>}/><Route path="today" element={<TodayPage/>}/><Route path="monitor" element={<MonitorPage/>}/><Route path="findings" element={<FindingsPage/>}/><Route path="findings/:id" element={<FindingDetailPage/>}/><Route path="actions" element={<ActionsExperience/>}/><Route path="actions/:id" element={<ActionDetail/>}/><Route path="product" element={<ProductTwinPage/>}/><Route path="settings" element={<SettingsPage/>}/></Route>

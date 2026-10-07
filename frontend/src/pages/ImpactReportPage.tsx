@@ -1,4 +1,5 @@
 import { useParams, Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAnalysis } from '../hooks';
 import RiskBadge from '../components/RiskBadge';
 import Tag from '../components/Tag';
@@ -12,33 +13,6 @@ const priorityStyles: Record<string, string> = {
   low: 'bg-green-100 text-green-800 border-green-200',
 };
 
-const confidenceLabel: Record<string, string> = {
-  high: '高',
-  medium: '中',
-  low: '低',
-};
-
-const priorityLabel: Record<string, string> = {
-  high: '高',
-  medium: '中',
-  low: '低',
-};
-
-const modelModeLabel: Record<string, string> = {
-  api: '在线模型',
-  mock: '规则模式',
-};
-
-const departmentLabel: Record<string, string> = {
-  Legal: '法务',
-  Product: '产品',
-  Engineering: '研发',
-  Security: '安全',
-  Operations: '运营',
-  'Supply Chain': '供应链',
-  Management: '管理层',
-};
-
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="bg-white border border-gray-200 rounded-lg p-5">
@@ -49,47 +23,78 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function ImpactReportPage() {
+  const { t, i18n } = useTranslation();
   const { id } = useParams();
   const numId = Number(id);
   const { data, loading, error, reload } = useAnalysis(numId);
 
-  if (loading) return <Spinner text="加载报告中…" />;
-  if (error || !data) return <ErrorBox message={error ?? '报告不存在'} onRetry={reload} />;
+  const confidenceLabel: Record<string, string> = {
+    high: t('misc.impactReport.confidenceLevel.high'),
+    medium: t('misc.impactReport.confidenceLevel.medium'),
+    low: t('misc.impactReport.confidenceLevel.low'),
+  };
+
+  const priorityLabel: Record<string, string> = {
+    high: t('misc.impactReport.priority.high'),
+    medium: t('misc.impactReport.priority.medium'),
+    low: t('misc.impactReport.priority.low'),
+  };
+
+  const modelModeLabel: Record<string, string> = {
+    api: t('misc.impactReport.modelMode.api'),
+    mock: t('misc.impactReport.modelMode.mock'),
+  };
+
+  const departmentLabel: Record<string, string> = {
+    Legal: t('misc.impactReport.department.legal'),
+    Product: t('misc.impactReport.department.product'),
+    Engineering: t('misc.impactReport.department.engineering'),
+    Security: t('misc.impactReport.department.security'),
+    Operations: t('misc.impactReport.department.operations'),
+    'Supply Chain': t('misc.impactReport.department.supplyChain'),
+    Management: t('misc.impactReport.department.management'),
+  };
+
+  if (loading) return <Spinner text={t('misc.impactReport.loading')} />;
+  if (error || !data) return <ErrorBox message={error ?? t('misc.impactReport.notFound')} onRetry={reload} />;
 
   return (
     <div>
       <div className="mb-4">
         <Link to="/" className="text-sm text-indigo-600 hover:underline">
-          ← 返回总览
+          {t('misc.impactReport.backToOverview')}
         </Link>
       </div>
       <PageHeader
-        title={`影响分析报告 #${data.id}`}
-        desc={`生成时间：${new Date(data.created_at).toLocaleString('zh-CN')} · 模型模式：${modelModeLabel[data.llm_mode] ?? '自定义模型'}`}
+        title={t('misc.impactReport.title', { id: data.id })}
+        desc={t('misc.impactReport.meta', {
+          time: new Date(data.created_at).toLocaleString(i18n.language),
+          mode: modelModeLabel[data.llm_mode] ?? t('misc.impactReport.modelMode.custom'),
+        })}
       />
 
       {data.status === 'degraded' && (
         <div className="mb-4 bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm rounded-lg px-4 py-3">
-          提示:本次分析为降级结果 —— 大模型服务不可用,以下内容基于规则/检索降级生成,仅供参考。
+          {t('misc.impactReport.degradedNotice')}
         </div>
       )}
       {data.status === 'failed' && (
         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
-          本次分析失败,以下数据可能不完整。
+          {t('misc.impactReport.failedNotice')}
         </div>
       )}
 
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Section title="风险等级">
+          <Section title={t('misc.impactReport.riskLevel')}>
             <div className="flex items-center gap-3">
               <RiskBadge level={data.risk_level} />
               {data.confidence && (
-                <span className="text-sm text-gray-500">置信度：{confidenceLabel[data.confidence]}</span>
+                <span className="text-sm text-gray-500">{t('misc.impactReport.confidence', { label: confidenceLabel[data.confidence] })}</span>
               )}
             </div>
           </Section>
-          <Section title="是否相关">
+          <Section title={t('misc.impactReport.relevance')}>
             <span
               className={`inline-block px-3 py-1 text-sm font-medium border rounded ${
                 data.relevant === true
@@ -99,36 +104,36 @@ export default function ImpactReportPage() {
                     : 'bg-gray-50 text-gray-500 border-gray-200'
               }`}
             >
-              {data.relevant === null ? '不确定' : data.relevant ? '是' : '否'}
+              {data.relevant === null ? t('misc.impactReport.relevantUncertain') : data.relevant ? t('misc.impactReport.relevantYes') : t('misc.impactReport.relevantNo')}
             </span>
           </Section>
         </div>
 
-        <Section title="分析结论">
-          <p className="text-sm text-gray-700 whitespace-pre-wrap">{data.summary || '无摘要'}</p>
+        <Section title={t('misc.impactReport.conclusion')}>
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">{data.summary || t('misc.impactReport.noSummary')}</p>
           {data.reasoning_summary && (
             <div className="mt-3 pt-3 border-t border-gray-100">
-              <div className="text-xs text-gray-400 mb-1">分析依据</div>
+              <div className="text-xs text-gray-400 mb-1">{t('misc.impactReport.reasoning')}</div>
               <p className="text-sm text-gray-600 whitespace-pre-wrap">{data.reasoning_summary}</p>
             </div>
           )}
         </Section>
 
-        <Section title="受影响范围">
+        <Section title={t('misc.impactReport.affectedScope')}>
           {data.affected_areas.length === 0 && data.affected_products.length === 0 ? (
-            <span className="text-sm text-gray-400">无</span>
+            <span className="text-sm text-gray-400">{t('misc.impactReport.none')}</span>
           ) : (
             <div>
               {data.affected_products.length > 0 && (
                 <div className="mb-2">
-                  <span className="text-xs text-gray-400 mr-2">受影响产品:</span>
+                  <span className="text-xs text-gray-400 mr-2">{t('misc.impactReport.affectedProducts')}</span>
                   {data.affected_products.map((p) => (
                     <Tag key={p}>{p}</Tag>
                   ))}
                 </div>
               )}
               <div>
-                <span className="text-xs text-gray-400 mr-2">受影响领域:</span>
+                <span className="text-xs text-gray-400 mr-2">{t('misc.impactReport.affectedAreas')}</span>
                 {data.affected_areas.map((a) => (
                   <Tag key={a}>{a}</Tag>
                 ))}
@@ -137,20 +142,20 @@ export default function ImpactReportPage() {
           )}
         </Section>
 
-        <Section title={`证据条款(${data.evidence.length})`}>
+        <Section title={t('misc.impactReport.evidenceTitle', { count: data.evidence.length })}>
           {data.evidence.length === 0 ? (
-            <span className="text-sm text-gray-400">无证据条款</span>
+            <span className="text-sm text-gray-400">{t('misc.impactReport.noEvidence')}</span>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-left text-gray-500 border-b border-gray-200">
-                    <th className="px-3 py-2 font-medium">法规</th>
-                    <th className="px-3 py-2 font-medium">条款</th>
-                    <th className="px-3 py-2 font-medium">原文摘要</th>
-                    <th className="px-3 py-2 font-medium">关联原因</th>
-                    <th className="px-3 py-2 font-medium">来源</th>
-                    <th className="px-3 py-2 font-medium">验证状态</th>
+                    <th className="px-3 py-2 font-medium">{t('misc.impactReport.table.regulation')}</th>
+                    <th className="px-3 py-2 font-medium">{t('misc.impactReport.table.article')}</th>
+                    <th className="px-3 py-2 font-medium">{t('misc.impactReport.table.excerpt')}</th>
+                    <th className="px-3 py-2 font-medium">{t('misc.impactReport.table.reason')}</th>
+                    <th className="px-3 py-2 font-medium">{t('misc.impactReport.table.source')}</th>
+                    <th className="px-3 py-2 font-medium">{t('misc.impactReport.table.verification')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -172,7 +177,7 @@ export default function ImpactReportPage() {
                             rel="noreferrer"
                             className="text-indigo-600 hover:underline text-xs break-all"
                           >
-                            链接
+                            {t('misc.impactReport.link')}
                           </a>
                         ) : (
                           <span className="text-gray-300">-</span>
@@ -180,9 +185,9 @@ export default function ImpactReportPage() {
                       </td>
                       <td className="px-3 py-2">
                         {ev.verified ? (
-                          <span className="text-green-700 text-xs font-medium">✓ 已验证</span>
+                          <span className="text-green-700 text-xs font-medium">{t('misc.impactReport.verified')}</span>
                         ) : (
-                          <span className="text-gray-400 text-xs">未验证</span>
+                          <span className="text-gray-400 text-xs">{t('misc.impactReport.unverified')}</span>
                         )}
                       </td>
                     </tr>
@@ -193,19 +198,19 @@ export default function ImpactReportPage() {
           )}
         </Section>
 
-        <Section title={`建议行动(${data.actions.length})`}>
+        <Section title={t('misc.impactReport.actionsTitle', { count: data.actions.length })}>
           {data.actions.length === 0 ? (
-            <span className="text-sm text-gray-400">无建议行动</span>
+            <span className="text-sm text-gray-400">{t('misc.impactReport.noActions')}</span>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-gray-50 text-left text-gray-500 border-b border-gray-200">
-                    <th className="px-3 py-2 font-medium">优先级</th>
-                    <th className="px-3 py-2 font-medium">负责部门</th>
-                    <th className="px-3 py-2 font-medium">任务标题</th>
-                    <th className="px-3 py-2 font-medium">任务说明</th>
-                    <th className="px-3 py-2 font-medium">关联条款</th>
+                    <th className="px-3 py-2 font-medium">{t('misc.impactReport.actionTable.priority')}</th>
+                    <th className="px-3 py-2 font-medium">{t('misc.impactReport.actionTable.department')}</th>
+                    <th className="px-3 py-2 font-medium">{t('misc.impactReport.actionTable.taskTitle')}</th>
+                    <th className="px-3 py-2 font-medium">{t('misc.impactReport.actionTable.description')}</th>
+                    <th className="px-3 py-2 font-medium">{t('misc.impactReport.actionTable.relatedClause')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -217,7 +222,7 @@ export default function ImpactReportPage() {
                             priorityStyles[a.priority] ?? 'bg-gray-100 text-gray-600 border-gray-200'
                           }`}
                         >
-                          {priorityLabel[a.priority] ?? '未分级'}
+                          {priorityLabel[a.priority] ?? t('misc.impactReport.priority.unrated')}
                         </span>
                       </td>
                       <td className="px-3 py-2 text-gray-700">{departmentLabel[a.department] ?? a.department}</td>

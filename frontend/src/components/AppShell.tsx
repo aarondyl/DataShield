@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { fetchMe, type MeResponse } from '../api/auth';
 import { readSession, writeSession, type LocalSession } from '../features/auth/session'; import { readSetup } from '../features/onboarding/state';
 import Spinner from './Spinner';
+import LanguageSwitcher from './LanguageSwitcher';
 
 const nav = [
-  { to: '/app/today', label: 'Today', icon: 'sun' },
-  { to: '/app/monitor', label: 'Monitor', icon: 'pulse' },
-  { to: '/app/findings', label: 'Findings', icon: 'finding' },
-  { to: '/app/actions', label: 'Actions', icon: 'check' },
-  { to: '/app/product', label: 'Product', icon: 'cube' },
+  { to: '/app/today', labelKey: 'today', icon: 'sun' },
+  { to: '/app/monitor', labelKey: 'monitor', icon: 'pulse' },
+  { to: '/app/findings', labelKey: 'findings', icon: 'finding' },
+  { to: '/app/actions', labelKey: 'actions', icon: 'check' },
+  { to: '/app/product', labelKey: 'product', icon: 'cube' },
 ];
 
 function Icon({ name }: { name: string }) {
@@ -25,6 +27,7 @@ function Icon({ name }: { name: string }) {
 
 export default function AppShell() {
   const navigate=useNavigate();
+  const { t } = useTranslation();
   const [session,setSession]=useState<LocalSession|null>(readSession());
   const [me,setMe]=useState<MeResponse|null>(null);
   const [checking,setChecking]=useState(true);
@@ -40,15 +43,16 @@ export default function AppShell() {
     return()=>{stopped=true}},[navigate]);
   const setup=readSetup();
   const isDemo=me!==null&&!('user_id' in me);
-  if(checking)return <Spinner text="Loading workspace…"/>;
+  if(checking)return <Spinner text={t('appnew.shell.loadingWorkspace')}/>;
   return <div className="ds-shell">
     <aside className="ds-sidebar">
       <NavLink to="/app/today" className="ds-brand"><span className="ds-logo">D</span><span>DataShield</span></NavLink>
-      <div className="ds-workspace"><span>Workspace</span><strong>{setup?.productName||session?.companyName||'My product'}</strong><small>{session?.edition==='enterprise'?'Enterprise edition':'Developer edition'}</small></div>
-      <nav aria-label="Primary navigation">{nav.map(item => <NavLink key={item.to} to={item.to} className={({isActive}) => `ds-nav-link${isActive ? ' active' : ''}`}><Icon name={item.icon}/><span>{item.label}</span></NavLink>)}</nav>
+      <div className="ds-workspace"><span>{t('appnew.shell.workspace')}</span><strong>{setup?.productName||session?.companyName||t('appnew.shell.myProduct')}</strong><small>{session?.edition==='enterprise'?t('appnew.shell.enterpriseEdition'):t('appnew.shell.developerEdition')}</small></div>
+      <nav aria-label={t('appnew.shell.primaryNav')}>{nav.map(item => <NavLink key={item.to} to={item.to} className={({isActive}) => `ds-nav-link${isActive ? ' active' : ''}`}><Icon name={item.icon}/><span>{t(`appnew.shell.nav.${item.labelKey}`)}</span></NavLink>)}</nav>
       <div className="ds-sidebar-bottom">
-        <NavLink to="/app/settings" className="ds-nav-link"><Icon name="cube"/><span>Settings</span></NavLink>
-        <div className="ds-profile"><span>{(session?.name||session?.email||'D')[0].toUpperCase()}</span><div><strong>{session?.name||session?.email||'Demo'}</strong><small>{isDemo?'Demo workspace':session?.email||'Local evaluation session'}</small></div></div>
+        <NavLink to="/app/settings" className="ds-nav-link"><Icon name="cube"/><span>{t('appnew.shell.settings')}</span></NavLink>
+        <LanguageSwitcher/>
+        <div className="ds-profile"><span>{(session?.name||session?.email||'D')[0].toUpperCase()}</span><div><strong>{session?.name||session?.email||t('appnew.shell.demo')}</strong><small>{isDemo?t('appnew.shell.demoWorkspace'):session?.email||t('appnew.shell.localSession')}</small></div></div>
       </div>
     </aside>
     <main className="ds-main"><Outlet/></main>

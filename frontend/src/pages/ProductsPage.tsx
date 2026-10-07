@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useCompanies, useProducts } from '../hooks';
 import { createCompany, createProduct, updateProduct } from '../api';
 import type { Product, ProductPayload } from '../types';
@@ -8,16 +9,16 @@ import EmptyState from '../components/EmptyState';
 import ErrorBox from '../components/ErrorBox';
 import Tag from '../components/Tag';
 
-const boolFields: { key: keyof ProductPayload; label: string }[] = [
-  { key: 'collects_personal_data', label: '收集个人数据' },
-  { key: 'collects_sensitive_data', label: '收集敏感数据' },
-  { key: 'collects_health_data', label: '收集健康数据' },
-  { key: 'collects_location_data', label: '收集位置数据' },
-  { key: 'children_related', label: '儿童相关' },
-  { key: 'third_party_data_sharing', label: '第三方数据共享' },
-  { key: 'uses_third_party_sdk', label: '使用第三方 SDK' },
-  { key: 'has_privacy_policy', label: '已有隐私政策' },
-  { key: 'cross_border_data_transfer', label: '跨境数据传输' },
+const boolFields: { key: keyof ProductPayload; labelKey: string }[] = [
+  { key: 'collects_personal_data', labelKey: 'collectsPersonalData' },
+  { key: 'collects_sensitive_data', labelKey: 'collectsSensitiveData' },
+  { key: 'collects_health_data', labelKey: 'collectsHealthData' },
+  { key: 'collects_location_data', labelKey: 'collectsLocationData' },
+  { key: 'children_related', labelKey: 'childrenRelated' },
+  { key: 'third_party_data_sharing', labelKey: 'thirdPartyDataSharing' },
+  { key: 'uses_third_party_sdk', labelKey: 'usesThirdPartySdk' },
+  { key: 'has_privacy_policy', labelKey: 'hasPrivacyPolicy' },
+  { key: 'cross_border_data_transfer', labelKey: 'crossBorderDataTransfer' },
 ];
 
 interface FormState {
@@ -44,6 +45,7 @@ const inputCls =
   'w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500';
 
 export default function ProductsPage({ mode = 'business' }: { mode?: 'business' | 'developer' }) {
+  const { t } = useTranslation();
   const isDeveloper = mode === 'developer';
   const companies = useCompanies();
   const products = useProducts();
@@ -80,7 +82,7 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isDeveloper && form.company_id === '') {
-      setSubmitError('请选择所属企业');
+      setSubmitError(t('business.products.companyRequired'));
       return;
     }
     setSubmitting(true);
@@ -117,7 +119,7 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
       resetForm();
       products.reload();
     } catch (err: any) {
-      setSubmitError(err?.response?.data?.detail ?? err?.message ?? '保存失败');
+      setSubmitError(err?.response?.data?.detail ?? err?.message ?? t('business.common.saveFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -128,7 +130,7 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
 
   return (
     <div>
-      <PageHeader title={isDeveloper ? 'Product Profile / 产品档案' : '产品合规护照'} desc={isDeveloper ? '一次描述产品，后续检查、修复和上线确认会默认读取这些信息' : '集中记录产品市场、数据处理方式和合规风险'} />
+      <PageHeader title={isDeveloper ? t('business.products.titleDev') : t('business.products.title')} desc={isDeveloper ? t('business.products.descDev') : t('business.products.desc')} />
       {loading ? (
         <Spinner />
       ) : error ? (
@@ -137,17 +139,17 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             {(products.data ?? []).length === 0 ? (
-              <EmptyState message={isDeveloper ? '暂无项目，请在右侧创建项目画像' : '暂无产品，请在右侧创建'} />
+              <EmptyState message={isDeveloper ? t('business.products.emptyDev') : t('business.products.empty')} />
             ) : (
               <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-left text-gray-500 border-b border-gray-200">
-                      <th className="px-4 py-2.5 font-medium">{isDeveloper ? '项目名称' : '产品名称'}</th>
-                      {!isDeveloper && <th className="px-4 py-2.5 font-medium">所属企业</th>}
-                      <th className="px-4 py-2.5 font-medium">类别</th>
-                      <th className="px-4 py-2.5 font-medium">目标市场</th>
-                      <th className="px-4 py-2.5 font-medium">数据属性</th>
+                      <th className="px-4 py-2.5 font-medium">{isDeveloper ? t('business.products.headerNameDev') : t('business.products.headerName')}</th>
+                      {!isDeveloper && <th className="px-4 py-2.5 font-medium">{t('business.products.headerCompany')}</th>}
+                      <th className="px-4 py-2.5 font-medium">{t('business.products.headerCategory')}</th>
+                      <th className="px-4 py-2.5 font-medium">{t('business.products.headerMarkets')}</th>
+                      <th className="px-4 py-2.5 font-medium">{t('business.products.headerFlags')}</th>
                       <th className="px-4 py-2.5 font-medium"></th>
                     </tr>
                   </thead>
@@ -162,12 +164,12 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
                           {boolFields
                             .filter((f) => p[f.key as keyof Product])
                             .map((f) => (
-                              <Tag key={f.key}>{f.label}</Tag>
+                              <Tag key={f.key}>{t(`business.products.flags.${f.labelKey}`)}</Tag>
                             ))}
                         </td>
                         <td className="px-4 py-2.5">
                           <button onClick={() => startEdit(p)} className="text-indigo-600 hover:underline">
-                            编辑
+                            {t('business.common.edit')}
                           </button>
                         </td>
                       </tr>
@@ -180,18 +182,18 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
 
           <form onSubmit={onSubmit} className="bg-white border border-gray-200 rounded-lg p-5 h-fit">
             <div className="text-sm font-semibold text-slate-900 mb-4">
-              {editing ? `编辑产品 #${editing.id}` : `创建${isDeveloper ? '产品档案' : '产品'}`}
+              {editing ? t('business.products.editTitle', { id: editing.id }) : t(isDeveloper ? 'business.products.createTitleDev' : 'business.products.createTitle')}
             </div>
             <div className="space-y-3">
               {!isDeveloper && <div>
-                <label className="block text-xs text-gray-500 mb-1">所属企业 *</label>
+                <label className="block text-xs text-gray-500 mb-1">{t('business.products.companyLabel')}</label>
                 <select
                   required
                   className={inputCls}
                   value={form.company_id}
                   onChange={(e) => setForm({ ...form, company_id: e.target.value ? Number(e.target.value) : '' })}
                 >
-                  <option value="">请选择</option>
+                  <option value="">{t('business.common.pleaseSelect')}</option>
                   {(companies.data ?? []).map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -200,7 +202,7 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
                 </select>
               </div>}
               <div>
-                <label className="block text-xs text-gray-500 mb-1">{isDeveloper ? '项目名称' : '产品名称'} *</label>
+                <label className="block text-xs text-gray-500 mb-1">{isDeveloper ? t('business.products.nameLabelDev') : t('business.products.nameLabel')} *</label>
                 <input
                   required
                   className={inputCls}
@@ -209,11 +211,11 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">{isDeveloper ? '项目类别' : '产品类别'}</label>
-                {isDeveloper ? <select required className={inputCls} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}><option value="">请选择</option>{['App','SaaS','Website','Mini Program','AI Product'].map((type)=><option key={type}>{type}</option>)}</select> : <input className={inputCls} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="如移动应用 / 网站服务 / 小程序"/>}
+                <label className="block text-xs text-gray-500 mb-1">{isDeveloper ? t('business.products.categoryLabelDev') : t('business.products.categoryLabel')}</label>
+                {isDeveloper ? <select required className={inputCls} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}><option value="">{t('business.common.pleaseSelect')}</option>{['App','SaaS','Website','Mini Program','AI Product'].map((type)=><option key={type}>{type}</option>)}</select> : <input className={inputCls} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder={t('business.products.categoryPlaceholder')}/>}
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">目标市场(逗号分隔)</label>
+                <label className="block text-xs text-gray-500 mb-1">{t('business.products.marketsLabel')}</label>
                 <input
                   className={inputCls}
                   value={form.target_markets}
@@ -222,7 +224,7 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">{isDeveloper ? '项目描述' : '产品描述'}</label>
+                <label className="block text-xs text-gray-500 mb-1">{isDeveloper ? t('business.products.descLabelDev') : t('business.products.descLabel')}</label>
                 <textarea
                   className={inputCls}
                   rows={3}
@@ -231,7 +233,7 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-2">数据属性</label>
+                <label className="block text-xs text-gray-500 mb-2">{t('business.products.flagsLabel')}</label>
                 <div className="grid grid-cols-2 gap-2">
                   {boolFields.map((f) => (
                     <label key={f.key} className="flex items-center gap-2 text-sm text-gray-700">
@@ -241,12 +243,12 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
                         checked={Boolean(form.flags[f.key])}
                         onChange={(e) => setForm({ ...form, flags: { ...form.flags, [f.key]: e.target.checked } })}
                       />
-                      {f.label}
+                      {t(`business.products.flags.${f.labelKey}`)}
                     </label>
                   ))}
                 </div>
               </div>
-              {isDeveloper && <div><label className="block text-xs text-gray-500 mb-1">第三方 SDK（逗号分隔）</label><input className={inputCls} value={form.third_party_sdks} onChange={(e)=>setForm({...form,third_party_sdks:e.target.value})} placeholder="Firebase Analytics, Sentry"/></div>}
+              {isDeveloper && <div><label className="block text-xs text-gray-500 mb-1">{t('business.products.sdkLabel')}</label><input className={inputCls} value={form.third_party_sdks} onChange={(e)=>setForm({...form,third_party_sdks:e.target.value})} placeholder={t('business.products.sdkPlaceholder')}/></div>}
             </div>
             {submitError && <div className="mt-3 text-xs text-red-600">{submitError}</div>}
             <div className="mt-4 flex gap-2">
@@ -255,7 +257,7 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
                 disabled={submitting}
                 className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 disabled:opacity-50"
               >
-                {submitting ? '保存中…' : editing ? '保存修改' : '创建'}
+                {submitting ? t('business.common.saving') : editing ? t('business.common.saveChanges') : t('business.common.create')}
               </button>
               {editing && (
                 <button
@@ -263,7 +265,7 @@ export default function ProductsPage({ mode = 'business' }: { mode?: 'business' 
                   onClick={resetForm}
                   className="px-4 py-2 border border-gray-300 text-sm rounded-md text-gray-600 hover:bg-gray-50"
                 >
-                  取消
+                  {t('business.common.cancel')}
                 </button>
               )}
             </div>
