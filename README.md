@@ -63,6 +63,13 @@ DataShield/
 
 - 全站中英文切换：基于 react-i18next，语言切换器位于 Landing 顶栏和工作台侧边栏；语言偏好存 localStorage（key：`datashield.lang`）。新增或修改文案的规范见 `frontend/src/i18n/README.md`。
 - 新页面：`/features` 六大功能页、`/plans` 版本对比页（Demo / Developer / Enterprise）。
+- 工作台内置法规库：`/app/regulations` 可全文查阅 GDPR、《个人信息保护法》《数据安全法》，支持条文展开与双语检索（`POST /api/v1/legal-search`）。
+
+## 管理后台
+
+- 入口 `/admin`，用管理员密钥（环境变量 `ADMIN_API_KEY`）登录；未配置该变量时管理 API 全部返回 503。
+- 能力：总览统计、用户管理（禁用/启用/重置密码，禁用即吊销会话）、企业工作区浏览、法规库重置（`POST /api/v1/admin/regulations/reseed` 恢复三部法规初始状态）、清空演示数据（`POST /api/v1/admin/demo/reset`）。
+- 所有管理请求需带请求头 `X-Admin-Key`；密钥只存在于服务端环境变量，不下发到普通用户。
 
 ## Vercel + Neon 部署
 
@@ -129,7 +136,13 @@ npm run dev
 
 ## 桌面应用
 
-`desktop/` 目录是 Electron 壳：窗口与进程由 Electron 管理，FastAPI 后端以 PyInstaller 打包内嵌分发（用户无需安装 Python），前端静态文件随包加载，数据存 `%APPDATA%/datashield-desktop`。
+`desktop/` 目录是 Electron 壳：窗口与进程由 Electron 管理，FastAPI 后端以 PyInstaller 打包内嵌分发（用户无需安装 Python），前端静态文件由内嵌后端同源托管（`http://127.0.0.1:18321/`）。
+
+桌面运行时安全模型（对齐 Desktop Runtime 规范）：
+
+- 后端只绑定 `127.0.0.1`；每次启动由 Electron 生成随机 runtime token，经环境变量传给后端、经 IPC 传给界面，所有 `/api/*` 请求（除 `/api/health`）必须携带，防止同机其他进程或网页盗用本地 API。
+- 数据集中存 `%APPDATA%/DataShield`（SQLite、日志、法规缓存）；旧版 `%APPDATA%/datashield-desktop` 数据首次启动自动迁移。
+- 启动时自动执行 `alembic upgrade head` 迁移；迁移前自动备份数据库（保留最近 3 份），失败自动回滚并把错误写入 `logs/migration-error.log`。
 
 开发模式（一条命令拉起本机后端、Vite 和 Electron）：
 
@@ -192,6 +205,8 @@ POST /api/v1/evaluation/demo   # 免注册演示入口
 | `MAILER_PROVIDER` | `console` | 邮件通道：`console` 仅把验证码打进日志，可扩展 `smtp` / `http` 真实发信 |
 | `AUTH_REQUIRE_EMAIL_VERIFY` | `false` | 注册后是否要求邮箱验证码验证 |
 | `DESKTOP_MODE` | `false` | 桌面模式（Electron 内嵌后端）：放宽 Origin 校验、cookie 不带 `secure` |
+| `ADMIN_API_KEY` | 空 | 管理后台密钥；为空时 `/api/v1/admin/*` 全部 503 |
+| `UNDERSTANDING_API_KEY` | 空 | 产品理解（网站/仓库分析）服务端凭证；注意经 `os.getenv` 读取，须为真实进程环境变量（systemd 用 `EnvironmentFile` 注入），否则相关接口 503 |
 
 ## License
 
