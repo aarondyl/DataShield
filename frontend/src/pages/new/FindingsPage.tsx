@@ -87,9 +87,9 @@ export function FindingDetailPage() {
   const [d, setD] = useState<any>(null);
   const [error, setError] = useState('');
   useEffect(() => {
-    getFinding(id).then(setD).catch((e) => setError(e.message));
-  }, [id]);
-  if (error) return <div className="ds-page"><State title={t('appnew.findings.detailLoadError')} text={error} /></div>;
+    getFinding(id).then(setD).catch((e) => setError(e?.response?.status === 404 ? t('appnew.findings.detailNotFound') : (e?.response?.data?.detail || e.message)));
+  }, [id, t]);
+  if (error) return <div className="ds-page"><Link className="ds-back" to="/app/findings">{t('appnew.findings.back')}</Link><State title={t('appnew.findings.detailLoadError')} text={error} /></div>;
   if (!d) return <div className="ds-page"><State title={t('appnew.findings.loadingEvidence')} /></div>;
 
   const f = d.finding ?? {};

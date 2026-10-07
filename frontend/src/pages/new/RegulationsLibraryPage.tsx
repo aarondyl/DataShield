@@ -22,6 +22,17 @@ interface SearchHit {
   text: string;
 }
 
+function stripArticleHeading(content: string, number: string, title: string): string {
+  const trimmed = content.trimStart();
+  for (const heading of [`${number} ${title}`.trim(), title, number].filter(Boolean)) {
+    if (trimmed.startsWith(heading)) {
+      const rest = trimmed.slice(heading.length);
+      if (!rest || rest.startsWith('\n')) return rest.trim();
+    }
+  }
+  return content;
+}
+
 function groupSections(articles: RegulationArticle[]): ArticleSection[] {
   const map = new Map<string, { number: string; title: string; parts: string[] }>();
   for (const a of articles) {
@@ -30,8 +41,7 @@ function groupSections(articles: RegulationArticle[]): ArticleSection[] {
       s = { number: a.article_number, title: a.title, parts: [] };
       map.set(a.article_number, s);
     }
-    const body = a.content.startsWith(a.title) ? a.content.slice(a.title.length).trim() : a.content;
-    s.parts.push(body);
+    s.parts.push(stripArticleHeading(a.content, a.article_number, a.title));
   }
   return [...map.values()].map(({ parts, ...rest }) => ({ ...rest, text: parts.filter(Boolean).join('\n') }));
 }
@@ -135,7 +145,7 @@ export default function RegulationsLibraryPage() {
             regulation: r.regulation_name,
             article: r.article,
             title: r.summary || '',
-            text: r.content.startsWith(r.article) ? r.content.slice(r.article.length).trim() : r.content,
+            text: stripArticleHeading(r.content, r.article, r.summary || ''),
           }))
         );
         setSearching(false);

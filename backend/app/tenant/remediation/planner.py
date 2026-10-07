@@ -478,8 +478,9 @@ def plan_remediation(
         {item.legal_unit_id for item in detail.legal_evidence},
     )
     qualifier = "潜在缺口" if gap.gap_status == GapStatus.POTENTIAL else "已确认缺口"
+    type_label = "文档修改" if request.remediation_type.value == "DOCUMENT_CHANGE" else "代码修改"
     summary = (
-        f"针对{qualifier}的 {request.remediation_type.value} 整改方案（基于所提供的法规与产品证据）；"
+        f"针对{qualifier}的{type_label}整改方案（基于所提供的法规与产品证据）；"
         "执行前需人工审核。"
     )
     record = create_remediation(

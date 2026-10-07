@@ -9,17 +9,21 @@ import BrandLogo from '../../components/BrandLogo';
 
 export default function AuthPage({mode}:{mode:'login'|'signup'}){
   const {t}=useTranslation();
+  const friendlyError=(detail:unknown,fallback:string)=>{const d=String(detail||'');if(d==='Email already registered')return t('appnew.auth.emailTaken');if(d==='Invalid email or password')return t('appnew.auth.invalidCredentials');if(d==='Account disabled')return t('appnew.auth.accountDisabled');return d||fallback};
   const navigate=useNavigate();const [params]=useSearchParams();const edition=((params.get('edition') as Edition)||readEdition());
   const [name,setName]=useState('');const [email,setEmail]=useState('');const [password,setPassword]=useState('');const [confirm,setConfirm]=useState('');const [company,setCompany]=useState('');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
   const submit=async(e:React.FormEvent)=>{e.preventDefault();setError('');
+    if(!email.trim()||!password||(mode==='signup'&&(!name.trim()||!confirm||!company.trim()))){setError(t('appnew.auth.requiredFields'));return}
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())){setError(t('appnew.auth.invalidEmail'));return}
+    if(mode==='signup'&&password.length<8){setError(t('appnew.auth.passwordTooShort'));return}
     if(mode==='signup'&&password!==confirm){setError(t('appnew.auth.passwordMismatch'));return}
     setBusy(true);
     try{
       if(mode==='signup'){const user=await register({email,password,name,company_name:company,edition});writeSession({name,email:user.email,edition:user.edition,companyName:company,companyId:user.company_id});navigate('/onboarding/understand')}
       else{const user=await login({email,password});writeSession({name:user.email.split('@')[0],email:user.email,edition:user.edition,companyId:user.company_id});navigate('/app/today')}
-    }catch(err:any){setError(err?.response?.data?.detail||(mode==='signup'?t('appnew.auth.signupError'):t('appnew.auth.loginError')));setBusy(false)}};
+    }catch(err:any){setError(friendlyError(err?.response?.data?.detail,mode==='signup'?t('appnew.auth.signupError'):t('appnew.auth.loginError')));setBusy(false)}};
   const demo=async()=>{setBusy(true);setError('');try{const d=await createDemoWorkspace();writeSession({name:'Aaron',email:'demo@datashield.local',edition:'developer',companyName:'Acme AI Labs',companyId:d.company_id});writeSetup({companyId:d.company_id,productId:d.product_id,productName:d.product_name,markets:['EU','US','UK'],method:'manual'});navigate('/app/today')}catch(err:any){setError(err?.response?.data?.detail||t('appnew.auth.demoError'));setBusy(false)}};
-  return <main className="ds-auth"><div className="ds-auth-brand"><Link to="/" className="ds-brand"><BrandLogo size={34}/><span>DataShield</span></Link><p>{t('appnew.auth.brandTagline')}</p></div><form onSubmit={submit}><span className="ds-eyebrow">{t('appnew.auth.editionEyebrow',{edition:t(`appnew.auth.edition.${edition}`,{defaultValue:edition})})}</span><h1>{mode==='signup'?t('appnew.auth.createTitle'):t('appnew.auth.welcomeBack')}</h1>
+  return <main className="ds-auth"><div className="ds-auth-brand"><div><Link to="/" className="ds-brand"><BrandLogo size={34}/><span>DataShield</span></Link><p>{t('appnew.auth.brandTagline')}</p><ul className="ds-auth-points"><li>{t('appnew.auth.brandPoint1')}</li><li>{t('appnew.auth.brandPoint2')}</li><li>{t('appnew.auth.brandPoint3')}</li></ul></div><small className="ds-auth-legal">{t('appnew.auth.brandDisclaimer')}</small></div><form onSubmit={submit} noValidate><span className="ds-eyebrow">{t('appnew.auth.editionEyebrow',{edition:t(`appnew.auth.edition.${edition}`,{defaultValue:edition})})}</span><h1>{mode==='signup'?t('appnew.auth.createTitle'):t('appnew.auth.welcomeBack')}</h1>
     {mode==='signup'&&<label>{t('appnew.auth.name')}<input required value={name} onChange={e=>setName(e.target.value)} autoComplete="name"/></label>}
     <label>{edition==='enterprise'?t('appnew.auth.workEmail'):t('appnew.auth.email')}<input required type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/></label>
     <label>{t('appnew.auth.password')}<input required type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete={mode==='signup'?'new-password':'current-password'} minLength={mode==='signup'?8:undefined} maxLength={128}/></label>
