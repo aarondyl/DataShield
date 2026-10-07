@@ -34,3 +34,24 @@
   注意为未知枚举留兜底（如 `t('common.status.unknown')` 或 i18next 的 `defaultValue`）。
 - 复数用 i18next 内置 `_one` / `_other` 后缀；不要在代码里写 `count > 1 ? 's' : ''`。
 - 品牌名 "DataShield" 等不翻译内容可复用 `misc.appTitle`。
+
+## 附录：统一术语表
+
+以下术语在所有片段文件中保持一致；新增或修改文案时先查此表，不要自造译法。
+
+| English | 中文 | 说明 |
+|---|---|---|
+| Finding | 合规发现 | 有证据支撑、适用于产品的差距；en 正文中作普通名词小写 `finding(s)` |
+| Remediation Action | 整改行动 | 由 Finding 生成、待人工审阅的建议行动 |
+| Product Twin | 产品画像 | 产品的事实模型；developer 旧页面中的 Product Profile 对应“产品档案” |
+| Applicability | 适用性 | 某要求是否适用于产品 |
+| Evidence | 证据 | 支撑结论的产品事实或法律条文 |
+| Workspace | 工作区 | 独立的评估环境 |
+| Regulation Intelligence | 法规智能 | 法规库、条文版本与官方来源；en 不用 Regulatory Intelligence |
+| Impact Analysis | 影响分析 | 法规变化对产品的影响评估 |
+| Self-Assessment | 合规自查 | 规则引擎逐项核对 |
+| Remediation Roadmap | 整改路线图 | 排好优先级、可验证的整改计划 |
+| Document Prefill | 文档预填 | 基于产品画像预填合规文档草稿 |
+| Privacy Policy | 隐私政策 | 作为文档名可大写；en UI 标签中作普通名词小写 `privacy policy` |
+| SDK Scan | SDK 扫描 | 依赖 / 权限清单扫描 |
+| Ready to Ship | 发布就绪 | 上线前基础检查通过的状态 |
