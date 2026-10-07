@@ -13,18 +13,24 @@ DataShield 是面向出海企业的数据合规分析与整改平台。新版将
 - 法规库：预置 GDPR、《个人信息保护法》《数据安全法》，支持上传法规文档。
 - 隐私政策工具：根据评估答案生成初稿，检查现有政策的 12 项法定要素。
 - 文档预填：根据产品说明或需求文档生成合规问卷预填建议。
+- 账户体系与版本：邮箱+密码注册/登录（PBKDF2 哈希入库、HttpOnly cookie 会话），Demo / Developer / Enterprise 三个版本，保留免注册演示入口。
+- 全站中英文切换：基于 react-i18next，Landing 顶栏与工作台侧边栏均有语言切换器。
+- 桌面应用：Electron 壳内嵌 PyInstaller 打包的后端，Windows 一键安装，无需 Python 环境。
 
 ## 架构
 
 ```text
-React + TypeScript
+React + TypeScript（react-i18next 全站中英文）
         │
         ▼
 FastAPI ── 确定性规则引擎（问卷、评分、报告、隐私政策）
         │
+        ├── 账户认证（/v1/auth：邮箱+密码、PBKDF2 哈希、HttpOnly 会话）
         ├── LangGraph Agent（影响判断、证据验证、行动规划）
         ├── RAG（法规切片、Embedding、Top-K 检索）
         └── PostgreSQL + pgvector（本地开发可使用 SQLite）
+
+桌面封装：Electron + PyInstaller 内嵌后端（desktop/，数据存 %APPDATA%/datashield-desktop）
 ```
 
 仓库现在只有一套应用：
@@ -32,17 +38,31 @@ FastAPI ── 确定性规则引擎（问卷、评分、报告、隐私政策�
 ```text
 DataShield/
 ├── api/index.py           # Vercel FastAPI Function 入口
-├── frontend/              # React + Vite + TypeScript
+├── frontend/              # React + Vite + TypeScript（含 src/i18n 中英文文案）
 ├── backend/
-│   ├── app/api/           # REST API
+│   ├── app/api/           # REST API（含 /v1/auth 账户认证）
 │   ├── app/agents/        # LangGraph 工作流
 │   ├── app/compliance/    # 原 DataShield 规则、评分、报告和政策能力
 │   ├── app/rag/           # 法规入库与检索
 │   ├── app/models/        # SQLAlchemy 模型
 │   └── tests/             # 后端自动化测试
+├── desktop/               # Electron 桌面壳（内嵌 PyInstaller 后端）
 ├── docker-compose.yml     # 应用 + PostgreSQL/pgvector
 └── 启动DataShield.bat      # Windows 本地开发启动器
 ```
+
+## 账户体系
+
+- 注册 / 登录：邮箱 + 密码，端点 `POST /api/v1/auth/register|login`；密码以 PBKDF2-HMAC-SHA256 哈希入库，会话使用 HttpOnly cookie。
+- 其他端点：`POST /api/v1/auth/logout`、`GET /api/v1/auth/me`、`POST /api/v1/auth/verify-email`（邮箱验证码）。
+- 免注册演示：`POST /api/v1/evaluation/demo` 保留演示入口，不注册也能进入工作区。
+- 邮件预留窗口：默认 `MAILER_PROVIDER=console` 只把验证码打进后端日志，后续可扩展 `smtp` / `http` 真实发信；`AUTH_REQUIRE_EMAIL_VERIFY=true` 时注册流程开启邮箱验证。
+- 账户数据落在同一个数据库：默认 SQLite 本地库，切换 PostgreSQL 改 `DATABASE_URL` 即可。
+
+## 中英文切换与站点页面
+
+- 全站中英文切换：基于 react-i18next，语言切换器位于 Landing 顶栏和工作台侧边栏；语言偏好存 localStorage（key：`datashield.lang`）。新增或修改文案的规范见 `frontend/src/i18n/README.md`。
+- 新页面：`/features` 六大功能页、`/plans` 版本对比页（Demo / Developer / Enterprise）。
 
 ## Vercel + Neon 部署
 
@@ -107,6 +127,27 @@ npm run dev
 
 打开 <http://localhost:5173>。Vite 会把 `/api` 请求代理到 `http://localhost:8000`。
 
+## 桌面应用
+
+`desktop/` 目录是 Electron 壳：窗口与进程由 Electron 管理，FastAPI 后端以 PyInstaller 打包内嵌分发（用户无需安装 Python），前端静态文件随包加载，数据存 `%APPDATA%/datashield-desktop`。
+
+开发模式（一条命令拉起本机后端、Vite 和 Electron）：
+
+```bash
+cd desktop
+npm install
+npm run dev
+```
+
+打包 NSIS 安装包：
+
+```bash
+cd desktop
+npm run dist
+```
+
+产出 `desktop/release/DataShield Setup 0.1.0.exe`（约 193MB，内嵌 PyInstaller 后端 + 前端静态文件）。Windows 非管理员环境打包需先处理 winCodeSign 的 7za wrapper，详见 `desktop/README.md`。
+
 ## 测试
 
 ```bash
@@ -129,6 +170,10 @@ GET/POST /api/compliance/assessments
 POST     /api/compliance/documents/analyze
 POST     /api/compliance/policy/generate
 POST     /api/compliance/policy/check
+
+POST /api/v1/auth/register|login|logout|verify-email
+GET  /api/v1/auth/me
+POST /api/v1/evaluation/demo   # 免注册演示入口
 ```
 
 ## 配置
@@ -144,6 +189,9 @@ POST     /api/compliance/policy/check
 | `LLM_MODEL` | `deepseek-chat` | 模型名称 |
 | `EMBEDDING_PROVIDER` | `local` | `local` 哈希向量；`api` 远程 Embedding |
 | `RUN_SEED` | `true` | 空数据库启动时写入演示数据 |
+| `MAILER_PROVIDER` | `console` | 邮件通道：`console` 仅把验证码打进日志，可扩展 `smtp` / `http` 真实发信 |
+| `AUTH_REQUIRE_EMAIL_VERIFY` | `false` | 注册后是否要求邮箱验证码验证 |
+| `DESKTOP_MODE` | `false` | 桌面模式（Electron 内嵌后端）：放宽 Origin 校验、cookie 不带 `secure` |
 
 ## License
 
