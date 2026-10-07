@@ -19,6 +19,15 @@ export default {
       product: '产品',
     },
   },
+  common: {
+    errorBoundary: {
+      title: '页面出错了',
+      body: '这个页面遇到了一个意外错误，你的数据没有丢失。可以返回工作台继续，或重新加载再试一次。',
+      summary: '错误详情',
+      backToWorkbench: '返回工作台',
+      reload: '重新加载',
+    },
+  },
   landing: {
     eyebrow: '持续合规',
     evaluationWorkspace: '评估工作区',
@@ -503,6 +512,13 @@ export default {
     acceptanceCriteria: '验收标准（怎么算改好了）',
     reject: '拒绝这份草案',
     approve: '采纳这份草案',
+    untitled: '未命名草案',
+    statusUnknown: '状态未知',
+    planMissing: '这份草案的内容数据不完整，以下信息可能不全。',
+    fieldEmpty: '（暂无内容）',
+    noRequestedChanges: 'AI 没有列出具体的修改点。',
+    noCodingPrompt: '（没有生成代码修改说明）',
+    noAcceptanceCriteria: '暂无验收标准。',
   },
   product: {
     setupFirst: '请先设置一个产品',

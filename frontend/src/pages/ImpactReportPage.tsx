@@ -58,6 +58,11 @@ export default function ImpactReportPage() {
   if (loading) return <Spinner text={t('misc.impactReport.loading')} />;
   if (error || !data) return <ErrorBox message={error ?? t('misc.impactReport.notFound')} onRetry={reload} />;
 
+  const affectedAreas = data.affected_areas ?? [];
+  const affectedProducts = data.affected_products ?? [];
+  const evidence = data.evidence ?? [];
+  const actions = data.actions ?? [];
+
   return (
     <div>
       <div className="mb-4">
@@ -120,21 +125,21 @@ export default function ImpactReportPage() {
         </Section>
 
         <Section title={t('misc.impactReport.affectedScope')}>
-          {data.affected_areas.length === 0 && data.affected_products.length === 0 ? (
+          {affectedAreas.length === 0 && affectedProducts.length === 0 ? (
             <span className="text-sm text-gray-400">{t('misc.impactReport.none')}</span>
           ) : (
             <div>
-              {data.affected_products.length > 0 && (
+              {affectedProducts.length > 0 && (
                 <div className="mb-2">
                   <span className="text-xs text-gray-400 mr-2">{t('misc.impactReport.affectedProducts')}</span>
-                  {data.affected_products.map((p) => (
+                  {affectedProducts.map((p) => (
                     <Tag key={p}>{p}</Tag>
                   ))}
                 </div>
               )}
               <div>
                 <span className="text-xs text-gray-400 mr-2">{t('misc.impactReport.affectedAreas')}</span>
-                {data.affected_areas.map((a) => (
+                {affectedAreas.map((a) => (
                   <Tag key={a}>{a}</Tag>
                 ))}
               </div>
@@ -142,8 +147,8 @@ export default function ImpactReportPage() {
           )}
         </Section>
 
-        <Section title={t('misc.impactReport.evidenceTitle', { count: data.evidence.length })}>
-          {data.evidence.length === 0 ? (
+        <Section title={t('misc.impactReport.evidenceTitle', { count: evidence.length })}>
+          {evidence.length === 0 ? (
             <span className="text-sm text-gray-400">{t('misc.impactReport.noEvidence')}</span>
           ) : (
             <div className="overflow-x-auto">
@@ -159,7 +164,7 @@ export default function ImpactReportPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.evidence.map((ev, i) => (
+                  {evidence.map((ev, i) => (
                     <tr key={i} className="border-b border-gray-100 last:border-0 align-top">
                       <td className="px-3 py-2 text-gray-700">{ev.regulation}</td>
                       <td className="px-3 py-2 text-gray-700 whitespace-nowrap">{ev.article}</td>
@@ -198,8 +203,8 @@ export default function ImpactReportPage() {
           )}
         </Section>
 
-        <Section title={t('misc.impactReport.actionsTitle', { count: data.actions.length })}>
-          {data.actions.length === 0 ? (
+        <Section title={t('misc.impactReport.actionsTitle', { count: actions.length })}>
+          {actions.length === 0 ? (
             <span className="text-sm text-gray-400">{t('misc.impactReport.noActions')}</span>
           ) : (
             <div className="overflow-x-auto">
@@ -214,7 +219,7 @@ export default function ImpactReportPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.actions.map((a, i) => (
+                  {actions.map((a, i) => (
                     <tr key={i} className="border-b border-gray-100 last:border-0 align-top">
                       <td className="px-3 py-2">
                         <span

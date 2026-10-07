@@ -5,6 +5,7 @@ import { fetchMe, type MeResponse } from '../api/auth';
 import { readSession, writeSession, type LocalSession } from '../features/auth/session'; import { readSetup } from '../features/onboarding/state';
 import Spinner from './Spinner';
 import LanguageSwitcher from './LanguageSwitcher';
+import ErrorBoundary from './ErrorBoundary';
 
 const nav = [
   { to: '/app/today', labelKey: 'today', icon: 'sun' },
@@ -57,6 +58,6 @@ export default function AppShell() {
         <div className="ds-profile" title={session?.email||undefined}><span>{(session?.name||session?.email||'D')[0].toUpperCase()}</span><div><strong>{session?.name||session?.email||t('appnew.shell.demo')}</strong><small>{isDemo?t('appnew.shell.demoWorkspace'):session?.email||t('appnew.shell.localSession')}</small></div></div>
       </div>
     </aside>
-    <main className="ds-main"><Outlet/></main>
+    <main className="ds-main"><ErrorBoundary><Outlet/></ErrorBoundary></main>
   </div>;
 }

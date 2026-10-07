@@ -19,6 +19,15 @@ export default {
       product: 'Product',
     },
   },
+  common: {
+    errorBoundary: {
+      title: 'Something went wrong',
+      body: 'This page hit an unexpected error. Your data is safe — head back to the workspace, or reload to try again.',
+      summary: 'Error details',
+      backToWorkbench: 'Back to workspace',
+      reload: 'Reload',
+    },
+  },
   landing: {
     eyebrow: 'Continuous compliance',
     evaluationWorkspace: 'Evaluation workspace',
@@ -503,6 +512,13 @@ export default {
     acceptanceCriteria: 'Acceptance criteria (what “done” looks like)',
     reject: 'Reject this draft',
     approve: 'Accept this draft',
+    untitled: 'Untitled draft',
+    statusUnknown: 'Unknown status',
+    planMissing: "This draft's content is incomplete — some information below may be missing.",
+    fieldEmpty: '(Nothing here yet)',
+    noRequestedChanges: 'The AI did not list any specific changes.',
+    noCodingPrompt: '(No code-change instructions were generated)',
+    noAcceptanceCriteria: 'No acceptance criteria provided.',
   },
   product: {
     setupFirst: 'Set up a product first',

@@ -385,9 +385,9 @@ export default function AdminPage() {
                       <td>{c.business_model}</td>
                       <td>{c.products}</td>
                       <td>
-                        {c.users.length === 0
+                        {(c.users||[]).length === 0
                           ? t('appnew.admin.workspaces.noMembers')
-                          : c.users.map((email) => <small key={email}>{email}</small>)}
+                          : (c.users||[]).map((email) => <small key={email}>{email}</small>)}
                       </td>
                       <td>{fmtDate(c.created_at)}</td>
                     </tr>
