@@ -5,6 +5,7 @@ import {login,register} from '../../api/auth';
 import {createDemoWorkspace} from '../../api/evaluation';
 import {readEdition,writeSession,type Edition} from '../../features/auth/session';
 import {writeSetup} from '../../features/onboarding/state';
+import BrandLogo from '../../components/BrandLogo';
 
 export default function AuthPage({mode}:{mode:'login'|'signup'}){
   const {t}=useTranslation();
@@ -18,7 +19,7 @@ export default function AuthPage({mode}:{mode:'login'|'signup'}){
       else{const user=await login({email,password});writeSession({name:user.email.split('@')[0],email:user.email,edition:user.edition,companyId:user.company_id});navigate('/app/today')}
     }catch(err:any){setError(err?.response?.data?.detail||(mode==='signup'?t('appnew.auth.signupError'):t('appnew.auth.loginError')));setBusy(false)}};
   const demo=async()=>{setBusy(true);setError('');try{const d=await createDemoWorkspace();writeSession({name:'Aaron',email:'demo@datashield.local',edition:'developer',companyName:'Acme AI Labs',companyId:d.company_id});writeSetup({companyId:d.company_id,productId:d.product_id,productName:d.product_name,markets:['EU','US','UK'],method:'manual'});navigate('/app/today')}catch(err:any){setError(err?.response?.data?.detail||t('appnew.auth.demoError'));setBusy(false)}};
-  return <main className="ds-auth"><div className="ds-auth-brand"><Link to="/" className="ds-brand"><span className="ds-logo">D</span><span>DataShield</span></Link><p>{t('appnew.auth.brandTagline')}</p></div><form onSubmit={submit}><span className="ds-eyebrow">{t('appnew.auth.editionEyebrow',{edition:t(`appnew.auth.edition.${edition}`,{defaultValue:edition})})}</span><h1>{mode==='signup'?t('appnew.auth.createTitle'):t('appnew.auth.welcomeBack')}</h1>
+  return <main className="ds-auth"><div className="ds-auth-brand"><Link to="/" className="ds-brand"><BrandLogo size={34}/><span>DataShield</span></Link><p>{t('appnew.auth.brandTagline')}</p></div><form onSubmit={submit}><span className="ds-eyebrow">{t('appnew.auth.editionEyebrow',{edition:t(`appnew.auth.edition.${edition}`,{defaultValue:edition})})}</span><h1>{mode==='signup'?t('appnew.auth.createTitle'):t('appnew.auth.welcomeBack')}</h1>
     {mode==='signup'&&<label>{t('appnew.auth.name')}<input required value={name} onChange={e=>setName(e.target.value)} autoComplete="name"/></label>}
     <label>{edition==='enterprise'?t('appnew.auth.workEmail'):t('appnew.auth.email')}<input required type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/></label>
     <label>{t('appnew.auth.password')}<input required type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete={mode==='signup'?'new-password':'current-password'} minLength={mode==='signup'?8:undefined} maxLength={128}/></label>

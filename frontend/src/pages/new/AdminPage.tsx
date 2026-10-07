@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import client from '../../api/client';
 import Spinner from '../../components/Spinner';
 import LanguageSwitcher from '../../components/LanguageSwitcher';
+import BrandLogo from '../../components/BrandLogo';
 
 const KEY_STORAGE = 'datashield.admin.key';
 
@@ -312,7 +313,7 @@ export default function AdminPage() {
       <main className="ds-admin-gate">
         <form onSubmit={enter}>
           <Link to="/" className="ds-brand">
-            <span className="ds-logo">D</span>
+            <BrandLogo size={30} />
             <span>DataShield</span>
           </Link>
           <h1>{t('appnew.admin.gate.title')}</h1>
@@ -368,7 +369,7 @@ export default function AdminPage() {
     <main className="ds-admin">
       <nav className="ds-admin-nav">
         <Link to="/" className="ds-brand">
-          <span className="ds-logo">D</span>
+          <BrandLogo size={30} />
           <span>DataShield</span>
         </Link>
         <div className="ds-admin-nav-actions">

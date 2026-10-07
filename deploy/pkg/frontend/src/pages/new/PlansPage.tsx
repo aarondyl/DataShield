@@ -1,0 +1,12 @@
+import {Link} from 'react-router-dom';
+import {useTranslation} from 'react-i18next';
+import LanguageSwitcher from '../../components/LanguageSwitcher';
+
+const EDITIONS:[string,string][]=[['demo','/'],['developer','/signup?edition=developer'],['enterprise','/choose']];
+const POINTS:Record<string,string[]>={demo:['noSignup','expires','sampleData'],developer:['selfServe','coreCheck','regulationSearch'],enterprise:['teamWorkspace','monitoring','roadmap','prioritySupport']};
+const ROWS=['selfAssessment','regulationSearch','impactAnalysis','dataRetention','teamWorkspace','monitoring','roadmap','support'];
+
+export default function PlansPage(){
+  const {t}=useTranslation();
+  return <main className="ds-public ds-plans-page"><nav><Link to="/" className="ds-brand"><span className="ds-logo">D</span><span>DataShield</span></Link><div style={{display:'flex',alignItems:'center',gap:18}}><Link to="/features" className="ds-text-link">{t('appnew.landing.navFeatures')}</Link><Link to="/plans" className="ds-text-link">{t('appnew.landing.navPlans')}</Link><LanguageSwitcher/><Link to="/login" className="ds-text-link">{t('appnew.landing.evaluationWorkspace')}</Link></div></nav><header className="ds-page-head"><span className="ds-eyebrow">{t('appnew.plans.eyebrow')}</span><h1>{t('appnew.plans.title')}</h1><p>{t('appnew.plans.subtitle')}</p></header><div className="ds-plans-grid">{EDITIONS.map(([k,to])=><article key={k} className={`ds-plan-card${k==='developer'?' featured':''}`}><span className="ds-eyebrow">{t(`appnew.plans.editions.${k}.badge`)}</span><h2>{t(`appnew.plans.editions.${k}.name`)}</h2><p>{t(`appnew.plans.editions.${k}.tagline`)}</p><ul>{(POINTS[k]||[]).map(p=><li key={p}>{t(`appnew.plans.editions.${k}.points.${p}`)}</li>)}</ul><Link className={`ds-button ${k==='developer'?'primary':'quiet'}`} to={to}>{t(`appnew.plans.editions.${k}.cta`)}</Link></article>)}</div><h2 className="ds-plans-compare-title">{t('appnew.plans.compareTitle')}</h2><table className="ds-plans-table"><thead><tr><th>{t('appnew.plans.table.capability')}</th><th>{t('appnew.plans.editions.demo.name')}</th><th>{t('appnew.plans.editions.developer.name')}</th><th>{t('appnew.plans.editions.enterprise.name')}</th></tr></thead><tbody>{ROWS.map(r=><tr key={r}><td>{t(`appnew.plans.table.rows.${r}.label`)}</td><td>{t(`appnew.plans.table.rows.${r}.demo`)}</td><td>{t(`appnew.plans.table.rows.${r}.developer`)}</td><td>{t(`appnew.plans.table.rows.${r}.enterprise`)}</td></tr>)}</tbody></table><p className="ds-legal-note">{t('appnew.plans.legalNote')}</p></main>
+}

@@ -2,6 +2,8 @@
 .ds-sidebar { position:sticky; top:0; height:100vh; padding:28px 20px 20px; display:flex; flex-direction:column; border-right:1px solid var(--ds-line); background:rgba(255,255,255,.88); }
 .ds-brand { display:flex; align-items:center; gap:10px; color:var(--ds-ink); font-weight:680; letter-spacing:-.02em; }
 .ds-logo { width:30px; height:30px; display:grid; place-items:center; border-radius:9px; color:white; background:var(--ds-accent); font-size:13px; }
+.ds-brand-logo { flex:none; display:inline-grid; place-items:center; background:#fff; border:1px solid var(--ds-line); overflow:hidden; }
+.ds-brand-logo img { width:100%; height:100%; object-fit:contain; display:block; }
 .ds-workspace { margin:32px 0 25px; padding:14px; border:1px solid var(--ds-line); border-radius:12px; display:flex; flex-direction:column; gap:3px; background:var(--ds-paper); }
 .ds-workspace span,.ds-workspace small,.ds-profile small { color:var(--ds-muted); font-size:11px; }.ds-workspace strong { font-size:13px; }
 .ds-sidebar nav { display:flex; flex-direction:column; gap:4px; }

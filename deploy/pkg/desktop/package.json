@@ -1,0 +1,51 @@
+{
+  "name": "datashield-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "DataShield 数据合规桌面版（Electron + 内嵌 FastAPI 后端）",
+  "main": "main.js",
+  "scripts": {
+    "dev:backend": "cross-env DATASHIELD_DATA_DIR=./desktop-data python ../backend/desktop_entry.py",
+    "dev:frontend": "npm --prefix ../frontend run dev",
+    "dev": "concurrently -k \"npm run dev:backend\" \"npm run dev:frontend\" \"wait-on tcp:127.0.0.1:18321 http://localhost:5173 && cross-env DESKTOP_DEV=1 DESKTOP_DEV_API=http://127.0.0.1:18321/api electron .\"",
+    "build:backend": "cd ../backend && python -m PyInstaller datashield-backend.spec --distpath dist --workpath build --noconfirm",
+    "build:frontend": "npm --prefix ../frontend run build -- --base=./",
+    "dist": "npm run build:backend && npm run build:frontend && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "electron": "^33.4.0",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.datashield.app",
+    "productName": "DataShield",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "extraResources": [
+      {
+        "from": "../backend/dist/datashield-backend",
+        "to": "datashield-backend"
+      },
+      {
+        "from": "../frontend/dist",
+        "to": "frontend-dist"
+      }
+    ]
+  }
+}

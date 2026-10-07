@@ -5,6 +5,7 @@ import { fetchMe, type MeResponse } from '../api/auth';
 import { readSession, writeSession, type LocalSession } from '../features/auth/session'; import { readSetup } from '../features/onboarding/state';
 import Spinner from './Spinner';
 import LanguageSwitcher from './LanguageSwitcher';
+import BrandLogo from './BrandLogo';
 import ErrorBoundary from './ErrorBoundary';
 
 const nav = [
@@ -49,7 +50,7 @@ export default function AppShell() {
   if(checking)return <Spinner text={t('appnew.shell.loadingWorkspace')}/>;
   return <div className="ds-shell">
     <aside className="ds-sidebar">
-      <NavLink to="/app/today" className="ds-brand"><span className="ds-logo">D</span><span>DataShield</span></NavLink>
+      <NavLink to="/app/today" className="ds-brand"><BrandLogo size={30}/><span>DataShield</span></NavLink>
       <div className="ds-workspace"><span>{t('appnew.shell.workspace')}</span><strong>{setup?.productName||session?.companyName||t('appnew.shell.myProduct')}</strong><small>{session?.edition==='enterprise'?t('appnew.shell.enterpriseEdition'):t('appnew.shell.developerEdition')}</small></div>
       <nav aria-label={t('appnew.shell.primaryNav')}>{nav.map(item => <NavLink key={item.to} to={item.to} className={({isActive}) => `ds-nav-link${isActive ? ' active' : ''}`}><Icon name={item.icon}/><span>{t(`appnew.shell.nav.${item.labelKey}`)}</span></NavLink>)}</nav>
       <div className="ds-sidebar-bottom">
