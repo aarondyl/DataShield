@@ -9,7 +9,7 @@
     "dev:frontend": "npm --prefix ../frontend run dev",
     "dev": "concurrently -k \"npm run dev:backend\" \"npm run dev:frontend\" \"wait-on tcp:127.0.0.1:18321 http://localhost:5173 && cross-env DESKTOP_DEV=1 DESKTOP_DEV_API=http://127.0.0.1:18321/api electron .\"",
     "build:backend": "cd ../backend && python -m PyInstaller datashield-backend.spec --distpath dist --workpath build --noconfirm",
-    "build:frontend": "npm --prefix ../frontend run build",
+    "build:frontend": "npm --prefix ../frontend run build -- --base=./",
     "dist": "npm run build:backend && npm run build:frontend && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis"
   },
   "devDependencies": {

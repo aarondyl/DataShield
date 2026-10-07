@@ -4,8 +4,9 @@
 //   后端由 `npm run dev:backend` 用系统 Python 启动（desktop_entry.py），
 //   preload 注入的 apiBase 指向 http://127.0.0.1:18321/api（可用 DESKTOP_DEV_API 覆盖）。
 // - 生产模式：spawn resources/datashield-backend/datashield-backend.exe
-//   （env 带 DATASHIELD_DATA_DIR=userData），轮询 /api/health 就绪后加载
-//   resources/frontend-dist/index.html；退出时杀掉后端进程树。
+//   （env 带 DATASHIELD_DATA_DIR=userData、DATASHIELD_FRONTEND_DIR=resources/frontend-dist），
+//   轮询 /api/health 就绪后加载 http://127.0.0.1:18321/（后端同源提供前端静态文件，
+//   避免 file:// 下 ES module 被 CORS 拦截导致的白屏）；退出时杀掉后端进程树。
 
 const { app, BrowserWindow } = require('electron');
 const { spawn, exec } = require('child_process');
@@ -40,8 +41,8 @@ function start() {
   startBackend();
   waitForBackend(120, 500)
     .then(() => {
-      const indexHtml = path.join(process.resourcesPath, 'frontend-dist', 'index.html');
-      createWindow(null, indexHtml);
+      // 后端同源托管前端静态文件（DATASHIELD_FRONTEND_DIR），直接加载后端地址
+      createWindow(`http://127.0.0.1:${BACKEND_PORT}/`);
     })
     .catch((err) => {
       console.error('后端启动失败:', err);
@@ -52,7 +53,11 @@ function start() {
 function startBackend() {
   const exe = path.join(process.resourcesPath, 'datashield-backend', 'datashield-backend.exe');
   backendProcess = spawn(exe, [], {
-    env: { ...process.env, DATASHIELD_DATA_DIR: app.getPath('userData') },
+    env: {
+      ...process.env,
+      DATASHIELD_DATA_DIR: app.getPath('userData'),
+      DATASHIELD_FRONTEND_DIR: path.join(process.resourcesPath, 'frontend-dist'),
+    },
     stdio: 'ignore',
     windowsHide: true,
   });
@@ -81,7 +86,7 @@ function waitForBackend(maxAttempts, intervalMs) {
   });
 }
 
-function createWindow(url, file) {
+function createWindow(url) {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -93,8 +98,7 @@ function createWindow(url, file) {
       nodeIntegration: false,
     },
   });
-  if (url) mainWindow.loadURL(url);
-  else mainWindow.loadFile(file);
+  mainWindow.loadURL(url);
   mainWindow.on('closed', () => {
     mainWindow = null;
   });

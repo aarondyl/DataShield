@@ -112,7 +112,11 @@ app.include_router(product_twin.router, prefix="/api", include_in_schema=False)
 
 # The production image serves the compiled React frontend from the same origin.
 # During development Vite runs separately and proxies /api to this service.
-static_dir = Path(__file__).resolve().parents[1] / "static"
+# Desktop (Electron) packaging points DATASHIELD_FRONTEND_DIR at the bundled frontend.
+import os as _os
+
+_frontend_env = _os.environ.get("DATASHIELD_FRONTEND_DIR")
+static_dir = Path(_frontend_env).resolve() if _frontend_env else Path(__file__).resolve().parents[1] / "static"
 if static_dir.exists():
     assets_dir = static_dir / "assets"
     if assets_dir.exists():
