@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.evaluation_auth import CurrentPrincipal, require_company_access, require_principal
-from app.models import FeedbackCandidate,Finding,Remediation,TenantAgentRun,TenantMissingContextItem
+from app.models import Feedback,FeedbackCandidate,Finding,Remediation,TenantAgentRun,TenantMissingContextItem
 from app.tenant.context.ownership import resolve_tenant_product
 router=APIRouter(prefix="/v1/today",tags=["Tenant Today"])
 class AttentionItem(BaseModel):
@@ -18,7 +18,14 @@ class TodayResponse(BaseModel):
 def today(tenant_id:int=Query(ge=1),product_id:int=Query(ge=1),db:Session=Depends(get_db),principal:CurrentPrincipal=Depends(require_principal)):
     require_company_access(tenant_id, principal)
     resolve_tenant_product(db,tenant_id,product_id); out=TodayResponse()
+    superseded_finding_ids=set()
+    applied=db.scalars(select(FeedbackCandidate).join(Feedback,Feedback.id==FeedbackCandidate.feedback_id).where(FeedbackCandidate.tenant_id==tenant_id,FeedbackCandidate.product_id==product_id,FeedbackCandidate.status=="APPLIED",Feedback.finding_id.is_not(None))).all()
+    for candidate in applied:
+        rerun=db.get(TenantAgentRun,candidate.reanalysis_run_id) if candidate.reanalysis_run_id else None
+        if rerun and not (rerun.output_json or {}).get("finding_ids"):
+            superseded_finding_ids.add(candidate.feedback.finding_id)
     for f in db.scalars(select(Finding).where(Finding.tenant_id==tenant_id,Finding.product_id==product_id).order_by(Finding.created_at.desc())).all():
+        if f.id in superseded_finding_ids: continue
         item=AttentionItem(id=f"finding:{f.id}",type="FINDING",title=f.title,summary=f.gap_summary,severity=f.impact_level,status=f.status,product_id=product_id,created_at=f.created_at,target_route=f"/app/findings/{f.id}",target={"finding_id":f.id})
         (out.needs_review if f.status=="OPEN" else out.recently_completed).append(item)
     runs=db.scalars(select(TenantAgentRun).where(TenantAgentRun.tenant_id==tenant_id,TenantAgentRun.product_id==product_id)).all(); run_ids=[r.id for r in runs]
