@@ -24,6 +24,8 @@ os.environ["LLM_PROVIDER"] = "mock"
 os.environ["EMBEDDING_PROVIDER"] = "local"
 os.environ["RUN_SEED"] = "true"
 os.environ["LLM_API_KEY"] = ""
+os.environ["LEGACY_TENANT_API_ENABLED"] = "true"
+os.environ["EVALUATION_AUTH_BYPASS"] = "true"
 
 # 保证以任意工作目录运行 pytest 时都能 import app.*
 if str(BACKEND_DIR) not in sys.path:

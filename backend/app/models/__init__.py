@@ -25,6 +25,7 @@ from app.models.tenant_intelligence import (
 )
 from app.models.remediation import Remediation, RemediationEvidence, RemediationRequirement
 from app.models.feedback import Feedback, FeedbackCandidate, FeedbackCandidateRequirement
+from app.models.evaluation import EvaluationSession
 
 __all__ = [
     "AgentMemory",
@@ -61,5 +62,5 @@ __all__ = [
     "Remediation",
     "RemediationEvidence",
     "RemediationRequirement",
-    "Feedback", "FeedbackCandidate", "FeedbackCandidateRequirement",
+    "Feedback", "FeedbackCandidate", "FeedbackCandidateRequirement", "EvaluationSession",
 ]

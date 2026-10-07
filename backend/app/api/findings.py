@@ -7,6 +7,7 @@ from pydantic import Field
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
+from app.core.evaluation_auth import CurrentPrincipal, require_company_access, require_principal, require_product_access
 from app.tenant.applicability.schemas import ApplicabilityResult, MissingContextItem
 from app.tenant.context.ownership import (
     ProductNotFoundError,
@@ -45,7 +46,11 @@ def get_findings(
     product_id: int | None = Query(default=None, ge=1),
     status: str | None = Query(default=None, pattern="^(OPEN|DISMISSED|RESOLVED)$"),
     db: Session = Depends(get_db),
+    principal: CurrentPrincipal = Depends(require_principal),
 ) -> list[FindingListItem]:
+    require_company_access(tenant_id, principal)
+    if product_id is not None:
+        require_product_access(db, product_id, principal)
     try:
         return list_findings(db, tenant_id, product_id=product_id, status=status)
     except (TenantNotFoundError, ProductNotFoundError, TenantProductMismatchError) as exc:
@@ -57,7 +62,9 @@ def get_finding(
     finding_id: int,
     tenant_id: int = Query(ge=1),
     db: Session = Depends(get_db),
+    principal: CurrentPrincipal = Depends(require_principal),
 ) -> FindingDetailResponse:
+    require_company_access(tenant_id, principal)
     detail = load_finding(db, tenant_id, finding_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="Finding does not exist for this tenant")

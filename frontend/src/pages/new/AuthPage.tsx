@@ -1,0 +1,11 @@
+import {useState} from 'react';
+import {Link,useNavigate,useSearchParams} from 'react-router-dom';
+import {beginSession} from '../../api/evaluation';
+import {readEdition,writeSession,type Edition} from '../../features/auth/session';
+
+export default function AuthPage({mode}:{mode:'login'|'signup'}){
+  const navigate=useNavigate();const [params]=useSearchParams();const edition=((params.get('edition') as Edition)||readEdition());
+  const [name,setName]=useState('');const [email,setEmail]=useState('');const [company,setCompany]=useState('');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
+  const submit=async(e:React.FormEvent)=>{e.preventDefault();setBusy(true);setError('');try{const display=name||email.split('@')[0];const workspace=company||`${display}'s workspace`;writeSession(await beginSession({name:display,email,company_name:workspace,edition}));navigate('/onboarding/understand')}catch(err:any){setError(err?.response?.data?.detail||'We could not create this evaluation workspace. Please try again.');setBusy(false)}};
+  return <main className="ds-auth"><div className="ds-auth-brand"><Link to="/" className="ds-brand"><span className="ds-logo">D</span><span>DataShield</span></Link><p>Create an isolated evaluation workspace. Production authentication can be connected later.</p></div><form onSubmit={submit}><span className="ds-eyebrow">{edition} edition</span><h1>{mode==='signup'?'Create your DataShield workspace':'Open an evaluation workspace'}</h1><label>Name<input required value={name} onChange={e=>setName(e.target.value)} autoComplete="name"/></label><label>{edition==='enterprise'?'Work email':'Email'}<input required type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email"/></label><label>Workspace name<input required value={company} onChange={e=>setCompany(e.target.value)} placeholder={edition==='enterprise'?'Company name':'My product workspace'}/></label>{error&&<div className="ds-inline-error" role="alert">{error}</div>}<button className="ds-button primary" disabled={busy} type="submit">{busy?'Creating workspace…':'Create workspace'} {!busy&&<span>→</span>}</button><div className="ds-auth-note">This is an evaluation session. No password is collected.</div></form></main>
+}

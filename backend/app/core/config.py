@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     # 全局法规智能层定时轮询（MVP 可选，默认关闭）
     scheduler_enabled: bool = False
     scheduler_interval_hours: int = 24
+    evaluation_session_days: int = 7
+    application_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
+    legacy_tenant_api_enabled: bool = False
+    evaluation_auth_bypass: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

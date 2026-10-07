@@ -510,8 +510,9 @@ class MockLLMClient(BaseLLMClient):
             return mock_remediation_document(context)
         if task == "feedback-candidate":
             facts = context.get("facts") or []
-            target = next((f for f in facts if "deletion" in f.get("name", "").lower()), facts[0] if facts else None)
             raw = (context.get("clarification_answer") or context.get("raw_feedback") or "").lower()
+            wanted = "ai_disclosure" if ("disclos" in raw and "ai" in raw) else "uploaded" if "upload" in raw else "deletion"
+            target = next((f for f in facts if wanted in f.get("name", "").lower()), facts[0] if facts else None)
             ambiguous = not target or any(word in raw for word in ("maybe", "planning", "计划"))
             return {"candidate_type":"FACT_CORRECTION","target_fact_id":target.get("fact_id") if target else None,
                 "proposed_name":target.get("name") if target else None,"proposed_value":True if not ambiguous else None,
