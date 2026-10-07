@@ -35,3 +35,6 @@ desktop/node_modules/
 backend/dist/
 backend/build/
 desktop/release/
+deploy/pkg/
+deploy/pkg.bin
+NEXT_TASKS.md
