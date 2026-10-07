@@ -7,7 +7,7 @@ import LanguageSwitcher from '../../components/LanguageSwitcher';
 
 const KEY_STORAGE = 'datashield.admin.key';
 
-type Tab = 'overview' | 'users' | 'workspaces' | 'regulations';
+type Tab = 'overview' | 'users' | 'workspaces' | 'regulations' | 'system';
 
 interface Overview {
   users: number;
@@ -56,6 +56,52 @@ interface AdminRegulation {
   requirements: number;
 }
 
+interface SystemInfo {
+  version: string;
+  db_kind: string;
+  llm_provider: string;
+  llm_model: string;
+  embedding_provider: string;
+  scheduler_enabled: boolean;
+  scheduler_interval_hours: number;
+  started_at: string;
+  uptime_seconds: number;
+  python_version: string;
+  env: Record<string, boolean | string>;
+}
+
+interface RegintelSource {
+  id: number;
+  name: string;
+  regulation_id: number | null;
+  jurisdiction: string;
+  source_type: string;
+  enabled: boolean;
+  last_checked_at: string | null;
+  last_success_at: string | null;
+  last_run_status: string | null;
+}
+
+interface IngestionRunRow {
+  id: number;
+  source_id: number | null;
+  regulation_id: number | null;
+  status: string;
+  started_at: string | null;
+  finished_at: string | null;
+  changes_count: number;
+  requirements_count: number;
+  chunks_count: number;
+  error: string;
+}
+
+interface RegintelStatus {
+  sources: RegintelSource[];
+  recent_ingestion_runs: IngestionRunRow[];
+  events_count: number;
+  scheduler: { enabled: boolean; interval_hours: number };
+}
+
 type Confirm =
   | { kind: 'resetPassword'; user: AdminUser }
   | { kind: 'reseed' }
@@ -83,6 +129,10 @@ export default function AdminPage() {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const [companies, setCompanies] = useState<AdminCompany[] | null>(null);
   const [regulations, setRegulations] = useState<AdminRegulation[] | null>(null);
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+  const [regintel, setRegintel] = useState<RegintelStatus | null>(null);
+  const [ingestingId, setIngestingId] = useState<number | null>(null);
+  const [busyUserIds, setBusyUserIds] = useState<number[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -107,6 +157,11 @@ export default function AdminPage() {
       if (target === 'users') adminGet<AdminUser[]>('/users', adminKey).then(setUsers).catch(fail);
       if (target === 'workspaces') adminGet<AdminCompany[]>('/companies', adminKey).then(setCompanies).catch(fail);
       if (target === 'regulations') adminGet<AdminRegulation[]>('/regulations', adminKey).then(setRegulations).catch(fail);
+      if (target === 'system') {
+        adminGet<SystemInfo>('/system', adminKey).then(setSystemInfo).catch(fail);
+        adminGet<RegintelStatus>('/regintel/status', adminKey).then(setRegintel).catch(fail);
+        adminGet<AdminRegulation[]>('/regulations', adminKey).then(setRegulations).catch(() => {});
+      }
     },
     [signOut, t]
   );
@@ -146,10 +201,29 @@ export default function AdminPage() {
       : d.toLocaleDateString(i18n.language === 'zh' ? 'zh-CN' : 'en', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
+  const fmtDateTime = (s: string | null) => {
+    if (!s) return '';
+    const d = new Date(s);
+    return Number.isNaN(d.getTime())
+      ? s
+      : d.toLocaleString(i18n.language === 'zh' ? 'zh-CN' : 'en', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  const fmtUptime = (seconds: number) => {
+    const totalMinutes = Math.floor(seconds / 60);
+    const days = Math.floor(totalMinutes / 1440);
+    const hours = Math.floor((totalMinutes % 1440) / 60);
+    const minutes = totalMinutes % 60;
+    if (days > 0) return `${t('appnew.admin.system.uptimeDays', { value: days })} ${t('appnew.admin.system.uptimeHours', { value: hours })}`;
+    if (hours > 0) return `${t('appnew.admin.system.uptimeHours', { value: hours })} ${t('appnew.admin.system.uptimeMinutes', { value: minutes })}`;
+    return t('appnew.admin.system.uptimeMinutes', { value: minutes });
+  };
+
   const toggleDisabled = (user: AdminUser) => {
-    if (!key) return;
+    if (!key || busyUserIds.includes(user.id)) return;
     setError('');
     setNotice('');
+    setBusyUserIds((prev) => [...prev, user.id]);
     adminPost<{ disabled: boolean }>(`/users/${user.id}/${user.disabled ? 'enable' : 'disable'}`, key)
       .then(() => {
         setNotice(t(user.disabled ? 'appnew.admin.users.enableDone' : 'appnew.admin.users.disableDone', { email: user.email }));
@@ -158,7 +232,29 @@ export default function AdminPage() {
       .catch((e: any) => {
         if (e?.response?.status === 401) return signOut();
         setError(e?.response?.data?.detail || t('appnew.admin.loadError'));
-      });
+      })
+      .finally(() => setBusyUserIds((prev) => prev.filter((id) => id !== user.id)));
+  };
+
+  const ingestSource = (source: RegintelSource) => {
+    if (!key || ingestingId !== null) return;
+    setIngestingId(source.id);
+    setError('');
+    setNotice('');
+    adminPost<IngestionRunRow>(`/regintel/sources/${source.id}/ingest`, key)
+      .then((run) => {
+        setNotice(
+          run.status === 'NO_CHANGE'
+            ? t('appnew.admin.system.ingestNoChange')
+            : t('appnew.admin.system.ingestDone', { changes: run.changes_count, requirements: run.requirements_count, chunks: run.chunks_count })
+        );
+        loadTab('system', key);
+      })
+      .catch((e: any) => {
+        if (e?.response?.status === 401) return signOut();
+        setError(t('appnew.admin.system.ingestFailed', { detail: e?.response?.data?.detail || e.message }));
+      })
+      .finally(() => setIngestingId(null));
   };
 
   const runConfirm = () => {
@@ -247,6 +343,7 @@ export default function AdminPage() {
     { id: 'users', label: t('appnew.admin.tabs.users') },
     { id: 'workspaces', label: t('appnew.admin.tabs.workspaces') },
     { id: 'regulations', label: t('appnew.admin.tabs.regulations') },
+    { id: 'system', label: t('appnew.admin.tabs.system') },
   ];
 
   const overviewCards: { label: string; value: number }[] = overview
@@ -262,6 +359,10 @@ export default function AdminPage() {
         { label: t('appnew.admin.overview.activeSessions'), value: overview.active_sessions },
       ]
     : [];
+
+  const regNameById = new Map((regulations || []).map((r) => [r.id, r.name]));
+  const sourceNameById = new Map((regintel?.sources || []).map((s) => [s.id, s.name]));
+  const runStatusLabel = (s: string) => t(`appnew.admin.system.runStatuses.${s}`, { defaultValue: s });
 
   return (
     <main className="ds-admin">
@@ -348,10 +449,10 @@ export default function AdminPage() {
                       <td>{u.active_sessions}</td>
                       <td>
                         <div className="ds-admin-actions">
-                          <button className={u.disabled ? '' : 'danger'} onClick={() => toggleDisabled(u)}>
+                          <button className={u.disabled ? '' : 'danger'} disabled={busyUserIds.includes(u.id)} onClick={() => toggleDisabled(u)}>
                             {u.disabled ? t('appnew.admin.users.enable') : t('appnew.admin.users.disable')}
                           </button>
-                          <button onClick={() => setConfirm({ kind: 'resetPassword', user: u })}>{t('appnew.admin.users.resetPassword')}</button>
+                          <button disabled={busyUserIds.includes(u.id)} onClick={() => setConfirm({ kind: 'resetPassword', user: u })}>{t('appnew.admin.users.resetPassword')}</button>
                         </div>
                       </td>
                     </tr>
@@ -443,6 +544,127 @@ export default function AdminPage() {
                 </div>
               </section>
             </>
+          ) : (
+            !error && <Spinner text={t('appnew.admin.loading')} />
+          ))}
+
+        {tab === 'system' &&
+          (systemInfo && regintel ? (
+            <div className="ds-admin-system">
+              <section className="ds-admin-panel">
+                <h2>{t('appnew.admin.system.backendTitle')}</h2>
+                <dl className="ds-admin-kv">
+                  <div><dt>{t('appnew.admin.system.version')}</dt><dd>{systemInfo.version}</dd></div>
+                  <div><dt>{t('appnew.admin.system.database')}</dt><dd>{systemInfo.db_kind}</dd></div>
+                  <div><dt>{t('appnew.admin.system.llm')}</dt><dd>{systemInfo.llm_provider} / {systemInfo.llm_model}</dd></div>
+                  <div><dt>{t('appnew.admin.system.embedding')}</dt><dd>{systemInfo.embedding_provider}</dd></div>
+                  <div>
+                    <dt>{t('appnew.admin.system.scheduler')}</dt>
+                    <dd>{systemInfo.scheduler_enabled ? t('appnew.admin.system.schedulerOn', { hours: systemInfo.scheduler_interval_hours }) : t('appnew.admin.system.schedulerOff')}</dd>
+                  </div>
+                  <div><dt>{t('appnew.admin.system.uptime')}</dt><dd>{fmtUptime(systemInfo.uptime_seconds)}</dd></div>
+                  <div><dt>{t('appnew.admin.system.startedAt')}</dt><dd>{fmtDateTime(systemInfo.started_at)}</dd></div>
+                  <div><dt>{t('appnew.admin.system.python')}</dt><dd>{systemInfo.python_version}</dd></div>
+                </dl>
+                <h3>{t('appnew.admin.system.envTitle')}</h3>
+                <dl className="ds-admin-kv flags">
+                  {Object.entries(systemInfo.env || {}).map(([k, v]) => (
+                    <div key={k}>
+                      <dt>{t(`appnew.admin.system.env.${k}`, { defaultValue: k })}</dt>
+                      <dd>{typeof v === 'boolean' ? (v ? t('appnew.admin.system.envOn') : t('appnew.admin.system.envOff')) : String(v)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+
+              <section className="ds-admin-panel">
+                <h2>{t('appnew.admin.system.regintelTitle')}</h2>
+                <p className="ds-admin-panel-meta">
+                  {t('appnew.admin.system.eventsCount')}: {regintel.events_count}
+                  {' · '}
+                  {t('appnew.admin.system.scheduler')}: {regintel.scheduler.enabled ? t('appnew.admin.system.schedulerOn', { hours: regintel.scheduler.interval_hours }) : t('appnew.admin.system.schedulerOff')}
+                </p>
+                {regintel.sources.length === 0 ? (
+                  <p>{t('appnew.admin.system.regintelEmpty')}</p>
+                ) : (
+                  <table className="ds-admin-table">
+                    <thead>
+                      <tr>
+                        <th>{t('appnew.admin.system.sourceName')}</th>
+                        <th>{t('appnew.admin.system.sourceRegulation')}</th>
+                        <th>{t('appnew.admin.system.sourceEnabled')}</th>
+                        <th>{t('appnew.admin.system.sourceLastChecked')}</th>
+                        <th>{t('appnew.admin.system.sourceLastSuccess')}</th>
+                        <th>{t('appnew.admin.system.sourceStatus')}</th>
+                        <th>{t('appnew.admin.system.sourceActions')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {regintel.sources.map((s) => (
+                        <tr key={s.id}>
+                          <td>
+                            {s.name}
+                            <small>{s.jurisdiction}</small>
+                          </td>
+                          <td>{s.regulation_id != null ? regNameById.get(s.regulation_id) || `#${s.regulation_id}` : '—'}</td>
+                          <td>{s.enabled ? t('appnew.admin.system.yes') : t('appnew.admin.system.no')}</td>
+                          <td>{s.last_checked_at ? fmtDateTime(s.last_checked_at) : t('appnew.admin.system.never')}</td>
+                          <td>{s.last_success_at ? fmtDateTime(s.last_success_at) : t('appnew.admin.system.never')}</td>
+                          <td>{s.last_run_status ? runStatusLabel(s.last_run_status) : '—'}</td>
+                          <td>
+                            <div className="ds-admin-actions">
+                              <button disabled={ingestingId !== null} onClick={() => ingestSource(s)}>
+                                {ingestingId === s.id ? t('appnew.admin.system.ingesting') : t('appnew.admin.system.ingestNow')}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </section>
+
+              <section className="ds-admin-panel">
+                <h2>{t('appnew.admin.system.runsTitle')}</h2>
+                {regintel.recent_ingestion_runs.length === 0 ? (
+                  <p>{t('appnew.admin.system.runsEmpty')}</p>
+                ) : (
+                  <table className="ds-admin-table">
+                    <thead>
+                      <tr>
+                        <th>{t('appnew.admin.system.runId')}</th>
+                        <th>{t('appnew.admin.system.runSource')}</th>
+                        <th>{t('appnew.admin.system.runStatus')}</th>
+                        <th>{t('appnew.admin.system.runStarted')}</th>
+                        <th>{t('appnew.admin.system.runFinished')}</th>
+                        <th>{t('appnew.admin.system.runChanges')}</th>
+                        <th>{t('appnew.admin.system.runRequirements')}</th>
+                        <th>{t('appnew.admin.system.runChunks')}</th>
+                        <th>{t('appnew.admin.system.runError')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {regintel.recent_ingestion_runs.map((run) => (
+                        <tr key={run.id}>
+                          <td>#{run.id}</td>
+                          <td>{run.source_id != null ? sourceNameById.get(run.source_id) || `#${run.source_id}` : '—'}</td>
+                          <td>
+                            <span className={`ds-admin-status${run.status === 'FAILED' ? ' off' : ''}`}>{runStatusLabel(run.status)}</span>
+                          </td>
+                          <td>{run.started_at ? fmtDateTime(run.started_at) : '—'}</td>
+                          <td>{run.finished_at ? fmtDateTime(run.finished_at) : '—'}</td>
+                          <td>{run.changes_count}</td>
+                          <td>{run.requirements_count}</td>
+                          <td>{run.chunks_count}</td>
+                          <td>{run.error || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </section>
+            </div>
           ) : (
             !error && <Spinner text={t('appnew.admin.loading')} />
           ))}
