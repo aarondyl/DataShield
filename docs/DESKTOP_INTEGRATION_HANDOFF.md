@@ -16,7 +16,7 @@
 | Twin 审核 | PASS | 事实确认追加新版本并显示历史；手动输入能力/控制/市场/主体及不同状态；TwinPage、Product Twin tests |
 | Cloud→Local | PASS（HTTP 契约） | HTTPS 配置持久化；来源切换不覆盖已有缓存；失败使用缓存；真实 TCP→SQLite→Finding 保留来源、主体与可信度 |
 | 中英双语 | PASS（自动化） | 中文默认、即时切换、偏好持久化、键树完整，两种语言相同业务路径 |
-| Windows NSIS / 实机 | PENDING | 新增完整 onedir 依赖、无控制台日志修复、sidecar 启动/PID/token 检查及 Rust tests；旧构建不代表当前 HEAD |
+| Windows NSIS | PASS（CI 安装目录） | run 37805108123：NSIS 构建、静默安装后的 sidecar 启动/PID/token、4 项 Rust 安全测试通过；GUI 实机仍未验收 |
 | AI Gateway / 安全 BYOK / Ollama | NOT AVAILABLE（明确标识） | 默认 deterministic mock，不是真实 AI 合规判断；不包含共享密钥 |
 | Release workflow | IMPLEMENTED / UNPUBLISHED | 指定完整 SHA 重建、全后端及 Windows 测试、SHA256；默认不发布 |
 | 自动更新 | DEFERRED | 未启用无签名 updater |
@@ -54,9 +54,16 @@ Windows 11 无 Python/Node 环境验证：安装、启动、中文业务链、En
 
 ## 待解决门禁与发布
 
-P0：最终 Windows 构建与 sidecar 启动尚需通过，未通过不合并。
+P0：业务与安装目录自动化均已通过；之后仅更新交接及构建来源记录，必须等待该提交对应的新 Windows CI 通过后再合并。
 P1：Windows GUI 实机验收；真实 Provider 尚未支持，不冒充真实 AI。
 P1：desktop-release.yml 不触发 Vercel/ECS，发布 desktop-v0.1.0 Pre-release 需实机验收及批准；Stable 另行批准。建议配置 desktop-release Environment 审批人。
 P2：安全签名 updater、更多内部事实名称/错误细节本地化、Windows GUI E2E。
 
 PR 保持 Draft，相关门禁全部通过才按条件授权转 Ready/合并，不绕过保护。没有发布 Release。
+
+## 已下载的构建基线
+
+run：https://github.com/aarondyl/DataShield/actions/runs/37805108123；Artifact ID 11563062733。
+业务 HEAD：5c73df47c5dec531b6b243bbe250cda9fcb64b84；该 PR run 使用 GitHub 临时 merge ref，安装包 SOURCE_COMMIT 为 4c5c4170a57c76ae89b62f873207fc73cd811271。
+DataShield_0.1.0_x64-setup.exe：35,462,943 字节；SHA256：685013d89a81cce4205ce645f8e2cbc0cdf88b516739abfdb4040febd96e1f5b。
+已修正 Windows workflow 直接检出 PR head SHA，避免将临时 merge ref 当成发行来源。交付时使用后续最新 run 的 SOURCE_COMMIT.txt 与 SHA256，不把上述基线冒充后续 HEAD。
