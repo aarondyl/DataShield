@@ -60,6 +60,10 @@ class Settings(BaseSettings):
 
     @property
     def local_regulation_cache_path(self) -> Path:
+        # 法规缓存与本地业务实体必须位于同一 SQLite 事务边界，保证
+        # 同步游标、法规外键和 Finding 溯源不会跨库失配。
+        if self.runtime_mode == "local":
+            return Path(self.local_data_dir) / "datashield.db"
         return Path(self.local_data_dir) / "regulations" / "cache.db"
 
 

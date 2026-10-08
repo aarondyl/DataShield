@@ -9,6 +9,7 @@ def test_local_mode_forces_offline_private_processing(monkeypatch, tmp_path):
     try:
         settings = get_settings()
         assert settings.database_url.endswith("datashield.db")
+        assert settings.local_regulation_cache_path == tmp_path / "datashield.db"
         assert settings.llm_provider == "mock" and settings.embedding_provider == "local"
         assert settings.scheduler_enabled is False
     finally: get_settings.cache_clear()
