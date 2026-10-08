@@ -22,7 +22,16 @@ class LocalRegulationCache:
             return db.execute("SELECT cursor,snapshot,offline FROM sync_state WHERE scope=?",(scope,)).fetchone() or (0,0,0)
     def apply(self, page: dict, bundles: list[dict], scope="all"):
         """同一事务写法规、事件和最后页游标；异常时全部回滚。"""
+        required={e["event_id"] for e in page["events"]}
+        supplied={b["event"]["event_id"] for b in bundles}
+        if required != supplied: raise ValueError("同步页面与法规 Bundle 不完整")
+        ids=[e["id"] for e in page["events"]]
+        if ids != sorted(set(ids)): raise ValueError("同步事件必须严格递增且不可重复")
+        if any(i > page["snapshot_cursor"] for i in ids): raise ValueError("事件超出固定快照")
         with self.connect() as db:
+            current=db.execute("SELECT cursor,snapshot FROM sync_state WHERE scope=?",(scope,)).fetchone() or (0,0)
+            if page["next_cursor"] < current[0]: raise ValueError("同步游标不能倒退")
+            if current[1] and page["snapshot_cursor"] < current[1]: raise ValueError("同步快照不能倒退")
             for b in bundles:
                 r=b["regulation"]; v=b["version"]
                 db.execute("INSERT OR REPLACE INTO cached_regulations VALUES (?,?)",(r["key"],json.dumps(r)))
