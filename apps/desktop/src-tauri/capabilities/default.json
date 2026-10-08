@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "DataShield Desktop main window permissions",
   "windows": ["main"],
-  "permissions": ["core:default", "shell:allow-spawn"]
+  "permissions": ["core:default"]
 }

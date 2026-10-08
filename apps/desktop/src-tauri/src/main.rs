@@ -295,6 +295,15 @@ fn main() {
 mod tests {
     use super::{valid_api_path, valid_loopback_url, valid_method};
     #[test]
+    fn renderer_has_no_shell_spawn_permission() {
+        let capability: serde_json::Value =
+            serde_json::from_str(include_str!("../capabilities/default.json")).unwrap();
+        assert_eq!(
+            capability["permissions"],
+            serde_json::json!(["core:default"])
+        );
+    }
+    #[test]
     fn only_loopback_runtime_urls_are_accepted() {
         assert!(valid_loopback_url("http://127.0.0.1:48327"));
         assert!(!valid_loopback_url("http://0.0.0.0:48327"));
