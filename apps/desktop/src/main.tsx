@@ -10,10 +10,10 @@ import { UnderstandingPage } from './UnderstandingPage';
 import { FindingDetail, type FindingDetailData } from './FindingDetail';
 import { TwinPage } from './TwinPage';
 import { CloudSettings } from './CloudSettings';
+import { MonitorPage } from './MonitorPage';
 
 type Screen = 'welcome' | 'workspace' | 'intake' | 'today' | 'monitor' | 'findings' | 'actions' | 'twin' | 'settings';
 type WorkspaceRef = { companyId: number; productId: number };
-type RegulationEvent = { event: { event_id: string; payload?: { materiality?: string; topics?: string[] } }; regulation: { name?: string; jurisdiction?: string } };
 const workspaceKey = 'datashield.desktop.workspace';
 
 function savedWorkspace(): WorkspaceRef | null {
@@ -98,22 +98,10 @@ function ProductIntake({ copy, workspace, onDone }: { copy: ReturnType<typeof us
       onDone();
     } catch { setError(true); } finally { setSaving(false); }
   };
-  return <section className="page business-page"><p className="eyebrow">{copy.intake.eyebrow}</p><h1>{copy.intake.title}</h1><p>{copy.intake.body}</p><form className="workspace-form" onSubmit={submit}><label>{copy.twin.title}<select value={group} onChange={e => setGroup(e.target.value)}>{Object.entries(copy.twin.groups).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label>{copy.intake.fact}<input value={fact} required onChange={e => setFact(e.target.value)} placeholder={copy.intake.placeholder} /></label><label>{copy.twin.title}<select value={factStatus} onChange={e => setFactStatus(e.target.value)}>{Object.entries(copy.twin.states).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>{error && <p className="form-error">{copy.intake.error}</p>}<button className="primary" disabled={saving}>{saving ? copy.intake.saving : copy.intake.continue}</button></form><UnderstandingPage copy={copy} workspace={workspace} onDone={onDone} /></section>;
+  return <section className="page business-page"><p className="eyebrow">{copy.intake.eyebrow}</p><h1>{copy.intake.title}</h1><p>{copy.intake.body}</p><form className="workspace-form" onSubmit={submit}><label>{copy.intake.group}<select value={group} onChange={e => setGroup(e.target.value)}>{Object.entries(copy.twin.groups).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label>{copy.intake.fact}<input value={fact} required onChange={e => setFact(e.target.value)} placeholder={copy.intake.placeholder} /></label><label>{copy.intake.status}<select value={factStatus} onChange={e => setFactStatus(e.target.value)}>{Object.entries(copy.twin.states).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>{error && <p className="form-error">{copy.intake.error}</p>}<button className="primary" disabled={saving}>{saving ? copy.intake.saving : copy.intake.continue}</button></form><UnderstandingPage copy={copy} workspace={workspace} onDone={onDone} /></section>;
 }
 
 
-function MonitorPage({ copy }: { copy: ReturnType<typeof useLocale>['copy'] }) {
-  const [state, setState] = useState<{ scope: string; using_local_cache: boolean; last_success_at: string; last_error: string } | null>(null);
-  const [events, setEvents] = useState<RegulationEvent[]>([]);
-  const [syncing, setSyncing] = useState(false);
-  const load = async () => {
-    const [nextState, nextEvents] = await Promise.all([localApiRequest<typeof state>('/api/v1/local-regulations/status'), localApiRequest<typeof events>('/api/v1/local-regulations/events')]);
-    setState(nextState); setEvents(nextEvents);
-  };
-  useEffect(() => { void load(); }, []);
-  const sync = async () => { setSyncing(true); try { await localApiRequest('/api/v1/local-regulations/sync', 'POST'); } catch { /* status preserves offline cache reason */ } finally { setSyncing(false); await load(); } };
-  return <section className="page"><h1>{copy.monitor.title}</h1><p>{state?.using_local_cache ? copy.monitor.offline : copy.monitor.body}</p><div className="settings-list"><div><strong>{copy.monitor.lastSync}</strong><span>{state?.last_success_at || copy.monitor.never}</span></div><div><strong>{copy.monitor.scope}</strong><span>{state?.scope || copy.monitor.loading}</span></div>{state?.last_error && <div><strong>{copy.monitor.status}</strong><span>{state.last_error}</span></div>}</div><button className="primary" disabled={syncing} onClick={() => void sync()}>{syncing ? copy.monitor.syncing : copy.monitor.sync}</button><div className="settings-list">{events.length ? events.map(item => <div key={item.event.event_id}><strong>{item.regulation.name || item.event.event_id}</strong><span>{item.regulation.jurisdiction || '—'} · {item.event.payload?.materiality || 'UNKNOWN'} · {(item.event.payload?.topics || []).join(', ')}</span></div>) : <div><span>{copy.monitor.empty}</span></div>}</div></section>;
-}
 
 function FindingsPage({ copy, workspace, initialFinding, onRemediate }: { copy: ReturnType<typeof useLocale>['copy']; workspace: WorkspaceRef | null; initialFinding: number | null; onRemediate: (id: number) => void }) {
   const [findings, setFindings] = useState<Array<{ id: number; title: string; impact_level: string; status: string; requirement_count: number; evidence_count: number; product_twin_version_id?: number }>>([]);

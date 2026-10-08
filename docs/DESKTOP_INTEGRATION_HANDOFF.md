@@ -43,7 +43,7 @@ CONFIRMED != APPLIED；UNKNOWN != FALSE；NOT_DETECTED != ABSENT；APPROVED != E
 
 后端：PYTHONPATH=/tmp/datashield-deps PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests -q（backend）。
 前端：npm test -- --maxWorkers=1；npm run build；npm audit --json（apps/desktop）。
-最近后端 310 项通过、39 项弃用警告；前端 13 项（含模拟结果不冒充无待办）、生产构建与共享 Web 构建通过；Desktop audit 0 漏洞。最终 CI 以对应提交和 SOURCE_COMMIT.txt 为准。
+最近后端 310 项通过、39 项弃用警告；前端 14 项（含离线缓存和模拟结果不冒充无待办）、生产构建与共享 Web 构建通过；Desktop audit 0 漏洞。最终 CI 以对应提交和 SOURCE_COMMIT.txt 为准。
 Linux cargo test 缺少 pkg-config/dbus 开发环境，不能报告通过；Windows CI 已加入 Rust 安全测试。
 
 ## Windows 人工验收（尚未完成）
