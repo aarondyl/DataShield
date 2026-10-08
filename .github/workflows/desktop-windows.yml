@@ -39,6 +39,10 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force apps/desktop/src-tauri/binaries | Out-Null
           Copy-Item backend/dist/datashield-local/datashield-local.exe apps/desktop/src-tauri/binaries/datashield-local-x86_64-pc-windows-msvc.exe
+          Copy-Item -Recurse backend/dist/datashield-local/_internal apps/desktop/src-tauri/binaries/_internal
+      - name: 验证打包后的 sidecar 启动与安全契约
+        shell: pwsh
+        run: ./scripts/smoke-desktop-sidecar.ps1 -Executable backend/dist/datashield-local/datashield-local.exe
       - name: 安装 Desktop 依赖
         run: npm --prefix apps/desktop ci
       - name: 验证 Desktop 业务交互与中英文词条

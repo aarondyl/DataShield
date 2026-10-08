@@ -55,6 +55,9 @@ def create_app() -> FastAPI:
     """按运行模式装载路由；云端法规进程不暴露私有业务 API。"""
     app = FastAPI(title="DataShield API", version="3.0.0", lifespan=lifespan)
     mode = get_settings().runtime_mode
+    if mode == "local":
+        from app.api import local_repositories
+        app.include_router(local_repositories.router, prefix="/api")
     from app.api import health
     app.include_router(health.router, prefix="/api")
     if mode == "cloud":

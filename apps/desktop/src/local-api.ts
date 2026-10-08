@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 
 export type RuntimeHealth = { ok: boolean; message?: string };
+export const selectRepository = () => invoke<string | null>('select_repository');
 
 // The renderer only sends an API path and body. Rust validates the path and
 // attaches X-Runtime-Token after reading runtime.json; the token never enters JS.

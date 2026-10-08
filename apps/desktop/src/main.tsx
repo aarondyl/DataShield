@@ -6,6 +6,7 @@ import './styles.css';
 import { RemediationPage } from './RemediationPage';
 import { FeedbackPanel } from './FeedbackPanel';
 import { TodayPage } from './TodayPage';
+import { UnderstandingPage } from './UnderstandingPage';
 
 type Screen = 'welcome' | 'workspace' | 'intake' | 'today' | 'monitor' | 'findings' | 'actions' | 'twin' | 'settings';
 type WorkspaceRef = { companyId: number; productId: number };
@@ -72,7 +73,7 @@ function App() {
       {screen === 'workspace' && <Workspace copy={copy} kind={workspaceKind} setKind={setWorkspaceKind} error={workspaceError} onContinue={createWorkspace} />}
       {screen === 'intake' && workspace && <ProductIntake copy={copy} workspace={workspace} onDone={() => setScreen('twin')} />}
       {screen === 'intake' && !workspace && <EmptyPage copy={copy} screen="twin" />}
-      {screen === 'twin' && <TwinPage copy={copy} workspace={workspace} />}
+      {screen === 'twin' && <TwinPage copy={copy} workspace={workspace} onIntake={() => setScreen('intake')} />}
       {screen === 'monitor' && <MonitorPage copy={copy} />}
       {screen === 'findings' && <FindingsPage copy={copy} workspace={workspace} initialFinding={selectedFinding} onRemediate={id => { setSelectedFinding(id); setScreen('actions'); }} />}
       {screen === 'actions' && <RemediationPage copy={copy} workspace={workspace} initialFinding={selectedFinding} onFinding={id => { setSelectedFinding(id); setScreen('findings'); }} />}
@@ -93,10 +94,10 @@ function ProductIntake({ copy, workspace, onDone }: { copy: ReturnType<typeof us
       onDone();
     } catch { setError(true); } finally { setSaving(false); }
   };
-  return <section className="page"><p className="eyebrow">{copy.intake.eyebrow}</p><h1>{copy.intake.title}</h1><p>{copy.intake.body}</p><form className="workspace-form" onSubmit={submit}><label>{copy.intake.fact}<input value={fact} required onChange={e => setFact(e.target.value)} placeholder={copy.intake.placeholder} /></label>{error && <p className="form-error">{copy.intake.error}</p>}<button className="primary" disabled={saving}>{saving ? copy.intake.saving : copy.intake.continue}</button></form></section>;
+  return <section className="page business-page"><p className="eyebrow">{copy.intake.eyebrow}</p><h1>{copy.intake.title}</h1><p>{copy.intake.body}</p><form className="workspace-form" onSubmit={submit}><label>{copy.intake.fact}<input value={fact} required onChange={e => setFact(e.target.value)} placeholder={copy.intake.placeholder} /></label>{error && <p className="form-error">{copy.intake.error}</p>}<button className="primary" disabled={saving}>{saving ? copy.intake.saving : copy.intake.continue}</button></form><UnderstandingPage copy={copy} workspace={workspace} onDone={onDone} /></section>;
 }
 
-function TwinPage({ copy, workspace }: { copy: ReturnType<typeof useLocale>['copy']; workspace: WorkspaceRef | null }) {
+function TwinPage({ copy, workspace, onIntake }: { copy: ReturnType<typeof useLocale>['copy']; workspace: WorkspaceRef | null; onIntake: () => void }) {
   const [facts, setFacts] = useState<Array<{ id: number; group: string; name: string; status: string }>>([]);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
@@ -105,7 +106,8 @@ function TwinPage({ copy, workspace }: { copy: ReturnType<typeof useLocale>['cop
       .then(value => setFacts(value.facts ?? [])).finally(() => setLoaded(true));
   }, [workspace]);
   if (!workspace) return <EmptyPage copy={copy} screen="twin" />;
-  return <section className="page empty"><h1>{copy.twin.title}</h1>{!loaded ? <div className="empty-card"><p>{copy.twin.loading}</p></div> : facts.length === 0 ? <div className="empty-card"><p>{copy.twin.empty}</p></div> : <div className="settings-list">{facts.map(fact => <div key={fact.id}><strong>{fact.name}</strong><span>{fact.group} · {fact.status}</span></div>)}</div>}</section>;
+  const intakeButton = <button className="primary" onClick={onIntake}>{copy.understanding.title}</button>;
+  return <section className="page empty"><h1>{copy.twin.title}</h1>{intakeButton}{!loaded ? <div className="empty-card"><p>{copy.twin.loading}</p></div> : facts.length === 0 ? <div className="empty-card"><p>{copy.twin.empty}</p></div> : <div className="settings-list">{facts.map(fact => <div key={fact.id}><strong>{fact.name}</strong><span>{fact.group} · {fact.status}</span></div>)}</div>}</section>;
 }
 
 function MonitorPage({ copy }: { copy: ReturnType<typeof useLocale>['copy'] }) {

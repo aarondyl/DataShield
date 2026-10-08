@@ -54,9 +54,53 @@ fn valid_loopback_url(url: &str) -> bool {
 
 fn valid_api_path(path: &str) -> bool {
     path.starts_with("/api/")
+        && !path.starts_with("/api/v1/local-repositories/grant")
+        && !path.split('?').next().unwrap_or("").contains('%')
         && !path.contains("..")
         && !path.contains("://")
         && !path.contains('\\')
+}
+
+#[tauri::command]
+async fn select_repository(state: State<'_, DesktopState>) -> Result<Option<String>, String> {
+    #[cfg(windows)]
+    {
+        let selected =
+            tauri::async_runtime::spawn_blocking(|| rfd::FileDialog::new().pick_folder())
+                .await
+                .map_err(|_| "无法打开文件夹选择器".to_string())?;
+        let Some(path) = selected else {
+            return Ok(None);
+        };
+        let descriptor = descriptor_from_state(&state).await?;
+        let response = state
+            .client
+            .post(format!(
+                "{}/api/v1/local-repositories/grant",
+                descriptor.base_url
+            ))
+            .header("X-Runtime-Token", descriptor.runtime_token)
+            .json(&serde_json::json!({"path": path.to_string_lossy()}))
+            .send()
+            .await
+            .map_err(|_| "无法授权所选目录".to_string())?;
+        if !response.status().is_success() {
+            return Err("所选目录不允许扫描".to_string());
+        }
+        let value: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|_| "目录授权响应无效".to_string())?;
+        Ok(value
+            .get("path")
+            .and_then(|v| v.as_str())
+            .map(str::to_owned))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = state;
+        Err("此预览版本的原生目录选择器仅支持 Windows".to_string())
+    }
 }
 
 fn valid_method(method: &str) -> bool {
@@ -221,7 +265,11 @@ fn main() {
             });
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![runtime_health, local_api_request])
+        .invoke_handler(tauri::generate_handler![
+            runtime_health,
+            local_api_request,
+            select_repository
+        ])
         .build(tauri::generate_context!())
         .expect("启动 DataShield Desktop 失败")
         .run(|app, event| {
@@ -253,6 +301,8 @@ mod tests {
         assert!(valid_api_path("/api/products"));
         assert!(!valid_api_path("https://example.com"));
         assert!(!valid_api_path("/api/../secret"));
+        assert!(!valid_api_path("/api/v1/local-repositories/grant"));
+        assert!(!valid_api_path("/api/v1/local-repositories/%67rant"));
     }
     #[test]
     fn bridge_only_allows_expected_http_methods() {

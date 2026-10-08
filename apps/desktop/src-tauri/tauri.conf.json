@@ -17,6 +17,7 @@
     "active": true,
     "targets": ["nsis"],
     "externalBin": ["binaries/datashield-local"],
+    "resources": { "binaries/_internal/": "_internal/" },
     "windows": { "wix": null, "nsis": { "installMode": "currentUser", "displayLanguageSelector": false } }
   }
 }

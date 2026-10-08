@@ -30,6 +30,11 @@ def validate_root(request: RepositoryRequest, allowed_roots=None):
     if request.analysis_mode == AccessMode.NO_REPOSITORY:
         return None
     roots = allowed_roots if allowed_roots is not None else os.getenv("UNDERSTANDING_REPOSITORY_ROOTS", "").split(os.pathsep)
+    if allowed_roots is None:
+        from app.core.config import get_settings
+        if get_settings().runtime_mode == "local":
+            from app.local_repositories import roots as desktop_roots
+            roots = desktop_roots()
     candidate = Path(request.repository_path).absolute()
     if any(linked(p) for p in (candidate, *candidate.parents)):
         raise ValueError("Linked paths are not permitted")
