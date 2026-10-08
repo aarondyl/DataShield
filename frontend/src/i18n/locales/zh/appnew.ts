@@ -564,6 +564,7 @@ export default {
   product: {
     setupFirst: '请先设置一个产品',
     loadError: '产品画像加载失败',
+    loadFailed: '产品画像加载失败，请稍后重试。',
     loading: '正在加载 DataShield 已知的信息',
     eyebrow: '产品画像 · 版本 {{version}}',
     title: 'DataShield 已知：',

@@ -46,6 +46,18 @@ try:
 except ImportError:
     pass  # 源码仓库内没有内置凭证（该文件不入库），保持 mock 演示模式
 
+# 产品理解子系统的服务端凭证：首次启动生成并持久化到数据目录
+# （该凭证经 os.getenv 读取；每次随机生成会让历史分析任务的归属校验失效，故持久化）
+_key_file = data_dir / "understanding.key"
+if not os.environ.get("UNDERSTANDING_API_KEY"):
+    import secrets as _secrets
+
+    if _key_file.exists():
+        os.environ["UNDERSTANDING_API_KEY"] = _key_file.read_text(encoding="utf-8").strip()
+    else:
+        os.environ["UNDERSTANDING_API_KEY"] = _secrets.token_urlsafe(32)
+        _key_file.write_text(os.environ["UNDERSTANDING_API_KEY"], encoding="utf-8")
+
 # PyInstaller onedir 模式下打包资源在 sys._MEIPASS；源码运行时在 backend/ 目录
 _bundle_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 

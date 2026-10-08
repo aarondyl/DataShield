@@ -564,6 +564,7 @@ export default {
   product: {
     setupFirst: 'Set up a product first',
     loadError: "Product Twin couldn't be loaded",
+    loadFailed: "The product profile couldn't be loaded. Please try again later.",
     loading: 'Loading what DataShield knows',
     eyebrow: 'Product Twin · Version {{version}}',
     title: 'DataShield knows:',
