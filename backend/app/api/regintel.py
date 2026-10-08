@@ -9,8 +9,10 @@
 - ``GET  /v1/events``：regulation.change.ready 事件流。
 """
 
-from fastapi import APIRouter, Depends, HTTPException
 import hashlib
+import hmac
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -44,6 +46,24 @@ from app.schemas.regintel import (
 )
 
 router = APIRouter(prefix="/v1", tags=["regintel"])
+
+
+def _require_cloud_operator(authorization: str | None = Header(default=None)) -> None:
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    # This router is also reused by the existing single-process Web deployment.
+    # The Cloud runtime is the shared public service, so only it enforces this
+    # operator boundary; preserving Web behaviour avoids silently changing the
+    # legacy deployment contract.
+    if settings.runtime_mode != "cloud":
+        return
+    expected = settings.cloud_admin_token
+    supplied = authorization.removeprefix("Bearer ") if authorization else ""
+    if not expected:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Cloud operator API is not configured")
+    if not hmac.compare_digest(supplied, expected):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Cloud operator authorization required")
 
 
 # ---------------------------------------------------------------------------
@@ -257,7 +277,7 @@ def list_sources(db: Session = Depends(get_db)) -> list[SourceOut]:
     return [SourceOut.model_validate(s) for s in sources]
 
 
-@router.post("/sources/{source_id}/ingest", response_model=IngestionRunOut)
+@router.post("/sources/{source_id}/ingest", response_model=IngestionRunOut, dependencies=[Depends(_require_cloud_operator)])
 def ingest_source(source_id: int, db: Session = Depends(get_db)) -> IngestionRunOut:
     """触发一次来源抓取 + 入库流水线（版本检测 / diff / 义务提取 / 增量向量化）。"""
     source = db.get(RegulatorySource, source_id)

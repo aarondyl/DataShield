@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     legacy_tenant_api_enabled: bool = False
     evaluation_auth_bypass: bool = False
     runtime_token: str = ""
+    # The Cloud API has a deliberately small public read surface.  Operations
+    # that can cause a source fetch or mutate RegIntel require this separate
+    # operator credential, injected from a secret file in the Cloud compose
+    # deployment.  It must never be bundled with Desktop.
+    cloud_admin_token: str = ""
+    cloud_admin_token_file: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -56,6 +62,8 @@ class Settings(BaseSettings):
         # Compose 环境、镜像层或命令行日志。显式 DATABASE_URL 仍用于开发和 CI。
         if self.database_url_file:
             self.database_url = Path(self.database_url_file).read_text(encoding="utf-8").strip()
+        if self.cloud_admin_token_file:
+            self.cloud_admin_token = Path(self.cloud_admin_token_file).read_text(encoding="utf-8").strip()
         if self.runtime_mode == "local":
             self.local_data_dir = self.local_data_dir or default_local_data_dir()
             if "DATABASE_URL" not in os.environ:

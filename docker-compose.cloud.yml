@@ -14,9 +14,20 @@ services:
       retries: 12
     secrets: [postgres_password]
     networks: [cloud_database]
+    restart: unless-stopped
+    mem_limit: 700m
+    logging: &json_logging
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
     # 故意不发布宿主机端口：生产数据库只能由 cloud 服务访问。
 
   cloud:
+    # Production must set CLOUD_IMAGE to a registry digest, for example
+    # registry.example/datashield-cloud@sha256:... and use `up --no-build`.
+    # The local default keeps the Compose file usable for non-production tests.
+    image: ${CLOUD_IMAGE:-datashield-cloud:local}
     build:
       context: .
       dockerfile: backend/Dockerfile.cloud
@@ -25,6 +36,7 @@ services:
       RUNTIME_MODE: cloud
       RUN_SEED: "false"
       SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-false}
+      CLOUD_ADMIN_TOKEN_FILE: /run/secrets/cloud_admin_token
     ports:
       - "${CLOUD_BIND_ADDRESS:-127.0.0.1}:8000:8000"
     depends_on:
@@ -35,8 +47,11 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-    secrets: [cloud_database_url]
+    secrets: [cloud_database_url, cloud_admin_token]
     networks: [cloud_database, cloud_egress]
+    restart: unless-stopped
+    mem_limit: 550m
+    logging: *json_logging
 
 networks:
   cloud_database:
@@ -46,9 +61,11 @@ networks:
 
 secrets:
   postgres_password:
-    external: true
+    file: ${CLOUD_SECRETS_DIR:?Set CLOUD_SECRETS_DIR to an absolute, deploy-user-only directory}/postgres_password
   cloud_database_url:
-    external: true
+    file: ${CLOUD_SECRETS_DIR:?Set CLOUD_SECRETS_DIR to an absolute, deploy-user-only directory}/cloud_database_url
+  cloud_admin_token:
+    file: ${CLOUD_SECRETS_DIR:?Set CLOUD_SECRETS_DIR to an absolute, deploy-user-only directory}/cloud_admin_token
 
 volumes:
   cloud_postgres_data:
