@@ -71,6 +71,11 @@ class Settings(BaseSettings):
             return Path(self.local_data_dir) / "datashield.db"
         return Path(self.local_data_dir) / "regulations" / "cache.db"
 
+    @property
+    def local_runtime_descriptor_path(self) -> Path:
+        """桌面壳读取的本机运行时描述；只应存在于当前用户应用目录。"""
+        return Path(self.local_data_dir) / "runtime.json"
+
 
 @lru_cache
 def get_settings() -> Settings:
