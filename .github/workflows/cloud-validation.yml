@@ -1,0 +1,59 @@
+name: Cloud RegIntel validation
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'docker-compose.cloud.yml'
+      - '.github/workflows/cloud-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cloud-contract-and-migration:
+    name: Cloud-only contract and pgvector migration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: datashield_cloud
+          POSTGRES_PASSWORD: ci-only-not-production
+          POSTGRES_DB: datashield_cloud
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U datashield_cloud -d datashield_cloud"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Cloud dependencies
+        run: python -m pip install -r backend/requirements-dev.txt
+      - name: Validate Cloud-only PostgreSQL migration
+        working-directory: backend
+        env:
+          RUNTIME_MODE: cloud
+          DATABASE_URL: postgresql+psycopg://datashield_cloud:ci-only-not-production@localhost:5432/datashield_cloud
+        run: |
+          python -m alembic -c alembic-cloud.ini upgrade head
+          python - <<'PY'
+          import os
+          from sqlalchemy import create_engine, inspect, text
+
+          engine = create_engine(os.environ["DATABASE_URL"])
+          tables = set(inspect(engine).get_table_names())
+          assert {"regulations", "regulation_events", "legal_chunks", "requirements"} <= tables
+          assert not ({"companies", "products", "findings", "remediations", "feedback"} & tables)
+          with engine.connect() as connection:
+              assert connection.execute(text("SELECT 1 FROM pg_extension WHERE extname = 'vector'")).scalar() == 1
+          PY
+      - name: Validate Cloud API contract and Local sync behavior
+        working-directory: backend
+        run: python -m pytest tests/test_cloud_api_contract.py tests/test_cloud_migration_isolation.py tests/test_local_regulation_cache.py tests/test_local_sync_http_e2e.py -q
+      - name: Build Cloud image only
+        run: docker build --file backend/Dockerfile.cloud --tag datashield-cloud-ci:${{ github.sha }} .

@@ -22,6 +22,30 @@ from app.core.config import get_settings
 from app.db.session import SessionLocal, init_db, init_regintel_db, is_sqlite
 
 
+CLOUD_API_VERSION = "1.0"
+
+
+async def enforce_cloud_api_compatibility(request, call_next):
+    """Keep the Desktop-facing Cloud contract explicitly versioned.
+
+    Clients which omit the header remain compatible with the first public
+    release. A client that sends an unsupported major version is rejected
+    before it can apply an incompatible regulation bundle.
+    """
+    if get_settings().runtime_mode == "cloud" and request.url.path.startswith("/api/v1/"):
+        requested = request.headers.get("X-DataShield-Api-Version")
+        if requested and requested.split(".", 1)[0] != CLOUD_API_VERSION.split(".", 1)[0]:
+            return JSONResponse(
+                {"detail": "Unsupported Cloud API version", "supported_version": CLOUD_API_VERSION},
+                status_code=426,
+                headers={"X-DataShield-Api-Version": CLOUD_API_VERSION},
+            )
+        response = await call_next(request)
+        response.headers["X-DataShield-Api-Version"] = CLOUD_API_VERSION
+        return response
+    return await call_next(request)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """启动流程：建表 → （SQLite）重建本地向量索引 → 写种子数据（仅当库为空）。"""
@@ -54,6 +78,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_app() -> FastAPI:
     """按运行模式装载路由；云端法规进程不暴露私有业务 API。"""
     app = FastAPI(title="DataShield API", version="3.0.0", lifespan=lifespan)
+    app.middleware("http")(enforce_cloud_api_compatibility)
     mode = get_settings().runtime_mode
     if mode == "local":
         from app.api import local_repositories
