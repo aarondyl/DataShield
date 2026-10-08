@@ -58,6 +58,15 @@ jobs:
         run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
       - name: 构建 NSIS 当前用户安装包
         run: npm --prefix apps/desktop run tauri -- build
+      - name: 验证实际安装目录中的 sidecar 依赖
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem apps/desktop/src-tauri/target/release/bundle/nsis -Filter '*.exe' | Select-Object -First 1
+          $installDirectory = Join-Path $env:RUNNER_TEMP ('DataShield-install-' + [guid]::NewGuid())
+          $installation = Start-Process -FilePath $installer.FullName -ArgumentList '/S',"/D=$installDirectory" -Wait -PassThru
+          if ($installation.ExitCode -ne 0) { throw 'NSIS silent installation failed' }
+          if (-not (Test-Path (Join-Path $installDirectory '_internal'))) { throw 'Installed PyInstaller payload is missing' }
+          ./scripts/smoke-desktop-sidecar.ps1 -Executable (Join-Path $installDirectory 'datashield-local.exe')
       - name: 生成安装包校验值及来源记录
         shell: pwsh
         run: |

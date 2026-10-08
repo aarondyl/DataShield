@@ -27,10 +27,10 @@ try {
   if (-not $ready) { throw 'Packaged sidecar did not become ready' }
   # Never print the descriptor or token; check authorization with a harmless read.
   $denied = $false
-  try { Invoke-RestMethod ($descriptor.base_url + '/api/v1/companies') -TimeoutSec 5 | Out-Null }
+  try { Invoke-RestMethod ($descriptor.base_url + '/api/companies') -TimeoutSec 5 | Out-Null }
   catch { $denied = [int]$_.Exception.Response.StatusCode -eq 401 }
   if (-not $denied) { throw 'Private API accepted a request without runtime token' }
-  Invoke-RestMethod ($descriptor.base_url + '/api/v1/companies') -Headers @{'X-Runtime-Token'=$descriptor.runtime_token} -TimeoutSec 5 | Out-Null
+  Invoke-RestMethod ($descriptor.base_url + '/api/companies') -Headers @{'X-Runtime-Token'=$descriptor.runtime_token} -TimeoutSec 5 | Out-Null
   Write-Host 'Packaged sidecar readiness, PID, loopback and runtime authorization passed'
 } catch {
   $logFile = Join-Path $dataDirectory 'sidecar-startup.log'

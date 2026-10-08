@@ -26,7 +26,7 @@ def test_cloud_http_sync_to_local_finding(tmp_path, monkeypatch):
     Base.metadata.create_all(cloud_engine); Base.metadata.create_all(local_engine)
     Cloud, Local=sessionmaker(bind=cloud_engine), sessionmaker(bind=local_engine)
     with Cloud() as db:
-        reg=Regulation(name="EU AI Act", jurisdiction="EU", official_identifier="EU:AI")
+        reg=Regulation(name="EU AI Act", jurisdiction="EU", official_identifier="EU:AI", canonical_source_url="https://eur-lex.europa.eu/eli/reg/2024/1689/oj")
         db.add(reg); db.flush()
         ver=RegulationVersion(regulation_id=reg.id, version_number=1, normalized_text="Article 50", content_hash="a"*64, is_current=True)
         db.add(ver); db.flush(); reg.current_version_id=ver.id
@@ -79,3 +79,8 @@ def test_cloud_http_sync_to_local_finding(tmp_path, monkeypatch):
         finding=db.scalar(select(Finding)); assert finding is not None
         assert finding.requirement_links and finding.evidence_links
         assert finding.requirement_links[0].requirement_id == finding.evidence_links[0].requirement_id
+        requirement = db.get(Requirement, finding.requirement_links[0].requirement_id)
+        assert requirement.subject_type == "provider"
+        assert requirement.object_type == "AI"
+        assert requirement.confidence == .9
+        assert finding.evidence_links[0].evidence_snapshot_json["source_url"] == "https://eur-lex.europa.eu/eli/reg/2024/1689/oj"
