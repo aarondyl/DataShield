@@ -71,10 +71,14 @@ jobs:
         shell: pwsh
         run: |
           $directory = 'apps/desktop/src-tauri/target/release/bundle/nsis'
+          $checksums = @()
           Get-ChildItem $directory -Filter '*.exe' | ForEach-Object {
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
             "$hash  $($_.Name)" | Set-Content (Join-Path $directory ($_.Name + '.sha256')) -Encoding utf8
+            $checksums += "$hash  $($_.Name)"
           }
+          if ($checksums.Count -ne 1) { throw 'Expected exactly one Windows NSIS installer' }
+          $checksums | Set-Content (Join-Path $directory 'SHA256SUMS.txt') -Encoding ascii
           git rev-parse HEAD | Set-Content (Join-Path $directory 'SOURCE_COMMIT.txt') -Encoding utf8
       - name: 上传 Windows 安装产物
         uses: actions/upload-artifact@v4
@@ -86,3 +90,4 @@ jobs:
             apps/desktop/src-tauri/target/release/bundle/nsis/*.nsis.zip
             apps/desktop/src-tauri/target/release/bundle/nsis/*.sha256
             apps/desktop/src-tauri/target/release/bundle/nsis/SOURCE_COMMIT.txt
+            apps/desktop/src-tauri/target/release/bundle/nsis/SHA256SUMS.txt
