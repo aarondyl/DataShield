@@ -25,8 +25,10 @@ def test_ambiguous_proposal_requires_question():
 
 
 def test_feedback_contract_is_strict_and_targeted():
+    # 产品事实纠正允许不绑定具体发现/整改（产品画像页直接纠正）
+    FeedbackCreateRequest(tenant_id=1, product_id=1, feedback_type="FACT_CORRECTION", raw_text="x")
     with pytest.raises(ValidationError):
-        FeedbackCreateRequest(tenant_id=1, product_id=1, feedback_type="FACT_CORRECTION", raw_text="x")
+        FeedbackCreateRequest(tenant_id=1, product_id=1, feedback_type="FINDING_FEEDBACK", raw_text="x")
     with pytest.raises(ValidationError):
         FeedbackCreateRequest(tenant_id=1, product_id=1, finding_id=1,
             feedback_type="FACT_CORRECTION", raw_text="x", surprise=True)

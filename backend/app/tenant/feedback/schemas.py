@@ -44,7 +44,7 @@ class FeedbackCreateRequest(Contract):
 
     @model_validator(mode="after")
     def validate_target(self):
-        if self.finding_id is None and self.remediation_id is None:
+        if self.finding_id is None and self.remediation_id is None and self.feedback_type != FeedbackType.FACT_CORRECTION:
             raise ValueError("finding_id or remediation_id is required")
         if self.feedback_type == FeedbackType.REMEDIATION_FEEDBACK and self.remediation_id is None:
             raise ValueError("remediation_id is required for REMEDIATION_FEEDBACK")
