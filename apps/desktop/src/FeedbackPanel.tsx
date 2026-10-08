@@ -5,14 +5,14 @@ import type { Scope } from './remediation-api';
 
 type Candidate = { id: number; status: 'PROPOSED' | 'NEEDS_CLARIFICATION' | 'CONFIRMED' | 'APPLIED' | 'REJECTED'; reasoning_summary: string; proposed_name?: string; proposed_status?: string; clarification_question?: string; applied_twin_version_id?: number; reanalysis_run_id?: number; last_error: string };
 type Submission = { feedback: { id: number; raw_text: string; finding_id: number }; candidates: Candidate[] };
-export function FeedbackPanel({ copy, workspace, findingId }: { copy: Copy; workspace: Scope; findingId: number }) {
+export function FeedbackPanel({ copy, workspace, findingId, onApplied }: { copy: Copy; workspace: Scope; findingId: number; onApplied?: () => void }) {
   const c = copy.feedback;
   const [text, setText] = useState(''); const [answer, setAnswer] = useState('');
   const [items, setItems] = useState<Submission[]>([]); const [busy, setBusy] = useState(false); const [error, setError] = useState('');
-  const load = async () => { const rows = await localApiRequest<Submission[]>(`/api/v1/products/${workspace.productId}/feedback?tenant_id=${workspace.companyId}`); setItems(rows.filter(item => item.feedback.finding_id === findingId)); };
+  const load = async () => { const rows = await localApiRequest<Submission[]>(`/api/v1/products/${workspace.productId}/feedback?tenant_id=${workspace.companyId}`); const scoped = rows.filter(item => item.feedback.finding_id === findingId); setItems(scoped); return scoped; };
   useEffect(() => { void load().catch(() => setError(c.error)); }, [workspace, findingId]);
-  const perform = async (action: () => Promise<unknown>) => { setBusy(true); setError(''); try { await action(); await load(); } catch { setError(c.error); await load().catch(() => {}); } finally { setBusy(false); } };
-  const decide = (candidate: Candidate, action: 'confirm' | 'reject' | 'apply' | 'clarify') => perform(() => localApiRequest(`/api/v1/feedback-candidates/${candidate.id}/${action}`, 'POST', { tenant_id: workspace.companyId, ...(action === 'clarify' ? { answer } : { note: '' }) }));
+  const perform = async (action: () => Promise<unknown>, appliedId?: number) => { setBusy(true); setError(''); try { await action(); const rows = await load(); if (appliedId && rows.some(row => row.candidates.some(c => c.id === appliedId && c.status === 'APPLIED'))) onApplied?.(); } catch { setError(c.error); await load().catch(() => {}); } finally { setBusy(false); } };
+  const decide = (candidate: Candidate, action: 'confirm' | 'reject' | 'apply' | 'clarify') => perform(() => localApiRequest(`/api/v1/feedback-candidates/${candidate.id}/${action}`, 'POST', { tenant_id: workspace.companyId, ...(action === 'clarify' ? { answer } : { note: '' }) }), action === 'apply' ? candidate.id : undefined);
   return <section className="empty-card"><h2>{c.title}</h2><p>{c.boundary}</p><p>{c.mock}</p>
     <form className="workspace-form" onSubmit={e => { e.preventDefault(); void perform(async () => { await localApiRequest('/api/v1/feedback', 'POST', { tenant_id: workspace.companyId, product_id: workspace.productId, finding_id: findingId, feedback_type: 'FACT_CORRECTION', raw_text: text, created_by: 'local-workspace-user' }); setText(''); }); }}><label>{c.input}<textarea required value={text} onChange={e => setText(e.target.value)} /></label><button className="primary" disabled={busy || !text.trim()}>{c.interpret}</button></form>
     {error && <p role="alert" className="form-error">{error}</p>}

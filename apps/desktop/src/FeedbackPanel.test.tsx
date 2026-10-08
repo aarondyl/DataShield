@@ -20,7 +20,8 @@ test('confirmation is separate from apply; written version and failed reanalysis
     }
     return (exists ? [{ feedback: { id: 1, finding_id: 3, raw_text: '用户事实' }, candidates: [{ id: 2, status, reasoning_summary: '修正解释', proposed_name: 'ai_disclosure', proposed_status: 'PRESENT', applied_twin_version_id: attempts ? 8 : null, reanalysis_run_id: attempts ? 9 : null, last_error: attempts === 1 ? 'FAILED' : '' }] }] : []) as never;
   });
-  render(<FeedbackPanel copy={zh} workspace={{ companyId: 2, productId: 4 }} findingId={3} />);
+  const refresh = vi.fn();
+  render(<FeedbackPanel copy={zh} workspace={{ companyId: 2, productId: 4 }} findingId={3} onApplied={refresh} />);
   fireEvent.change(screen.getByLabelText(zh.feedback.input), { target: { value: '用户事实' } });
   fireEvent.click(screen.getByRole('button', { name: zh.feedback.interpret }));
   await screen.findByText('修正解释');
@@ -32,6 +33,8 @@ test('confirmation is separate from apply; written version and failed reanalysis
   fireEvent.click(screen.getByRole('button', { name: zh.feedback.apply }));
   await screen.findByText(zh.feedback.failed);
   expect(screen.queryByText(zh.feedback.applied)).toBeNull();
+  expect(refresh).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: zh.feedback.retry }));
   await screen.findByText(zh.feedback.applied);
+  expect(refresh).toHaveBeenCalledTimes(1);
 });
