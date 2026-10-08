@@ -298,6 +298,7 @@ class TestChangeDetectionFlow:
             sync = client.get("/api/v1/sync/events", params={"limit": 1}).json()
             assert sync["snapshot_cursor"] >= event["id"]
             assert sync["events"] and sync["events"][0]["id"] <= sync["snapshot_cursor"]
+            assert sync["next_cursor"] >= sync["events"][-1]["id"]
             for private in ("company", "product", "twin", "finding", "remediation", "feedback"):
                 assert private not in str(sync).lower()
 

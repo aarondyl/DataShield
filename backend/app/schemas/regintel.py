@@ -204,6 +204,7 @@ class SyncPage(BaseModel):
     """法规同步页；不含任何租户或产品字段。"""
     schema_version: str = "1.0"
     snapshot_cursor: int
-    next_cursor: int | None = None
+    # 每页都可提交；最后页也返回游标，空页回显请求 cursor。
+    next_cursor: int
     has_more: bool
     events: list[EventOut] = Field(default_factory=list)
