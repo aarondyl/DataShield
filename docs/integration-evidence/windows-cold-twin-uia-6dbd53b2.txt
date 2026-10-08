@@ -1,0 +1,261 @@
+DataShield
+DataShield - Web 内容
+DataShield
+D
+DataShield
+Development preview
+Main navigation
+Today
+Monitor
+Findings
+Actions
+Product Twin
+Settings
+Local Agent connected
+Check again
+Language
+简体中文
+English
+Product Twin
+Connect and understand a product
+Confirming facts appends a new Twin version without overwriting history.
+Current Twin version: v2
+ai_features
+Capabilities
+ · 
+Present
+ · 
+Confirmed
+user_registration
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+login
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+oauth
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+user_profile
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+payment
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+subscription
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+file_upload
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+AI_generation
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+AI_chat
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+recommendation
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+search
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+analytics
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+admin_panel
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+email
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+notification
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+content_creation
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+content_storage
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+data_export
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+account_deletion
+Capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+account_deletion
+capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+data_export
+capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+cookie_consent
+capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+privacy_policy
+capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+terms_of_service
+capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+AI_disclosure
+capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+age_gate
+capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+data_retention
+capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+audit_logging
+capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+access_control
+capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+user_consent
+capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+marketing_opt_out
+capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+contact_or_complaint_channel
+capabilities
+ · 
+Not detected
+ · 
+Awaiting confirmation
+Confirm this fact
+Version history
+v
+2
+ · 
+10/9/2026, 3:05:53 AM
+v
+1
+ · 
+10/9/2026, 2:54:27 AM

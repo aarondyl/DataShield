@@ -20,3 +20,7 @@
 人工验收需要回传：每项 PASS/FAIL/未执行、截图（不含 token/私有业务文件）、失败最小复现、Windows build、安装器 SHA256。不要只回传“能打开”。真实 HTTPS 未就绪时，第 6–10 步不能用临时 HTTP 或演示语料替代。
 
 完整重启、真实业务操作和升级后的用户数据观察必须实际执行；无法远程操作时由用户完成并反馈。若发现 P0，修复后从新固定提交重新构建并重复受影响步骤，再申请最终发布批准。
+
+本轮旧 RC 的 Windows 自动化已有记录于 `docs/integration-evidence/windows-installed-79d1c513.json`，但该包已被修复取代，不能作为新 RC 的全项 PASS。网站理解还须在正常公网 DNS 下复验；当前 fake-IP 解析被安全拒绝。
+
+新版 `6dbd53b2` 已实际安装并自动化复验冷启动自动连接、英文导航/偏好、GUI Twin 时间、SQLite 持久化、正常退出、token 轮换和模拟业务 API 闭环。独立 RC 的卸载保留 SQLite（文件 SHA256 不变），同包重装工作区仍在；这不是跨版本升级、用户人工或实际 HTTPS 验收。新包位于 `C:\Users\Aaron\Downloads\DataShield-RC-6dbd53b2`。

@@ -1,0 +1,23 @@
+ControlType.Pane | DataShield
+ControlType.Pane | DataShield - Web 内容
+ControlType.Document | DataShield
+ControlType.Text | D
+ControlType.Text | DataShield
+ControlType.Text | Development preview
+ControlType.Group | 主导航
+ControlType.Button | Today
+ControlType.Button | Monitor
+ControlType.Button | Findings
+ControlType.Button | Actions
+ControlType.Button | Product Twin
+ControlType.Button | Settings
+ControlType.Text | Local Agent is unavailable
+ControlType.Button | Check again
+ControlType.Group | Language
+ControlType.Button | 简体中文
+ControlType.Button | English
+ControlType.Text | A local-first compliance workspace
+ControlType.Text | Welcome to DataShield
+ControlType.Text | Your product data, evidence, and personalized compliance analysis stay on this device by default.
+ControlType.Button | Create local workspace
+ControlType.Button | View data and privacy

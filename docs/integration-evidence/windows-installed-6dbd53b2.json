@@ -1,0 +1,17 @@
+{
+  "source_commit": "6dbd53b2c6562a9d8c782fe338f7427b210bb4e8",
+  "installer_sha256": "ad27a6660fe8bf431a593f53d593d00d6f6d73aed0a9452f774b1f91b1305d0d",
+  "windows_build": "10.0.26200.0",
+  "elevated": false,
+  "installation": "PASS",
+  "same_version_rc_reinstall": "PASS",
+  "sqlite_workspace_persistence": "PASS",
+  "normal_exit_sidecar_cleanup": "PASS",
+  "normal_exit_descriptor_cleanup": "PASS",
+  "token_rotation": "PASS",
+  "old_token_status": 401,
+  "db": "sqlite",
+  "real_https": "NOT_RUN",
+  "human_visual_acceptance": "NOT_RUN",
+  "classification": "实际 Windows 11 自动化；演示夹具和 mock；非人工/真实 HTTPS/法律验收"
+}
