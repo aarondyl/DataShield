@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import actions, analysis, companies, compliance, developer, evaluation, feedback, findings, health, products, regintel, regulations, remediations, tenant_agent, today, ui_understanding
 from app.api import product_twin, repository_understanding, website_understanding
 from app.core.config import get_settings
-from app.db.session import SessionLocal, init_db, is_sqlite
+from app.db.session import SessionLocal, init_db, init_regintel_db, is_sqlite
 from app.rag.retrieval import rebuild_local_store_from_db
 from app.regintel.retrieval import rebuild_legal_chunk_store_from_db
 from app.services.seed import seed_if_empty
@@ -31,16 +31,20 @@ from app.services.scheduler import start_scheduler
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """启动流程：建表 → （SQLite）重建本地向量索引 → 写种子数据（仅当库为空）。"""
-    init_db()
+    settings = get_settings()
+    if settings.runtime_mode == "cloud":
+        init_regintel_db()
+    else:
+        init_db()
     if is_sqlite():
         # 覆盖重启场景：把库里已有的条款向量重新加载进内存索引
         rebuild_local_store_from_db()
         rebuild_legal_chunk_store_from_db()
-    if get_settings().run_seed:
+    if settings.run_seed and settings.runtime_mode != "cloud":
         with SessionLocal() as db:
             seed_if_empty(db)
     # 可选：法规来源定时轮询（SCHEDULER_ENABLED=true 时启动）
-    scheduler = start_scheduler()
+    scheduler = start_scheduler() if settings.runtime_mode == "cloud" else None
     yield
     if scheduler is not None:
         scheduler.shutdown(wait=False)
