@@ -1,5 +1,5 @@
 from app.core.config import get_settings
-from app.db.base import Base
+from sqlalchemy import create_engine, inspect
 
 
 def test_local_mode_forces_offline_private_processing(monkeypatch, tmp_path):
@@ -14,11 +14,16 @@ def test_local_mode_forces_offline_private_processing(monkeypatch, tmp_path):
     finally: get_settings.cache_clear()
 
 
-def test_cloud_table_selection_excludes_private_tables():
-    from app.db.session import init_regintel_db
-    # The implementation exposes its table selection through create_all; inspect
-    # source to guard against accidental private-table initialization.
-    import inspect
-    source = inspect.getsource(init_regintel_db)
-    for private_table in ("companies", "products", "product_twin", "findings", "remediations", "feedback"):
-        assert private_table not in source
+def test_cloud_initialization_creates_only_regintel_tables(tmp_path, monkeypatch):
+    import app.db.session as session
+    cloud_engine = create_engine(f"sqlite:///{tmp_path / 'cloud.db'}")
+    monkeypatch.setattr(session, "engine", cloud_engine)
+    monkeypatch.setattr(session, "IS_SQLITE", True)
+    session.init_regintel_db()
+    names = set(inspect(cloud_engine).get_table_names())
+    assert {"regulations", "regulation_versions", "legal_units", "requirements", "legal_chunks", "regulation_events", "regulatory_sources"} <= names
+    assert not ({"companies", "products", "product_twin_versions", "findings", "remediations", "feedback"} & names)
+    # Existing unrelated data is intentionally preserved, never deleted.
+    with cloud_engine.begin() as conn: conn.exec_driver_sql("CREATE TABLE preserved_data (id INTEGER)")
+    session.init_regintel_db()
+    assert "preserved_data" in inspect(cloud_engine).get_table_names()

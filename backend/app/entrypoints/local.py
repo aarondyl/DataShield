@@ -1,8 +1,10 @@
 """本地用户智能体入口：仅回环监听，私有数据置于用户应用目录。"""
 import os
+import secrets
 from pathlib import Path
 
 os.environ.setdefault("RUNTIME_MODE", "local")
+os.environ.setdefault("RUNTIME_TOKEN", secrets.token_urlsafe(32))
 from app.core.config import get_settings
 
 settings = get_settings()
