@@ -4,6 +4,18 @@ from app.api import local_regulations as api
 from app.core.config import Settings
 from app.local_regulations.cache import LocalRegulationCache
 from app.local_regulations.client import CloudSyncClient
+from app.local_regulations.client import SecureCloudRedirectHandler
+from urllib.request import Request
+from urllib.error import URLError
+
+
+def test_cloud_https_sync_rejects_redirect_downgrade_before_request():
+    handler = SecureCloudRedirectHandler()
+    request = Request("https://regintel.example.org/api/v1/sync/events")
+    with pytest.raises(URLError, match="downgrade HTTPS"):
+        handler.redirect_request(request, None, 302, "Found", {}, "http://regintel.example.org/api/v1/sync/events")
+    redirect = handler.redirect_request(request, None, 302, "Found", {}, "https://regintel.example.org/public/events")
+    assert redirect.full_url == "https://regintel.example.org/public/events"
 
 def test_public_endpoint_persists_without_credentials(tmp_path, monkeypatch):
     settings = Settings(runtime_mode="local", local_data_dir=str(tmp_path))

@@ -38,13 +38,14 @@ Runtime token 只由 sidecar/Rust 持有，Renderer 不读取描述文件。Rust
 目录授权仅当前进程有效，重启需重选；跳过链接/敏感文件，不执行或上传仓库。
 Local-only 配置/缓存/目录授权不注册到 Cloud/Web。Cloud 不加载 Tenant 私有 API；同步只获取公开法规。
 Local 模式拒绝继承的 PostgreSQL/Cloud DATABASE_URL，在建立连接和初始化租户表前失败，避免从开发者终端启动 Desktop 时意外访问 Cloud 数据库。
+公开法规同步拒绝 HTTPS → HTTP 重定向降级，失败保留缓存，不把降级传输的法规数据用于分析。
 CONFIRMED != APPLIED；UNKNOWN != FALSE；NOT_DETECTED != ABSENT；APPROVED != EXECUTED != RESOLVED。
 
 ## 自动化回归
 
 后端：PYTHONPATH=/tmp/datashield-deps PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests -q（backend）。
 前端：npm test -- --maxWorkers=1；npm run build；npm audit --json（apps/desktop）。
-后端全量 321 项通过、47 项弃用警告，含 SQLite 严格边界、中文反馈状态/事实定位和中英文真实 API 闭环断言（隔离的 Demo fixture，明确使用 mock，不代表真实 AI 判断）；前端 14 项、生产构建与共享 Web 构建通过；Desktop audit 0 漏洞。最终 CI 以 SOURCE_COMMIT.txt 为准。
+后端全量 322 项通过、47 项弃用警告，含 HTTPS 不降级、SQLite 严格边界、中文反馈状态/事实定位和中英文真实 API 闭环断言（隔离的 Demo fixture，明确使用 mock，不代表真实 AI 判断）；前端 14 项、生产构建与共享 Web 构建通过；Desktop audit 0 漏洞。最终 CI 以 SOURCE_COMMIT.txt 为准。
 Linux cargo test 缺少 pkg-config/dbus 开发环境，不能报告通过；Windows CI 已加入 Rust 安全测试。
 
 ## Windows 人工验收（尚未完成）

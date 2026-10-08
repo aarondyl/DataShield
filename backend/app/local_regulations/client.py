@@ -1,14 +1,24 @@
 """仅拉取公开法规的 HTTP 同步客户端。"""
 import time
 from urllib.parse import urlencode
-from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
+from urllib.error import URLError
+from urllib.request import Request, HTTPRedirectHandler, build_opener
 
 from .cache import LocalRegulationCache
+
+
+class SecureCloudRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if urlsplit(req.full_url).scheme == "https" and urlsplit(newurl).scheme != "https":
+            raise URLError("Cloud regulation sync cannot downgrade HTTPS")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 class CloudSyncClient:
     def __init__(self, base_url: str, cache: LocalRegulationCache, timeout=5, retries=3, session_factory=None):
         self.base_url=base_url.rstrip("/"); self.cache=cache; self.timeout=timeout; self.retries=retries
         self.session_factory=session_factory
+        self.opener = build_opener(SecureCloudRedirectHandler())
     def get_json(self,path,params):
         url=self.base_url+path+"?"+urlencode(params)
         last=None
@@ -16,7 +26,7 @@ class CloudSyncClient:
             try:
                 import json
                 request = Request(url, headers={"X-DataShield-Api-Version": "1.0"})
-                with urlopen(request,timeout=self.timeout) as r: return json.load(r)
+                with self.opener.open(request,timeout=self.timeout) as r: return json.load(r)
             except Exception as exc: last=exc; time.sleep(min(.1*(2**n),1))
         raise ConnectionError("法规同步不可用，保留本地缓存") from last
     def sync(self, scope="all", jurisdiction=None):
