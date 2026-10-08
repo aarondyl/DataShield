@@ -1,4 +1,5 @@
 import type { Copy } from './i18n';
+import { apiDate } from './datetime';
 
 type LegalEvidence = { legal_unit_id: number; regulation_id: number; regulation_name: string; version_id: number; version: number; article: string; heading: string; content: string; source_url: string; requirement_ids: number[] };
 export type FindingDetailData = {
@@ -12,7 +13,7 @@ export type FindingDetailData = {
 export function FindingDetail({ copy, detail }: { copy: Copy; detail: FindingDetailData }) {
   const c = copy.findings;
   const locale = document.documentElement.lang || 'zh-CN';
-  const time = new Date(detail.finding.created_at);
+  const time = apiDate(detail.finding.created_at);
   const evidence = detail.evidence_snapshots?.length ? detail.evidence_snapshots.map(e => ({ ...e.snapshot, key: `snapshot-${e.id}` })) : detail.legal_evidence.map((e, i) => ({ ...e, key: `legal-${i}` }));
   const source = (url: string) => /^https?:\/\//.test(url) ? <a href={url} target="_blank" rel="noreferrer">{c.officialSource}</a> : <span>{c.noEvidence}</span>;
   return <article className="empty-card"><h2>{detail.finding.title}</h2><p>{c.risk}: {c.risks[detail.finding.impact_level as keyof typeof c.risks] ?? detail.finding.impact_level} · {c.states[detail.finding.status as keyof typeof c.states] ?? detail.finding.status}</p>

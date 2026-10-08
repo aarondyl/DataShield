@@ -176,6 +176,7 @@ async fn runtime_health(state: State<'_, DesktopState>) -> Result<RuntimeHealth,
         match state
             .client
             .get(format!("{}/api/health", descriptor.base_url))
+            .timeout(Duration::from_secs(2))
             .send()
             .await
         {
@@ -250,6 +251,7 @@ fn main() {
         // Never forward the process-held runtime token through a redirect.
         client: reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
+            .timeout(Duration::from_secs(60))
             .build()
             .expect("Unable to initialize the local HTTP client"),
         descriptor: Mutex::new(None),

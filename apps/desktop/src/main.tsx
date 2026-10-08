@@ -63,7 +63,7 @@ function App() {
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">D</span><span>{copy.productName}</span></div>
       <p className="preview-tag">{copy.labels.demo}</p>
-      <nav aria-label="主导航">
+      <nav aria-label={copy.labels.navigation}>
         {nav.map(item => <button key={item.key} className={screen === item.key ? 'nav-item active' : 'nav-item'} onClick={() => setScreen(item.key)}>{item.label}</button>)}
       </nav>
       <div className={'runtime ' + runtime}><span aria-hidden="true" />{statusText}<button onClick={() => void checkRuntime()}>{copy.labels.retry}</button></div>
