@@ -22,8 +22,11 @@
 公共只读 Desktop 面：
 
 - `GET /api/health`
-- `GET /api/v1/regulations`、`GET /api/v1/requirements`
+- `GET /api/v1/regulations`、`GET /api/v1/regulations/{id}`、`GET /api/v1/regulations/{id}/versions`
+- `GET /api/v1/requirements`、`GET /api/v1/requirements/{id}`、`GET /api/v1/legal-units/{id}`
 - `POST /api/v1/legal-search`
+- `GET /api/v1/changes`、`GET /api/v1/changes/{id}`、`GET /api/v1/events`、`GET /api/v1/events/{event_id}`
+- `GET /api/v1/sources`、`GET /api/v1/ingestion-runs`
 - `GET /api/v1/sync/events?cursor=&snapshot_cursor=&limit=&jurisdiction=`
 - `GET /api/v1/sync/events/{event_id}/bundle`
 
