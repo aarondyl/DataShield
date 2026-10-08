@@ -17,6 +17,9 @@ backend/datashield.db
 backend/tests/test_datashield.db
 frontend/node_modules/
 frontend/dist/
+apps/desktop/node_modules/
+apps/desktop/dist/
+apps/desktop/src-tauri/target/
 .pnpm-store/
 node_modules/
 .codex/

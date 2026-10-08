@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "DataShield",
+  "version": "0.1.0",
+  "identifier": "com.datashield.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [{ "title": "DataShield", "width": 1180, "height": 760, "minWidth": 900, "minHeight": 620 }],
+    "security": { "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: data:; style-src 'self' 'unsafe-inline'; script-src 'self'" }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "externalBin": ["binaries/datashield-local"],
+    "windows": { "wix": null, "nsis": { "installerMode": "currentUser", "displayLanguageSelector": false } }
+  }
+}
