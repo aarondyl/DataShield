@@ -44,7 +44,12 @@ class CloudSyncClient:
             except ConnectionError:
                 self.cache.mark_offline(scope)
                 raise
-            self._commit_page(page, bundles, scope); cursor=page["next_cursor"]
+            try:
+                self._commit_page(page, bundles, scope)
+            except ValueError:
+                self.cache.mark_offline(scope)
+                raise
+            cursor=page["next_cursor"]
             if not page["has_more"]:
                 from app.local_regulations.tasks import run_pending
                 run_pending(self.session_factory)

@@ -87,4 +87,6 @@ def sync(jurisdiction: str | None = Query(default=None)) -> dict:
         cursor = CloudSyncClient(settings.cloud_regintel_base_url, cache).sync(jurisdiction=jurisdiction)
     except ConnectionError as exc:
         raise HTTPException(503, "Cloud 法规服务不可用，正在使用本地缓存") from exc
+    except ValueError as exc:
+        raise HTTPException(502, "Cloud 同步数据未通过契约校验，正在使用本地缓存") from exc
     return {"cursor": cursor, "status": cache.status(_scope(jurisdiction)), "events": cache.events()}

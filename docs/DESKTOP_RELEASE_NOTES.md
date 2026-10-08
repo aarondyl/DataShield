@@ -12,6 +12,8 @@ Windows 11 x64 用户下载安装包，无需另装 Python、Node 或 Docker。�
 
 修复首次法规入库缺失同步事件：首次纳入资料库生成 `initial_import` 基线事件，Desktop 可获取首版语料；它不代表法规刚刚发生修订。相同内容再次抓取不重复发布事件。
 
+英文来源自动选择英文义务抽取；不兼容的同步页和无法推进的分页被拒绝，原有缓存保留并显示可恢复错误。
+
 用户数据存于 `%LOCALAPPDATA%\DataShield`。升级前退出软件并备份此目录，安装新版后检查工作区；卸载后需自行确认数据保留行为。未启用安全自动更新，更新方式为手动下载并安装经过批准的新版本。
 
 已知限制：安装包尚未进行 Authenticode 签名；Windows 可能提示未知发布者。网站/仓库理解为静态提取，整改批准仅接受建议，不自动执行或判定合规。模拟分析、推断画像、未核验摘要、演示语料与官方法规应分别识别，演示语料不可作为正式依据。首次公开发布必须在 Windows 实机、真实 HTTPS 和官方语料验收完成且用户批准后执行；本文件当前为 Release Notes 草案。预发布不构成法律建议。
@@ -25,3 +27,5 @@ Private product data remains in local SQLite. Public regulations are pulled over
 Requires Windows 11 x64 and Microsoft WebView2 Runtime (the first installation may download it). No Python, Node, or Docker installation is required. Verify `DataShield_0.1.0_x64-setup.exe` against `SHA256SUMS.txt`, install for the current user, create a workspace, configure the accepted HTTPS Cloud endpoint, and sync regulations.
 
 This integration adds a checksum manifest, rotates runtime credentials on each start, and removes the current process's descriptor on normal exit. Publication checks the main commit and asset checksums, with no Cloud deployment steps. The installer is not Authenticode signed. Understanding uses static extraction; remediation approval does not execute changes. Demo corpus and unverified summaries are not official legal evidence. Back up `%LOCALAPPDATA%\DataShield` before upgrading. Updates require manually downloading and installing an approved release. These notes remain a draft until Windows, HTTPS and official-corpus acceptance and user approval are complete. This pre-release is not legal advice.
+
+Official English HTML parsing now decodes entities, rejects duplicate article numbers, and selects English requirement extraction. The first ingestion emits an `initial_import` sync baseline, distinct from a new legislative amendment. Repeated unchanged ingestion is idempotent. Incompatible or stalled sync pages preserve the cache and report a recoverable failure. The privacy entry opens Settings. Fixture-based sync, remediation, feedback correction, reanalysis and Today regression has been exercised; official-corpus and live HTTPS acceptance remain separate gates.

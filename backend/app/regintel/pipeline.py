@@ -272,7 +272,7 @@ def run_ingestion(
     *,
     use_llm: bool | None = None,
     default_subject: str = "",
-    language: str = "zh",
+    language: str | None = None,
     sync_legacy: bool = False,
 ) -> IngestionRun:
     """执行一次完整的法规入库/更新流水线，返回运行记录（绝不抛出，失败记为 FAILED）。
@@ -287,6 +287,7 @@ def run_ingestion(
     db.commit()
     db.refresh(run)
     try:
+        language = language or ("en" if source.parser_type in {"eu_english", "gdpr_bilingual"} else "zh")
         _run_pipeline(db, source, run, use_llm=use_llm, default_subject=default_subject,
                       language=language, sync_legacy=sync_legacy)
     except Exception as exc:  # 流水线失败不拖垮服务，运行记录标记 FAILED

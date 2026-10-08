@@ -43,6 +43,8 @@ class LocalRegulationCache:
             regulations={row[0]: json.loads(row[1]) for row in db.execute("SELECT entity_key,payload FROM cached_regulations")}
         return [{"event": json.loads(payload), "sequence": sequence, "regulation": regulations.get(bundles.get(event_id,("", ""))[0], {}), "version_key": bundles.get(event_id,("", ""))[1]} for event_id,sequence,payload in rows]
     def _validate(self, page: dict, bundles: list[dict], current: tuple[int, int]):
+        if str(page.get("schema_version", "1.0")).split(".", 1)[0] != "1":
+            raise ValueError("不兼容的 Cloud 同步页面契约版本，未更新本地缓存")
         if any(str(bundle.get("schema_version", "1.0")).split(".", 1)[0] != "1" for bundle in bundles):
             raise ValueError("不兼容的 Cloud 法规契约版本，未更新本地缓存")
         required={e["event_id"] for e in page["events"]}
@@ -50,6 +52,8 @@ class LocalRegulationCache:
         if len(required) != len(page["events"]) or len(supplied) != len(bundles): raise ValueError("同步页面或 Bundle 存在重复事件")
         if required != supplied: raise ValueError("同步页面与法规 Bundle 不完整")
         ids=[e["id"] for e in page["events"]]
+        if page.get("has_more") and (not ids or page["next_cursor"] <= current[0]):
+            raise ValueError("同步分页未取得进展，未更新本地缓存")
         if ids != sorted(set(ids)): raise ValueError("同步事件必须严格递增且不可重复")
         if any(i > page["snapshot_cursor"] for i in ids): raise ValueError("事件超出固定快照")
         expected=ids[-1] if ids else page.get("cursor", page["next_cursor"])

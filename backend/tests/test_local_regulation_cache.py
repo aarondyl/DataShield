@@ -28,6 +28,17 @@ def test_incompatible_bundle_version_never_advances_cursor(tmp_path):
         cache.apply(page, [bundle])
     assert cache.progress() == (0, 0, 0)
 
+
+def test_incompatible_page_and_stalled_pagination_preserve_cache(tmp_path):
+    cache = LocalRegulationCache(tmp_path / 'regulations.db')
+    page, bundle = _page_bundle()
+    page['schema_version'] = '2.0'
+    with pytest.raises(ValueError, match='契约版本'):
+        cache.apply(page, [bundle])
+    with pytest.raises(ValueError, match='未取得进展'):
+        cache.apply({'snapshot_cursor': 7, 'next_cursor': 0, 'events': [], 'has_more': True}, [])
+    assert cache.progress() == (0, 0, 0)
+
 def test_cache_rejects_incomplete_or_backward_page(tmp_path):
     c=LocalRegulationCache(tmp_path/"r.db")
     page={"snapshot_cursor":2,"next_cursor":2,"events":[{"id":2,"event_id":"e2"}]}

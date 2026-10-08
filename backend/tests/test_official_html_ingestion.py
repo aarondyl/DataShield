@@ -60,7 +60,7 @@ def test_first_import_emits_sync_bundle_and_unchanged_retry_is_idempotent(monkey
         db.add(regulation); db.flush()
         source = RegulatorySource(regulation_id=regulation.id, source_name='TEST FIXTURE', parser_type='eu_english')
         db.add(source); db.commit()
-        run = run_ingestion(db, source, use_llm=False, language='en', default_subject='provider')
+        run = run_ingestion(db, source, use_llm=False)
         assert run.status == 'COMPLETED' and run.event_id is not None
         event = db.get(RegulationEvent, run.event_id)
         assert event.payload['initial_import'] is True
@@ -79,3 +79,4 @@ def test_first_import_emits_sync_bundle_and_unchanged_retry_is_idempotent(monkey
     assert page['events'][0]['event_id'] == event_id
     bundle = client.get(f'/api/v1/sync/events/{event_id}/bundle').json()
     assert bundle['requirements'] and bundle['legal_units']
+    assert bundle['requirements'][0]['subject_type'] == 'provider'
