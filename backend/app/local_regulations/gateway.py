@@ -3,7 +3,7 @@ import json
 import hashlib
 from .cache import LocalRegulationCache
 from app.tenant.regulatory.schemas import RequirementContext
-from app.tenant.regulatory.schemas import RegulationSourceContext, RegulationTrigger
+from app.tenant.regulatory.schemas import RegulationSourceContext, RegulationTrigger, LegalEvidence
 
 class LocalRegulationGateway:
     def __init__(self, cache: LocalRegulationCache): self.cache=cache
@@ -43,3 +43,13 @@ class LocalRegulationGateway:
         return RegulationTrigger(event_id=event_id,event_type=event.get("event_type","regulation.change.ready"),
           regulation_id=0,version_id=0,change_ids=[],requirement_ids=[],legal_unit_ids=[],payload=payload,
           materiality=payload.get("materiality","LOW"),topics=payload.get("topics",[]),change_summaries=[],source=RegulationSourceContext())
+
+    def evidence_for(self, requirements: list[RequirementContext]) -> list[LegalEvidence]:
+        with self.cache.connect() as db:
+            rows=db.execute("SELECT entity_key,payload FROM cached_legal_units").fetchall()
+        units={key:json.loads(value) for key,value in rows}; result=[]
+        for req in requirements:
+            unit=next((u for k,u in units.items() if self._local_id(k)==req.legal_unit_id),None)
+            if unit:
+                result.append(LegalEvidence(legal_unit_id=req.legal_unit_id,regulation_id=0,regulation_name="本地法规缓存",version_id=req.version_id,version=0,article=unit.get("unit_number",""),heading=unit.get("heading",""),content=unit.get("text",""),source_url="",requirement_ids=[req.id]))
+        return result
