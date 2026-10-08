@@ -80,6 +80,10 @@ class Settings(BaseSettings):
                     pass
             if "DATABASE_URL" not in os.environ:
                 self.database_url = f"sqlite:///{(Path(self.local_data_dir) / 'datashield.db').as_posix()}"
+            # A Desktop launched from a developer shell may inherit Cloud
+            # DATABASE_URL. Never initialize tenant tables on that database.
+            if self.database_url.split(":", 1)[0] not in {"sqlite", "sqlite+pysqlite"}:
+                raise ValueError("Local runtime requires SQLite; Cloud database URLs are not permitted")
             # Desktop 默认保持可重复的离线 mock；只有该显式模式才覆盖 provider。
             # byok/local/cloud 是未来 Desktop 选择边界：本层保留用户 provider
             # 配置，不保存密钥，也不在此实现远程网关或本地模型客户端。
