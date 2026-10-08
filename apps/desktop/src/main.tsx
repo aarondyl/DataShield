@@ -70,7 +70,8 @@ function App() {
       {screen === 'intake' && !workspace && <EmptyPage copy={copy} screen="twin" />}
       {screen === 'twin' && <TwinPage copy={copy} workspace={workspace} />}
       {screen === 'monitor' && <MonitorPage copy={copy} />}
-      {(['today', 'findings', 'actions'] as Screen[]).includes(screen) && <EmptyPage copy={copy} screen={screen as 'today' | 'findings' | 'actions'} />}
+      {screen === 'findings' && <FindingsPage copy={copy} workspace={workspace} />}
+      {(['today', 'actions'] as Screen[]).includes(screen) && <EmptyPage copy={copy} screen={screen as 'today' | 'actions'} />}
       {screen === 'settings' && <Settings copy={copy} />}
     </section>
   </main>;
@@ -113,6 +114,16 @@ function MonitorPage({ copy }: { copy: ReturnType<typeof useLocale>['copy'] }) {
   useEffect(() => { void load(); }, []);
   const sync = async () => { setSyncing(true); try { await localApiRequest('/api/v1/local-regulations/sync', 'POST'); } catch { /* status preserves offline cache reason */ } finally { setSyncing(false); await load(); } };
   return <section className="page"><h1>{copy.monitor.title}</h1><p>{state?.using_local_cache ? copy.monitor.offline : copy.monitor.body}</p><div className="settings-list"><div><strong>{copy.monitor.lastSync}</strong><span>{state?.last_success_at || copy.monitor.never}</span></div><div><strong>{copy.monitor.scope}</strong><span>{state?.scope || copy.monitor.loading}</span></div>{state?.last_error && <div><strong>{copy.monitor.status}</strong><span>{state.last_error}</span></div>}</div><button className="primary" disabled={syncing} onClick={() => void sync()}>{syncing ? copy.monitor.syncing : copy.monitor.sync}</button><div className="settings-list">{events.length ? events.map(item => <div key={item.event.event_id}><strong>{item.regulation.name || item.event.event_id}</strong><span>{item.regulation.jurisdiction || '—'} · {item.event.payload?.materiality || 'UNKNOWN'} · {(item.event.payload?.topics || []).join(', ')}</span></div>) : <div><span>{copy.monitor.empty}</span></div>}</div></section>;
+}
+
+function FindingsPage({ copy, workspace }: { copy: ReturnType<typeof useLocale>['copy']; workspace: WorkspaceRef | null }) {
+  const [findings, setFindings] = useState<Array<{ id: number; title: string; impact_level: string; status: string; requirement_count: number; evidence_count: number; product_twin_version_id?: number }>>([]);
+  const [message, setMessage] = useState(''); const [running, setRunning] = useState(false);
+  const load = async () => { if (!workspace) return; try { setFindings(await localApiRequest<typeof findings>(`/api/v1/findings?tenant_id=${workspace.companyId}&product_id=${workspace.productId}`)); } catch { setMessage(copy.findings.loadError); } };
+  useEffect(() => { void load(); }, [workspace]);
+  const run = async () => { if (!workspace) return; setRunning(true); setMessage(''); try { const requirements = await localApiRequest<Array<{ id: number }>>('/api/v1/local-regulations/requirements'); if (!requirements.length) { setMessage(copy.findings.noRequirements); return; } const result = await localApiRequest<{ status: string; missing_context: unknown[]; finding_ids: number[] }>('/api/v1/tenant-agent/analyze', 'POST', { tenant_id: workspace.companyId, product_id: workspace.productId, trigger_type: 'MANUAL_SCAN', requirement_ids: requirements.map(item => item.id) }); setMessage(result.missing_context.length ? copy.findings.needsContext : result.finding_ids.length ? copy.findings.done : copy.findings.noApplicable); await load(); } catch { setMessage(copy.findings.runError); } finally { setRunning(false); } };
+  if (!workspace) return <EmptyPage copy={copy} screen="findings" />;
+  return <section className="page"><h1>{copy.findings.title}</h1><p>{copy.findings.body}</p><button className="primary" disabled={running} onClick={() => void run()}>{running ? copy.findings.running : copy.findings.run}</button>{message && <p className="form-error">{message}</p>}<div className="settings-list">{findings.length ? findings.map(item => <div key={item.id}><strong>{item.title}</strong><span>{item.impact_level} · {item.status} · {copy.findings.requirements}: {item.requirement_count} · {copy.findings.evidence}: {item.evidence_count} · {copy.findings.twin}: v{item.product_twin_version_id ?? '—'}</span></div>) : <div><span>{copy.findings.empty}</span></div>}</div></section>;
 }
 
 function Welcome({ copy, onCreate }: { copy: ReturnType<typeof useLocale>['copy']; onCreate: () => void }) {
