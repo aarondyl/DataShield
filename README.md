@@ -83,6 +83,16 @@ docker compose up --build
 LLM_PROVIDER=api LLM_API_KEY=你的密钥 docker compose up --build
 ```
 
+### 云端法规服务部署边界
+
+Web 托管模式仍使用上面的 `docker compose`。云端公共法规服务使用独立的 `backend/Dockerfile.cloud` 和 `docker-compose.cloud.yml`，不包含 React 或租户业务路由；生产数据库不发布端口，密码必须从部署平台 Secret 注入：
+
+```bash
+POSTGRES_PASSWORD=仅在部署环境提供 docker compose -f docker-compose.cloud.yml up --build
+```
+
+完整的人工批准、健康检查与回滚约束见 [阶段四部署与构建边界](docs/阶段四部署与构建边界.md)。
+
 ## 本地开发
 
 后端使用 Python 3.12：

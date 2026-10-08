@@ -113,3 +113,19 @@ def init_db() -> None:
         for name, sql_type in regulation_additions.items():
             if name not in regulation_columns:
                 connection.execute(text(f"ALTER TABLE regulations ADD COLUMN {name} {sql_type}"))
+
+
+def init_regintel_db() -> None:
+    """只初始化云端法规服务所需表，绝不创建租户私有领域表。"""
+    from app.db.base import Base
+    from app.models import LegalChunk, LegalUnit, Regulation, RegulationArticle, RegulationChange, RegulationEvent, RegulationVersion, RegulatorySource, Requirement
+    from app.models.regulatory_source import IngestionRun, SourceSnapshot
+    tables = [
+        Regulation.__table__, RegulationArticle.__table__, RegulationVersion.__table__, LegalUnit.__table__,
+        Requirement.__table__, LegalChunk.__table__, RegulationChange.__table__, RegulationEvent.__table__,
+        RegulatorySource.__table__, SourceSnapshot.__table__, IngestionRun.__table__,
+    ]
+    if not IS_SQLITE:
+        with engine.begin() as connection:
+            connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+    Base.metadata.create_all(bind=engine, tables=tables)

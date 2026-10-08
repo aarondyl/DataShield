@@ -18,35 +18,68 @@ from fastapi.responses import FileResponse
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import actions, analysis, companies, compliance, developer, evaluation, feedback, findings, health, products, regintel, regulations, remediations, tenant_agent, today, ui_understanding
-from app.api import product_twin, repository_understanding, website_understanding
 from app.core.config import get_settings
-from app.db.session import SessionLocal, init_db, is_sqlite
-from app.rag.retrieval import rebuild_local_store_from_db
-from app.regintel.retrieval import rebuild_legal_chunk_store_from_db
-from app.services.seed import seed_if_empty
-from app.services.scheduler import start_scheduler
+from app.db.session import SessionLocal, init_db, init_regintel_db, is_sqlite
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """启动流程：建表 → （SQLite）重建本地向量索引 → 写种子数据（仅当库为空）。"""
-    init_db()
-    if is_sqlite():
+    settings = get_settings()
+    if settings.runtime_mode == "cloud":
+        init_regintel_db()
+    else:
+        init_db()
+    if is_sqlite() and settings.runtime_mode != "cloud":
+        from app.rag.retrieval import rebuild_local_store_from_db
+        from app.regintel.retrieval import rebuild_legal_chunk_store_from_db
         # 覆盖重启场景：把库里已有的条款向量重新加载进内存索引
         rebuild_local_store_from_db()
         rebuild_legal_chunk_store_from_db()
-    if get_settings().run_seed:
+    if settings.run_seed and settings.runtime_mode != "cloud":
+        from app.services.seed import seed_if_empty
         with SessionLocal() as db:
             seed_if_empty(db)
     # 可选：法规来源定时轮询（SCHEDULER_ENABLED=true 时启动）
-    scheduler = start_scheduler()
+    if settings.runtime_mode == "cloud":
+        from app.services.scheduler import start_scheduler
+        scheduler = start_scheduler()
+    else:
+        scheduler = None
     yield
     if scheduler is not None:
         scheduler.shutdown(wait=False)
 
 
-app = FastAPI(title="DataShield API", version="3.0.0", lifespan=lifespan)
+def create_app() -> FastAPI:
+    """按运行模式装载路由；云端法规进程不暴露私有业务 API。"""
+    app = FastAPI(title="DataShield API", version="3.0.0", lifespan=lifespan)
+    mode = get_settings().runtime_mode
+    from app.api import health
+    app.include_router(health.router, prefix="/api")
+    if mode == "cloud":
+        from app.api import regintel
+        app.include_router(regintel.router, prefix="/api")
+        return app
+    from app.api import actions, analysis, companies, compliance, developer, evaluation, feedback, findings, products, regulations, remediations, tenant_agent, today, ui_understanding
+    for module in (companies, products, regulations, analysis, actions, compliance, developer):
+        app.include_router(module.router, prefix="/api")
+    if mode == "web":
+        from app.api import regintel
+        app.include_router(regintel.router, prefix="/api")
+    for module in (evaluation, tenant_agent, findings, remediations, feedback, today, ui_understanding):
+        app.include_router(module.router, prefix="/api")
+    from app.api import product_twin, repository_understanding, website_understanding
+    app.include_router(website_understanding.router)
+    app.include_router(website_understanding.router, prefix="/api", include_in_schema=False)
+    app.include_router(repository_understanding.router)
+    app.include_router(repository_understanding.router, prefix="/api", include_in_schema=False)
+    app.include_router(product_twin.router)
+    app.include_router(product_twin.router, prefix="/api", include_in_schema=False)
+    return app
+
+
+app = create_app()
 
 _LEGACY_TENANT_PREFIXES = (
     "/api/companies", "/api/products", "/api/analysis", "/api/actions",
@@ -59,6 +92,16 @@ async def guard_legacy_tenant_apis(request, call_next):
     """Keep old routes available for trusted deployments but closed in shared previews."""
     if not get_settings().legacy_tenant_api_enabled and request.url.path.startswith(_LEGACY_TENANT_PREFIXES):
         return JSONResponse({"detail": "Legacy tenant API is disabled"}, status_code=404)
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def enforce_local_runtime_token(request, call_next):
+    """Local API 需要启动进程生成的短期 token，健康检查例外。"""
+    settings = get_settings()
+    if settings.runtime_mode == "local" and request.url.path.startswith("/api/") and request.url.path != "/api/health":
+        if not settings.runtime_token or request.headers.get("X-Runtime-Token") != settings.runtime_token:
+            return JSONResponse({"detail": "Invalid runtime token"}, status_code=401)
     return await call_next(request)
 
 
@@ -81,23 +124,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (health, companies, products, regulations, regintel, analysis, actions, compliance, developer):
-    app.include_router(module.router, prefix="/api")
-
-for module in (evaluation, tenant_agent, findings, remediations, feedback, today, ui_understanding):
-    app.include_router(module.router, prefix="/api")
-
-app.include_router(website_understanding.router)
-app.include_router(website_understanding.router, prefix="/api", include_in_schema=False)
-app.include_router(repository_understanding.router)
-app.include_router(repository_understanding.router, prefix="/api", include_in_schema=False)
-app.include_router(product_twin.router)
-app.include_router(product_twin.router, prefix="/api", include_in_schema=False)
+# 路由由 create_app 按模式装载。
 
 # The production image serves the compiled React frontend from the same origin.
 # During development Vite runs separately and proxies /api to this service.
 static_dir = Path(__file__).resolve().parents[1] / "static"
-if static_dir.exists():
+if get_settings().runtime_mode == "web" and static_dir.exists():
     assets_dir = static_dir / "assets"
     if assets_dir.exists():
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
