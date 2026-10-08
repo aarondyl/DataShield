@@ -53,6 +53,36 @@ def test_create_code_change_returns_typed_canonical_detail(client):
     assert body["remediation"]["prompt_version"] == "remediation-code-v1"
 
 
+def test_desktop_runtime_token_protects_remediation_without_web_cookie(client, monkeypatch, tmp_path):
+    """Desktop authenticates via the Rust-held runtime token, not evaluation cookies."""
+    scenario = _finding(client)
+    from app.core.config import get_settings
+    monkeypatch.setenv("RUNTIME_MODE", "local")
+    monkeypatch.setenv("LOCAL_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("RUNTIME_TOKEN", "test-desktop-runtime-token")
+    monkeypatch.setenv("EVALUATION_AUTH_BYPASS", "false")
+    get_settings.cache_clear()
+    url = f"/api/v1/findings/{scenario['finding_id']}/remediations"
+    headers = {"X-Runtime-Token": "test-desktop-runtime-token"}
+    try:
+        assert client.post(url, json=_request(scenario)).status_code == 401
+        created = client.post(url, headers=headers, json=_request(scenario))
+        assert created.status_code == 201, created.text
+        remediation_id = created.json()["remediation"]["id"]
+        detail_url = f"/api/v1/remediations/{remediation_id}"
+        assert client.get(detail_url, params={"tenant_id": scenario["tenant_id"]}).status_code == 401
+        detail = client.get(detail_url, headers=headers, params={"tenant_id": scenario["tenant_id"]})
+        assert detail.status_code == 200
+        assert detail.json()["legal_evidence"]
+        approved = client.post(detail_url + "/approve", headers=headers, json={"tenant_id": scenario["tenant_id"]})
+        assert approved.status_code == 200
+        assert approved.json()["remediation"]["status"] == "APPROVED"
+        with SessionLocal() as db:
+            assert db.get(Finding, scenario["finding_id"]).status == "OPEN"
+    finally:
+        get_settings.cache_clear()
+
+
 def test_create_document_change_is_draft_and_writes_no_file(client, tmp_path):
     scenario = _finding(client)
     before = set(tmp_path.iterdir())

@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client';
 import { getRuntimeHealth, localApiRequest } from './local-api';
 import { type Locale, useLocale } from './i18n';
 import './styles.css';
+import { RemediationPage } from './RemediationPage';
+import { FeedbackPanel } from './FeedbackPanel';
+import { TodayPage } from './TodayPage';
 
 type Screen = 'welcome' | 'workspace' | 'intake' | 'today' | 'monitor' | 'findings' | 'actions' | 'twin' | 'settings';
 type WorkspaceRef = { companyId: number; productId: number };
@@ -23,6 +26,7 @@ function App() {
   const [workspaceKind, setWorkspaceKind] = useState<'developer' | 'enterprise'>('developer');
   const [workspaceError, setWorkspaceError] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceRef | null>(savedWorkspace);
+  const [selectedFinding, setSelectedFinding] = useState<number | null>(null);
 
   const checkRuntime = async () => {
     setRuntime('checking');
@@ -70,8 +74,9 @@ function App() {
       {screen === 'intake' && !workspace && <EmptyPage copy={copy} screen="twin" />}
       {screen === 'twin' && <TwinPage copy={copy} workspace={workspace} />}
       {screen === 'monitor' && <MonitorPage copy={copy} />}
-      {screen === 'findings' && <FindingsPage copy={copy} workspace={workspace} />}
-      {(['today', 'actions'] as Screen[]).includes(screen) && <EmptyPage copy={copy} screen={screen as 'today' | 'actions'} />}
+      {screen === 'findings' && <FindingsPage copy={copy} workspace={workspace} initialFinding={selectedFinding} onRemediate={id => { setSelectedFinding(id); setScreen('actions'); }} />}
+      {screen === 'actions' && <RemediationPage copy={copy} workspace={workspace} initialFinding={selectedFinding} onFinding={id => { setSelectedFinding(id); setScreen('findings'); }} />}
+      {screen === 'today' && <TodayPage copy={copy} workspace={workspace} onNavigate={(page, id) => { setSelectedFinding(id ?? null); setScreen(page); }} />}
       {screen === 'settings' && <Settings copy={copy} />}
     </section>
   </main>;
@@ -116,16 +121,19 @@ function MonitorPage({ copy }: { copy: ReturnType<typeof useLocale>['copy'] }) {
   return <section className="page"><h1>{copy.monitor.title}</h1><p>{state?.using_local_cache ? copy.monitor.offline : copy.monitor.body}</p><div className="settings-list"><div><strong>{copy.monitor.lastSync}</strong><span>{state?.last_success_at || copy.monitor.never}</span></div><div><strong>{copy.monitor.scope}</strong><span>{state?.scope || copy.monitor.loading}</span></div>{state?.last_error && <div><strong>{copy.monitor.status}</strong><span>{state.last_error}</span></div>}</div><button className="primary" disabled={syncing} onClick={() => void sync()}>{syncing ? copy.monitor.syncing : copy.monitor.sync}</button><div className="settings-list">{events.length ? events.map(item => <div key={item.event.event_id}><strong>{item.regulation.name || item.event.event_id}</strong><span>{item.regulation.jurisdiction || '—'} · {item.event.payload?.materiality || 'UNKNOWN'} · {(item.event.payload?.topics || []).join(', ')}</span></div>) : <div><span>{copy.monitor.empty}</span></div>}</div></section>;
 }
 
-function FindingsPage({ copy, workspace }: { copy: ReturnType<typeof useLocale>['copy']; workspace: WorkspaceRef | null }) {
+function FindingsPage({ copy, workspace, initialFinding, onRemediate }: { copy: ReturnType<typeof useLocale>['copy']; workspace: WorkspaceRef | null; initialFinding: number | null; onRemediate: (id: number) => void }) {
   const [findings, setFindings] = useState<Array<{ id: number; title: string; impact_level: string; status: string; requirement_count: number; evidence_count: number; product_twin_version_id?: number }>>([]);
   const [message, setMessage] = useState(''); const [running, setRunning] = useState(false);
-  const [detail, setDetail] = useState<{ finding: { title: string; applicability_summary: string; gap_summary: string; product_twin_version_id?: number; created_at: string }; requirements: Array<{ summary: string; regulation_name?: string; version_id?: number }>; legal_evidence: Array<{ regulation_name: string; article: string; heading: string; source_url: string }>; agent_run: { id: number; created_at: string } } | null>(null);
+  const [detail, setDetail] = useState<{ finding: { id: number; status: string; title: string; applicability_summary: string; gap_summary: string; product_twin_version_id?: number; created_at: string }; requirements: Array<{ summary: string; regulation_name?: string; version_id?: number }>; legal_evidence: Array<{ regulation_name: string; article: string; heading: string; source_url: string }>; agent_run: { id: number; created_at: string } } | null>(null);
+  useEffect(() => { if (workspace && initialFinding) void localApiRequest<typeof detail>(`/api/v1/findings/${initialFinding}?tenant_id=${workspace.companyId}`).then(setDetail).catch(() => setMessage(copy.findings.loadError)); }, [workspace, initialFinding]);
   const load = async () => { if (!workspace) return; try { setFindings(await localApiRequest<typeof findings>(`/api/v1/findings?tenant_id=${workspace.companyId}&product_id=${workspace.productId}`)); } catch { setMessage(copy.findings.loadError); } };
   useEffect(() => { void load(); }, [workspace]);
   const run = async () => { if (!workspace) return; setRunning(true); setMessage(''); try { const requirements = await localApiRequest<Array<{ id: number }>>('/api/v1/local-regulations/requirements'); if (!requirements.length) { setMessage(copy.findings.noRequirements); return; } const result = await localApiRequest<{ status: string; missing_context: unknown[]; finding_ids: number[] }>('/api/v1/tenant-agent/analyze', 'POST', { tenant_id: workspace.companyId, product_id: workspace.productId, trigger_type: 'MANUAL_SCAN', requirement_ids: requirements.map(item => item.id) }); setMessage(result.missing_context.length ? copy.findings.needsContext : result.finding_ids.length ? copy.findings.done : copy.findings.noApplicable); await load(); } catch { setMessage(copy.findings.runError); } finally { setRunning(false); } };
   if (!workspace) return <EmptyPage copy={copy} screen="findings" />;
   const open = async (id: number) => { try { setDetail(await localApiRequest<typeof detail>(`/api/v1/findings/${id}?tenant_id=${workspace.companyId}`)); } catch { setMessage(copy.findings.loadError); } };
-  return <section className="page"><h1>{copy.findings.title}</h1><p>{copy.findings.body}</p><button className="primary" disabled={running} onClick={() => void run()}>{running ? copy.findings.running : copy.findings.run}</button>{message && <p className="form-error">{message}</p>}<div className="settings-list">{findings.length ? findings.map(item => <div key={item.id}><button className="quiet" onClick={() => void open(item.id)}>{item.title}</button><span>{item.impact_level} · {item.status} · {copy.findings.requirements}: {item.requirement_count} · {copy.findings.evidence}: {item.evidence_count} · {copy.findings.twin}: v{item.product_twin_version_id ?? '—'}</span></div>) : <div><span>{copy.findings.empty}</span></div>}</div>{detail && <div className="settings-list"><div><strong>{copy.findings.applicability}</strong><span>{detail.finding.applicability_summary}</span></div><div><strong>{copy.findings.gap}</strong><span>{detail.finding.gap_summary}</span></div><div><strong>{copy.findings.runRef}</strong><span>#{detail.agent_run.id} · {detail.agent_run.created_at}</span></div><div><strong>{copy.findings.requirements}</strong><span>{detail.requirements.map(item => `${item.regulation_name || ''} ${item.summary}`).join('；') || copy.findings.noEvidence}</span></div><div><strong>{copy.findings.evidence}</strong><span>{detail.legal_evidence.map(item => `${item.regulation_name} ${item.article} ${item.heading} ${item.source_url}`).join('；') || copy.findings.noEvidence}</span></div></div>}</section>;
+  const remediationButton = detail?.finding.status === 'OPEN' ? <button className="primary" onClick={() => onRemediate(detail.finding.id)}>{copy.actions.create}</button> : null;
+  const feedbackPanel = detail ? <FeedbackPanel key={detail.finding.id} copy={copy} workspace={workspace} findingId={detail.finding.id} /> : null;
+  return <section className="page"><h1>{copy.findings.title}</h1>{remediationButton}<p>{copy.findings.body}</p><button className="primary" disabled={running} onClick={() => void run()}>{running ? copy.findings.running : copy.findings.run}</button>{message && <p className="form-error">{message}</p>}<div className="settings-list">{findings.length ? findings.map(item => <div key={item.id}><button className="quiet" onClick={() => void open(item.id)}>{item.title}</button><span>{item.impact_level} · {item.status} · {copy.findings.requirements}: {item.requirement_count} · {copy.findings.evidence}: {item.evidence_count} · {copy.findings.twin}: v{item.product_twin_version_id ?? '—'}</span></div>) : <div><span>{copy.findings.empty}</span></div>}</div>{detail && <div className="settings-list"><div><strong>{copy.findings.applicability}</strong><span>{detail.finding.applicability_summary}</span></div><div><strong>{copy.findings.gap}</strong><span>{detail.finding.gap_summary}</span></div><div><strong>{copy.findings.runRef}</strong><span>#{detail.agent_run.id} · {detail.agent_run.created_at}</span></div><div><strong>{copy.findings.requirements}</strong><span>{detail.requirements.map(item => `${item.regulation_name || ''} ${item.summary}`).join('；') || copy.findings.noEvidence}</span></div><div><strong>{copy.findings.evidence}</strong><span>{detail.legal_evidence.map(item => `${item.regulation_name} ${item.article} ${item.heading} ${item.source_url}`).join('；') || copy.findings.noEvidence}</span></div></div>}{feedbackPanel}</section>;
 }
 
 function Welcome({ copy, onCreate }: { copy: ReturnType<typeof useLocale>['copy']; onCreate: () => void }) {

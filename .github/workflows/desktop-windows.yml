@@ -41,6 +41,8 @@ jobs:
           Copy-Item backend/dist/datashield-local/datashield-local.exe apps/desktop/src-tauri/binaries/datashield-local-x86_64-pc-windows-msvc.exe
       - name: 安装 Desktop 依赖
         run: npm --prefix apps/desktop ci
+      - name: 验证 Desktop 业务交互与中英文词条
+        run: npm --prefix apps/desktop test -- --maxWorkers=1
       - name: 构建 NSIS 当前用户安装包
         run: npm --prefix apps/desktop run tauri -- build
       - name: 上传 Windows 安装产物
