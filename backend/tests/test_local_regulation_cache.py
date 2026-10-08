@@ -13,3 +13,11 @@ def test_cache_rejects_incomplete_or_backward_page(tmp_path):
     try: c.apply(page,[])
     except ValueError: pass
     else: assert False
+
+def test_cache_rejects_duplicate_and_bad_final_cursor(tmp_path):
+    c=LocalRegulationCache(tmp_path/"r.db")
+    page={"snapshot_cursor":2,"next_cursor":1,"events":[{"id":2,"event_id":"e2"}]}
+    bundle={"event":{"event_id":"e2"},"regulation":{"key":"r"},"version":{"key":"v"},"legal_units":[],"requirements":[]}
+    try: c.apply(page,[bundle])
+    except ValueError: pass
+    else: assert False

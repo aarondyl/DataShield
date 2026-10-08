@@ -24,10 +24,13 @@ class LocalRegulationCache:
         """同一事务写法规、事件和最后页游标；异常时全部回滚。"""
         required={e["event_id"] for e in page["events"]}
         supplied={b["event"]["event_id"] for b in bundles}
+        if len(required) != len(page["events"]) or len(supplied) != len(bundles): raise ValueError("同步页面或 Bundle 存在重复事件")
         if required != supplied: raise ValueError("同步页面与法规 Bundle 不完整")
         ids=[e["id"] for e in page["events"]]
         if ids != sorted(set(ids)): raise ValueError("同步事件必须严格递增且不可重复")
         if any(i > page["snapshot_cursor"] for i in ids): raise ValueError("事件超出固定快照")
+        expected=ids[-1] if ids else page.get("cursor", page["next_cursor"])
+        if page["next_cursor"] != expected: raise ValueError("next_cursor 必须等于本页最后事件或空页 cursor")
         with self.connect() as db:
             current=db.execute("SELECT cursor,snapshot FROM sync_state WHERE scope=?",(scope,)).fetchone() or (0,0)
             if page["next_cursor"] < current[0]: raise ValueError("同步游标不能倒退")
