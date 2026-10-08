@@ -1,7 +1,7 @@
 """仅拉取公开法规的 HTTP 同步客户端。"""
 import time
 from urllib.parse import urlencode
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 from .cache import LocalRegulationCache
 
@@ -15,7 +15,8 @@ class CloudSyncClient:
         for n in range(self.retries):
             try:
                 import json
-                with urlopen(url,timeout=self.timeout) as r: return json.load(r)
+                request = Request(url, headers={"X-DataShield-Api-Version": "1.0"})
+                with urlopen(request,timeout=self.timeout) as r: return json.load(r)
             except Exception as exc: last=exc; time.sleep(min(.1*(2**n),1))
         raise ConnectionError("法规同步不可用，保留本地缓存") from last
     def sync(self, scope="all", jurisdiction=None):

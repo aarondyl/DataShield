@@ -19,6 +19,15 @@ def test_cache_commits_cursor_with_bundle_atomically(tmp_path):
     c.apply(page,[bundle]); assert c.progress()==(7,0,0)
     with c.connect() as db: assert db.execute("select count(*) from cached_requirements").fetchone()[0]==1
 
+
+def test_incompatible_bundle_version_never_advances_cursor(tmp_path):
+    cache = LocalRegulationCache(tmp_path / "regulations.db")
+    page, bundle = _page_bundle()
+    bundle["schema_version"] = "2.0"
+    with pytest.raises(ValueError, match="契约版本"):
+        cache.apply(page, [bundle])
+    assert cache.progress() == (0, 0, 0)
+
 def test_cache_rejects_incomplete_or_backward_page(tmp_path):
     c=LocalRegulationCache(tmp_path/"r.db")
     page={"snapshot_cursor":2,"next_cursor":2,"events":[{"id":2,"event_id":"e2"}]}

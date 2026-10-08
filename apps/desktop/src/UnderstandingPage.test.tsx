@@ -15,7 +15,7 @@ test('repository path comes from native picker and analysis requires a separate 
   fireEvent.click(screen.getByRole('button', { name: zh.understanding.select }));
   await screen.findByText('C:\\Projects\\MyProduct');
   fireEvent.click(screen.getByRole('button', { name: zh.understanding.repository }));
-  await screen.findByText('file_upload · NOT_DETECTED');
+  await screen.findByText('file_upload · 未检测到');
   expect(localApiRequest).toHaveBeenCalledWith('/api/v1/ui/understanding/repository', 'POST', { company_id: 2, product_id: 4, product_description: '', repository_path: 'C:\\Projects\\MyProduct', analysis_mode: 'FULL' });
   expect(done).not.toHaveBeenCalled();
   await waitFor(() => expect(screen.getByRole('button', { name: zh.understanding.attach }).hasAttribute('disabled')).toBe(false));

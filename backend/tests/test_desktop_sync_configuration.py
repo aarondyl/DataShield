@@ -28,3 +28,18 @@ def test_bundle_fetch_failure_preserves_cache_and_marks_offline(tmp_path, monkey
     monkeypatch.setattr(client, "get_json", fetch)
     with pytest.raises(ConnectionError): client.sync()
     assert cache.progress("all:jurisdiction=*") == (0, 0, 1)
+
+
+@pytest.mark.parametrize("mode", ["web", "cloud"])
+def test_desktop_configuration_and_folder_grants_not_mounted_elsewhere(mode, monkeypatch):
+    from app.core.config import get_settings
+    from app.main import create_app
+    from fastapi.testclient import TestClient
+    monkeypatch.setenv("RUNTIME_MODE", mode)
+    get_settings.cache_clear()
+    try:
+        client = TestClient(create_app())
+        assert client.get("/api/v1/local-regulations/configuration").status_code == 404
+        assert client.post("/api/v1/local-repositories/grant", json={"path": "/tmp"}).status_code == 404
+    finally:
+        get_settings.cache_clear()

@@ -14,3 +14,9 @@ test('empty findings without sync or analysis never imply all clear', async () =
   expect(screen.getByText(zh.monitor.offline)).toBeTruthy();
   expect(screen.queryByText(zh.today.clear)).toBeNull();
 });
+test('a completed mock analysis cannot claim a verified all-clear', async () => {
+  vi.mocked(localApiRequest).mockImplementation(async path => (path.includes('/today?') ? { needs_review: [], waiting_for_you: [], recently_completed: [], latest_run: { id: 1, status: 'COMPLETED', model_provider: 'mock' } } : path.includes('/status') ? { last_success_at: '2026-10-08', using_local_cache: false } : []) as never);
+  render(<TodayPage copy={zh} workspace={{ companyId: 2, productId: 4 }} onNavigate={vi.fn()} />);
+  await screen.findByText(/本地模拟模型/);
+  expect(screen.queryByText(zh.today.clear)).toBeNull();
+});

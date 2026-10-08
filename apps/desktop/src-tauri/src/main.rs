@@ -247,7 +247,11 @@ fn start_sidecar(app: &tauri::AppHandle, state: &DesktopState) -> Result<(), Str
 
 fn main() {
     let state = DesktopState {
-        client: reqwest::Client::new(),
+        // Never forward the process-held runtime token through a redirect.
+        client: reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .expect("Unable to initialize the local HTTP client"),
         descriptor: Mutex::new(None),
         expected_sidecar_pid: Mutex::new(None),
         child: Mutex::new(None),

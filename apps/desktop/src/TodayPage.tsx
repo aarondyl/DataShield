@@ -16,7 +16,7 @@ export function TodayPage({ copy, workspace, onNavigate }: { copy: Copy; workspa
     {!sync?.last_success_at && <p>{c.noSync}<button onClick={() => onNavigate('monitor')}>{copy.monitor.title}</button></p>}{sync?.using_local_cache && <p>{copy.monitor.offline}</p>}
     {!data.latest_run ? <p>{c.noRun}</p> : <p>{c.lastRun}: #{data.latest_run.id} · {data.latest_run.status === 'FAILED' ? c.failed : data.latest_run.status === 'NEEDS_USER_INPUT' ? c.context : data.latest_run.status === 'COMPLETED' ? c.completed : c.running}{data.latest_run.model_provider === 'mock' && ` · ${c.mock}`}</p>}
     {data.needs_review.length > 0 && section(c.review, data.needs_review)}{data.waiting_for_you.length > 0 && section(c.waiting, data.waiting_for_you)}
-    {data.latest_run?.status === 'COMPLETED' && sync?.last_success_at && !data.needs_review.length && !data.waiting_for_you.length && <p>{c.clear}</p>}
+    {data.latest_run?.status === 'COMPLETED' && data.latest_run.model_provider !== 'mock' && sync?.last_success_at && !data.needs_review.length && !data.waiting_for_you.length && <p>{c.clear}</p>}
     {data.recently_completed.length > 0 && section(c.recent, data.recently_completed)}
     <section className="empty-card"><h2>{c.changes}</h2><p>{c.changeBoundary}</p>{events.length ? events.map(e => <p key={e.event.event_id}>{e.regulation.name || e.event.event_id}</p>) : <p>{copy.monitor.empty}</p>}</section>
   </>}</section>;

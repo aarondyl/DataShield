@@ -43,6 +43,8 @@ class LocalRegulationCache:
             regulations={row[0]: json.loads(row[1]) for row in db.execute("SELECT entity_key,payload FROM cached_regulations")}
         return [{"event": json.loads(payload), "sequence": sequence, "regulation": regulations.get(bundles.get(event_id,("", ""))[0], {}), "version_key": bundles.get(event_id,("", ""))[1]} for event_id,sequence,payload in rows]
     def _validate(self, page: dict, bundles: list[dict], current: tuple[int, int]):
+        if any(str(bundle.get("schema_version", "1.0")).split(".", 1)[0] != "1" for bundle in bundles):
+            raise ValueError("不兼容的 Cloud 法规契约版本，未更新本地缓存")
         required={e["event_id"] for e in page["events"]}
         supplied={b["event"]["event_id"] for b in bundles}
         if len(required) != len(page["events"]) or len(supplied) != len(bundles): raise ValueError("同步页面或 Bundle 存在重复事件")
