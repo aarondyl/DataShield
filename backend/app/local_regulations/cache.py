@@ -2,6 +2,7 @@
 import json
 import sqlite3
 from pathlib import Path
+from typing import Callable
 
 
 class LocalRegulationCache:
@@ -15,6 +16,7 @@ class LocalRegulationCache:
             CREATE TABLE IF NOT EXISTS cached_versions (entity_key TEXT PRIMARY KEY, regulation_key TEXT NOT NULL, payload TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS cached_legal_units (entity_key TEXT PRIMARY KEY, version_key TEXT NOT NULL, payload TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS cached_requirements (entity_key TEXT PRIMARY KEY, version_key TEXT NOT NULL, payload TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS cached_event_bundles (event_id TEXT PRIMARY KEY, regulation_key TEXT NOT NULL, version_key TEXT NOT NULL);
             """)
     def connect(self): return sqlite3.connect(self.path)
     def progress(self, scope="all"):
@@ -23,8 +25,7 @@ class LocalRegulationCache:
     def mark_offline(self, scope="all"):
         with self.connect() as db:
             db.execute("INSERT INTO sync_state(scope,cursor,snapshot,offline) VALUES (?,0,0,1) ON CONFLICT(scope) DO UPDATE SET offline=1",(scope,))
-    def apply(self, page: dict, bundles: list[dict], scope="all"):
-        """同一事务写法规、事件和最后页游标；异常时全部回滚。"""
+    def _validate(self, page: dict, bundles: list[dict], current: tuple[int, int]):
         required={e["event_id"] for e in page["events"]}
         supplied={b["event"]["event_id"] for b in bundles}
         if len(required) != len(page["events"]) or len(supplied) != len(bundles): raise ValueError("同步页面或 Bundle 存在重复事件")
@@ -34,17 +35,37 @@ class LocalRegulationCache:
         if any(i > page["snapshot_cursor"] for i in ids): raise ValueError("事件超出固定快照")
         expected=ids[-1] if ids else page.get("cursor", page["next_cursor"])
         if page["next_cursor"] != expected: raise ValueError("next_cursor 必须等于本页最后事件或空页 cursor")
-        with self.connect() as db:
-            current=db.execute("SELECT cursor,snapshot FROM sync_state WHERE scope=?",(scope,)).fetchone() or (0,0)
-            if page["next_cursor"] < current[0]: raise ValueError("同步游标不能倒退")
-            if current[1] and page["snapshot_cursor"] < current[1]: raise ValueError("同步快照不能倒退")
-            for b in bundles:
-                r=b["regulation"]; v=b["version"]
-                db.execute("INSERT OR REPLACE INTO cached_regulations VALUES (?,?)",(r["key"],json.dumps(r)))
-                db.execute("INSERT OR REPLACE INTO cached_versions VALUES (?,?,?)",(v["key"],r["key"],json.dumps(v)))
-                for u in b["legal_units"]: db.execute("INSERT OR REPLACE INTO cached_legal_units VALUES (?,?,?)",(u["key"],v["key"],json.dumps(u)))
-                for q in b["requirements"]: db.execute("INSERT OR REPLACE INTO cached_requirements VALUES (?,?,?)",(q["key"],v["key"],json.dumps(q)))
-            for e in page["events"]: db.execute("INSERT OR REPLACE INTO cached_events VALUES (?,?,?)",(e["event_id"],e["id"],json.dumps(e)))
-            # 完成时清除快照，下一轮可取得新的上界；未完成时保留以恢复分页。
-            snapshot = page["snapshot_cursor"] if page.get("has_more") else 0
-            db.execute("INSERT INTO sync_state(scope,cursor,snapshot,offline) VALUES (?,?,?,0) ON CONFLICT(scope) DO UPDATE SET cursor=excluded.cursor,snapshot=excluded.snapshot,offline=0",(scope,page["next_cursor"],snapshot))
+        if page["next_cursor"] < current[0]: raise ValueError("同步游标不能倒退")
+        if current[1] and page["snapshot_cursor"] < current[1]: raise ValueError("同步快照不能倒退")
+
+    def apply(self, page: dict, bundles: list[dict], scope="all", *, db=None,
+              materialize: Callable[[dict], None] | None = None):
+        """单事务写缓存、ORM 物化和 cursor。
+
+        传入 SQLAlchemy Session 时绝不自行提交；调用者可把本地实体和任务一起回滚。
+        """
+        if db is None:
+            with self.connect() as conn:
+                self._apply(conn.execute, page, bundles, scope, materialize)
+            return
+        conn = db.connection()
+        self._apply(lambda sql, params=(): conn.exec_driver_sql(sql, params), page, bundles, scope, materialize)
+
+    def _apply(self, execute, page: dict, bundles: list[dict], scope: str, materialize):
+        current = execute("SELECT cursor,snapshot FROM sync_state WHERE scope=?", (scope,)).fetchone() or (0, 0)
+        self._validate(page, bundles, current)
+        for b in bundles:
+            r, v = b["regulation"], b["version"]
+            execute("INSERT OR REPLACE INTO cached_regulations VALUES (?,?)", (r["key"], json.dumps(r)))
+            execute("INSERT OR REPLACE INTO cached_versions VALUES (?,?,?)", (v["key"], r["key"], json.dumps(v)))
+            for u in b["legal_units"]:
+                execute("INSERT OR REPLACE INTO cached_legal_units VALUES (?,?,?)", (u["key"], v["key"], json.dumps(u)))
+            for q in b["requirements"]:
+                execute("INSERT OR REPLACE INTO cached_requirements VALUES (?,?,?)", (q["key"], v["key"], json.dumps(q)))
+            execute("INSERT OR REPLACE INTO cached_event_bundles VALUES (?,?,?)", (b["event"]["event_id"], r["key"], v["key"]))
+            if materialize is not None:
+                materialize(b)
+        for e in page["events"]:
+            execute("INSERT OR REPLACE INTO cached_events VALUES (?,?,?)", (e["event_id"], e["id"], json.dumps(e)))
+        snapshot = page["snapshot_cursor"] if page.get("has_more") else 0
+        execute("INSERT INTO sync_state(scope,cursor,snapshot,offline) VALUES (?,?,?,0) ON CONFLICT(scope) DO UPDATE SET cursor=excluded.cursor,snapshot=excluded.snapshot,offline=0", (scope, page["next_cursor"], snapshot))
