@@ -43,7 +43,7 @@ CONFIRMED != APPLIED；UNKNOWN != FALSE；NOT_DETECTED != ABSENT；APPROVED != E
 
 后端：PYTHONPATH=/tmp/datashield-deps PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python3 -m pytest tests -q（backend）。
 前端：npm test -- --maxWorkers=1；npm run build；npm audit --json（apps/desktop）。
-最近后端 310 项通过、39 项弃用警告；前端 14 项（含离线缓存和模拟结果不冒充无待办）、生产构建与共享 Web 构建通过；Desktop audit 0 漏洞。最终 CI 以对应提交和 SOURCE_COMMIT.txt 为准。
+后端全量 319 项通过、47 项弃用警告，含中文反馈状态/事实定位和中英文真实 API 闭环断言（隔离的 Demo fixture，明确使用 mock，不代表真实 AI 判断）；前端 14 项、生产构建与共享 Web 构建通过；Desktop audit 0 漏洞。最终 CI 以 SOURCE_COMMIT.txt 为准。
 Linux cargo test 缺少 pkg-config/dbus 开发环境，不能报告通过；Windows CI 已加入 Rust 安全测试。
 
 ## Windows 人工验收（尚未完成）
@@ -55,6 +55,7 @@ Windows 11 无 Python/Node 环境验证：安装、启动、中文业务链、En
 ## 待解决门禁与发布
 
 P0：业务与安装目录自动化均已通过；之后仅更新交接及构建来源记录，必须等待该提交对应的新 Windows CI 通过后再合并。
+中文反馈复查额外修复了既有 mock 将否定/未知反馈误判 PRESENT 的问题。无法明确定位事实时要求澄清；UNKNOWN 与 NOT_DETECTED 不再生成 FALSE。此修复必须进入最终安装包并重跑 Windows CI。
 P1：Windows GUI 实机验收；真实 Provider 尚未支持，不冒充真实 AI。
 P1：desktop-release.yml 不触发 Vercel/ECS，发布 desktop-v0.1.0 Pre-release 需实机验收及批准；Stable 另行批准。建议配置 desktop-release Environment 审批人。
 P2：安全签名 updater、更多内部事实名称/错误细节本地化、Windows GUI E2E。

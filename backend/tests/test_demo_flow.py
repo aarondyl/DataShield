@@ -11,7 +11,8 @@ ORIGIN={"Origin":"http://localhost:5173"}
 def enforce_auth(monkeypatch):
     monkeypatch.setenv("EVALUATION_AUTH_BYPASS","false"); get_settings.cache_clear(); yield; get_settings.cache_clear()
 
-def test_complete_isolated_demo_flow():
+@pytest.mark.parametrize("correction", ["We already disclose AI use to users.", "我们已经支持 AI告知，并向用户说明使用人工智能。"])
+def test_complete_isolated_demo_flow(correction):
     with TestClient(app) as client:
         created=client.post("/api/v1/evaluation/demo",headers=ORIGIN)
         assert created.status_code==201,created.text
@@ -27,7 +28,7 @@ def test_complete_isolated_demo_flow():
         assert approved.status_code==200
         assert approved.json()["remediation"]["status"]=="APPROVED"
 
-        feedback=client.post("/api/v1/feedback",headers=ORIGIN,json={"tenant_id":scope["company_id"],"product_id":scope["product_id"],"finding_id":finding_id,"feedback_type":"FACT_CORRECTION","raw_text":"We already disclose AI use to users.","created_by":"evaluation-user"})
+        feedback=client.post("/api/v1/feedback",headers=ORIGIN,json={"tenant_id":scope["company_id"],"product_id":scope["product_id"],"finding_id":finding_id,"feedback_type":"FACT_CORRECTION","raw_text":correction,"created_by":"evaluation-user"})
         assert feedback.status_code==201,feedback.text
         candidate=feedback.json()["candidates"][0]
         assert candidate["status"]=="PROPOSED"
