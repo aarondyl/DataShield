@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.deepseek.com/v1"
     llm_model: str = "deepseek-chat"
     llm_provider: str = "mock"
+    desktop_ai_mode: Literal["mock", "byok", "local", "cloud"] = "mock"
     embedding_provider: str = "local"
     embedding_model: str = "text-embedding-3-small"
     embedding_dim: int = 384
@@ -59,8 +60,12 @@ class Settings(BaseSettings):
             self.local_data_dir = self.local_data_dir or default_local_data_dir()
             if "DATABASE_URL" not in os.environ:
                 self.database_url = f"sqlite:///{(Path(self.local_data_dir) / 'datashield.db').as_posix()}"
-            self.llm_provider = "mock"
-            self.embedding_provider = "local"
+            # Desktop 默认保持可重复的离线 mock；只有该显式模式才覆盖 provider。
+            # byok/local/cloud 是未来 Desktop 选择边界：本层保留用户 provider
+            # 配置，不保存密钥，也不在此实现远程网关或本地模型客户端。
+            if self.desktop_ai_mode == "mock":
+                self.llm_provider = "mock"
+                self.embedding_provider = "local"
             self.scheduler_enabled = False
 
     @property
