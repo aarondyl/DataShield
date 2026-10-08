@@ -3,6 +3,7 @@ import json
 import hashlib
 from .cache import LocalRegulationCache
 from app.tenant.regulatory.schemas import RequirementContext
+from app.tenant.regulatory.schemas import RegulationSourceContext, RegulationTrigger
 
 class LocalRegulationGateway:
     def __init__(self, cache: LocalRegulationCache): self.cache=cache
@@ -33,3 +34,12 @@ class LocalRegulationGateway:
                 status=item.get("status", "ACTIVE"), regulation_name="本地法规缓存", jurisdiction="", regulation_version=None, source_url="",
             ))
         return result
+
+    def trigger(self, event_id: str) -> RegulationTrigger:
+        with self.cache.connect() as db:
+            row=db.execute("SELECT payload FROM cached_events WHERE event_id=?",(event_id,)).fetchone()
+        if not row: raise ValueError("本地法规缓存中不存在该事件")
+        event=json.loads(row[0]); payload=event.get("payload") or {}
+        return RegulationTrigger(event_id=event_id,event_type=event.get("event_type","regulation.change.ready"),
+          regulation_id=0,version_id=0,change_ids=[],requirement_ids=[],legal_unit_ids=[],payload=payload,
+          materiality=payload.get("materiality","LOW"),topics=payload.get("topics",[]),change_summaries=[],source=RegulationSourceContext())

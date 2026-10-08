@@ -58,6 +58,10 @@ class Settings(BaseSettings):
             self.embedding_provider = "local"
             self.scheduler_enabled = False
 
+    @property
+    def local_regulation_cache_path(self) -> Path:
+        return Path(self.local_data_dir) / "regulations" / "cache.db"
+
 
 @lru_cache
 def get_settings() -> Settings:
