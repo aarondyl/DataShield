@@ -1,5 +1,14 @@
 from app.core.config import get_settings
 from sqlalchemy import create_engine, inspect
+import pytest
+
+
+@pytest.mark.parametrize("url", ["postgresql://user:ci-only@localhost/cloud", "postgresql+psycopg://user:ci-only@localhost/cloud"])
+def test_local_runtime_rejects_inherited_cloud_database_before_connection(monkeypatch, tmp_path, url):
+    from app.core.config import Settings
+    monkeypatch.setenv("DATABASE_URL", url)
+    with pytest.raises(ValueError, match="Local runtime requires SQLite"):
+        Settings(runtime_mode="local", local_data_dir=str(tmp_path))
 
 
 def test_local_mode_defaults_to_offline_mock_processing(monkeypatch, tmp_path):
@@ -11,6 +20,8 @@ def test_local_mode_defaults_to_offline_mock_processing(monkeypatch, tmp_path):
         assert settings.database_url.endswith("datashield.db")
         assert settings.local_regulation_cache_path == tmp_path / "datashield.db"
         assert settings.llm_provider == "mock" and settings.embedding_provider == "local"
+        assert settings.legacy_tenant_api_enabled is True
+        assert settings.evaluation_auth_bypass is True
         assert settings.scheduler_enabled is False
     finally: get_settings.cache_clear()
 

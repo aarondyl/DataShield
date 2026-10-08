@@ -510,15 +510,41 @@ class MockLLMClient(BaseLLMClient):
             return mock_remediation_document(context)
         if task == "feedback-candidate":
             facts = context.get("facts") or []
-            raw = (context.get("clarification_answer") or context.get("raw_feedback") or "").lower()
-            wanted = "ai_disclosure" if ("disclos" in raw and "ai" in raw) else "uploaded" if "upload" in raw else "deletion"
-            target = next((f for f in facts if wanted in f.get("name", "").lower()), facts[0] if facts else None)
-            ambiguous = not target or any(word in raw for word in ("maybe", "planning", "计划"))
+            original = (context.get("raw_feedback") or "").lower()
+            answer = (context.get("clarification_answer") or "").lower()
+            raw = answer or original
+            aliases = {
+                "account_deletion": ("account deletion", "删除账号", "删除账户", "注销账号", "注销账户", "账号删除", "账户删除"),
+                "ai_disclosure": ("ai disclosure", "disclose ai", "ai告知", "ai提示", "人工智能告知", "人工智能提示"),
+                "file_upload": ("file upload", "文件上传", "上传文件"),
+                "uploaded": ("upload", "文件上传", "上传文件"),
+            }
+            def matches(fact, text):
+                import re
+                name = fact.get("name", "").lower()
+                terms = (name, name.replace("_", " "), *aliases.get(name, ()))
+                # A short market fact such as US must not match "users".
+                return any(term and re.search(r"(?<![a-z0-9_])" + re.escape(term) + r"(?![a-z0-9_])", text) for term in terms)
+            targets = [f for f in facts if matches(f, answer)] if answer else []
+            if not targets:
+                targets = [f for f in facts if matches(f, original)]
+            target = targets[0] if len(targets) == 1 else None
+            status = None
+            if any(w in raw for w in ("not detected", "not_detected", "未检测到", "未发现", "没检测到", "没有检测到", "没有发现")):
+                status = "NOT_DETECTED"
+            elif any(w in raw for w in ("unknown", "don't know", "do not know", "not sure", "未知", "不知道", "不确定", "不能确定")):
+                status = "UNKNOWN"
+            elif any(w in raw for w in ("not support", "don't support", "no longer support", "not have", "not available", "does not exist", "absent", "没有", "不支持", "不存在", "未提供", "尚未支持", "尚未实现", "不具备")):
+                status = "ABSENT"
+            elif any(w in raw for w in ("support", "available", "implemented", "exists", "already", "yes", "支持", "已实现", "存在", "具备", "已经")):
+                status = "PRESENT"
+            ambiguous = not target or status is None or any(word in raw for word in ("maybe", "planning", "计划", "可能", "准备"))
+            chinese = any('\u4e00' <= char <= '\u9fff' for char in original + answer)
             return {"candidate_type":"FACT_CORRECTION","target_fact_id":target.get("fact_id") if target else None,
-                "proposed_name":target.get("name") if target else None,"proposed_value":True if not ambiguous else None,
-                "proposed_status":"PRESENT" if not ambiguous else None,"confidence":0.85 if not ambiguous else 0.4,
-                "reasoning_summary":"User feedback indicates an existing capability." if not ambiguous else "The feedback does not establish whether the capability is currently available.",
-                "needs_clarification":ambiguous,"clarification_question":"Is this capability currently available to users?" if ambiguous else None}
+                "proposed_name":target.get("name") if target else None,"proposed_value":(status == "PRESENT") if not ambiguous and status in ("PRESENT", "ABSENT") else None,
+                "proposed_status":status if not ambiguous else None,"confidence":0.85 if not ambiguous else 0.4,
+                "reasoning_summary":("确定性模拟解释：保留用户明确描述的事实状态，仍需人工审核。" if chinese else "Deterministic interpretation preserves the explicitly stated fact status; human review is required.") if not ambiguous else ("未能明确定位产品事实或判断当前状态，需要用户澄清。" if chinese else "The feedback does not identify one product fact and its current state."),
+                "needs_clarification":ambiguous,"clarification_question":("请明确是哪项产品事实，以及当前是存在、不存在、未知还是未检测到？" if chinese else "Which product fact is meant, and is it present, absent, unknown, or not detected?") if ambiguous else None}
         # 未识别的任务类型：返回空对象，由调用方按"证据不足"降级处理
         return {}
 

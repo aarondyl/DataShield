@@ -1,0 +1,3 @@
+# 仅 Desktop Windows sidecar 构建机使用；不用于 Cloud/Web 服务镜像。
+-r requirements.txt
+pyinstaller>=6.10,<7

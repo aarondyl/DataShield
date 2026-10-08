@@ -80,18 +80,23 @@ def create_app() -> FastAPI:
     app = FastAPI(title="DataShield API", version="3.0.0", lifespan=lifespan)
     app.middleware("http")(enforce_cloud_api_compatibility)
     mode = get_settings().runtime_mode
+    if mode == "local":
+        from app.api import local_repositories
+        app.include_router(local_repositories.router, prefix="/api")
     from app.api import health
     app.include_router(health.router, prefix="/api")
     if mode == "cloud":
         from app.api import regintel
         app.include_router(regintel.router, prefix="/api")
         return app
-    from app.api import actions, analysis, companies, compliance, developer, evaluation, feedback, findings, products, regulations, remediations, tenant_agent, today, ui_understanding
+    from app.api import actions, analysis, companies, compliance, developer, evaluation, feedback, findings, local_regulations, products, regulations, remediations, tenant_agent, today, ui_understanding
     for module in (companies, products, regulations, analysis, actions, compliance, developer):
         app.include_router(module.router, prefix="/api")
     if mode == "web":
         from app.api import regintel
         app.include_router(regintel.router, prefix="/api")
+    if mode == "local":
+        app.include_router(local_regulations.router, prefix="/api")
     for module in (evaluation, tenant_agent, findings, remediations, feedback, today, ui_understanding):
         app.include_router(module.router, prefix="/api")
     from app.api import product_twin, repository_understanding, website_understanding

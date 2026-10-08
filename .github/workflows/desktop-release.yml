@@ -1,0 +1,61 @@
+name: Desktop Release Candidate（不部署 Cloud/Web）
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: '经审核的完整 40 位 Commit SHA；从此提交重新构建'
+        required: true
+        type: string
+      publish_approved:
+        description: '仅在用户完成 Windows 实机验收并批准发布后勾选'
+        default: false
+        type: boolean
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+      - name: 校验指定提交并运行完整后端回归
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements-dev.txt
+      - run: python -m pytest tests -q
+        working-directory: backend
+  windows:
+    needs: validate
+    uses: ./.github/workflows/desktop-windows.yml
+    with:
+      source_ref: ${{ inputs.source_sha }}
+  publish:
+    if: ${{ inputs.publish_approved }}
+    needs: windows
+    environment: desktop-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: DataShield-Windows-Installer
+          path: release-assets
+      - name: 发布经批准的 Desktop Pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          test "$(tr -d '\r\n\357\273\277' < release-assets/SOURCE_COMMIT.txt)" = "$SOURCE_SHA"
+          printf '\nSource Commit: `%s`\n' "$SOURCE_SHA" >> docs/DESKTOP_RELEASE_NOTES.md
+          gh release create desktop-v0.1.0 release-assets/* --prerelease --target "$SOURCE_SHA" --title 'DataShield Desktop v0.1.0' --notes-file docs/DESKTOP_RELEASE_NOTES.md

@@ -1,6 +1,7 @@
 """本地法规缓存：只保存云端公开法规数据，绝不保存或上传私有上下文。"""
 import json
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -18,14 +19,32 @@ class LocalRegulationCache:
             CREATE TABLE IF NOT EXISTS cached_requirements (entity_key TEXT PRIMARY KEY, version_key TEXT NOT NULL, payload TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS cached_event_bundles (event_id TEXT PRIMARY KEY, regulation_key TEXT NOT NULL, version_key TEXT NOT NULL);
             """)
+            columns={row[1] for row in db.execute("PRAGMA table_info(sync_state)")}
+            for name in ("last_success_at", "last_attempt_at", "last_error"):
+                if name not in columns: db.execute(f"ALTER TABLE sync_state ADD COLUMN {name} TEXT NOT NULL DEFAULT ''")
     def connect(self): return sqlite3.connect(self.path)
     def progress(self, scope="all"):
         with self.connect() as db:
             return db.execute("SELECT cursor,snapshot,offline FROM sync_state WHERE scope=?",(scope,)).fetchone() or (0,0,0)
     def mark_offline(self, scope="all"):
         with self.connect() as db:
-            db.execute("INSERT INTO sync_state(scope,cursor,snapshot,offline) VALUES (?,0,0,1) ON CONFLICT(scope) DO UPDATE SET offline=1",(scope,))
+            now=datetime.now(timezone.utc).isoformat()
+            db.execute("INSERT INTO sync_state(scope,cursor,snapshot,offline,last_attempt_at,last_error) VALUES (?,0,0,1,?,?) ON CONFLICT(scope) DO UPDATE SET offline=1,last_attempt_at=excluded.last_attempt_at,last_error=excluded.last_error",(scope,now,"法规同步不可用，正在使用本地缓存"))
+
+    def status(self, scope="all"):
+        with self.connect() as db:
+            row=db.execute("SELECT cursor,snapshot,offline,last_success_at,last_attempt_at,last_error FROM sync_state WHERE scope=?",(scope,)).fetchone()
+        return dict(zip(("cursor","snapshot","offline","last_success_at","last_attempt_at","last_error"), row or (0,0,0,"","","")))
+
+    def events(self, limit=100):
+        with self.connect() as db:
+            rows=db.execute("SELECT event_id,event_seq,payload FROM cached_events ORDER BY event_seq DESC LIMIT ?",(limit,)).fetchall()
+            bundles={row[0]: (row[1], row[2]) for row in db.execute("SELECT event_id,regulation_key,version_key FROM cached_event_bundles")}
+            regulations={row[0]: json.loads(row[1]) for row in db.execute("SELECT entity_key,payload FROM cached_regulations")}
+        return [{"event": json.loads(payload), "sequence": sequence, "regulation": regulations.get(bundles.get(event_id,("", ""))[0], {}), "version_key": bundles.get(event_id,("", ""))[1]} for event_id,sequence,payload in rows]
     def _validate(self, page: dict, bundles: list[dict], current: tuple[int, int]):
+        if any(str(bundle.get("schema_version", "1.0")).split(".", 1)[0] != "1" for bundle in bundles):
+            raise ValueError("不兼容的 Cloud 法规契约版本，未更新本地缓存")
         required={e["event_id"] for e in page["events"]}
         supplied={b["event"]["event_id"] for b in bundles}
         if len(required) != len(page["events"]) or len(supplied) != len(bundles): raise ValueError("同步页面或 Bundle 存在重复事件")
@@ -68,4 +87,5 @@ class LocalRegulationCache:
         for e in page["events"]:
             execute("INSERT OR REPLACE INTO cached_events VALUES (?,?,?)", (e["event_id"], e["id"], json.dumps(e)))
         snapshot = page["snapshot_cursor"] if page.get("has_more") else 0
-        execute("INSERT INTO sync_state(scope,cursor,snapshot,offline) VALUES (?,?,?,0) ON CONFLICT(scope) DO UPDATE SET cursor=excluded.cursor,snapshot=excluded.snapshot,offline=0", (scope, page["next_cursor"], snapshot))
+        now=datetime.now(timezone.utc).isoformat()
+        execute("INSERT INTO sync_state(scope,cursor,snapshot,offline,last_success_at,last_attempt_at,last_error) VALUES (?,?,?,0,?,?, '') ON CONFLICT(scope) DO UPDATE SET cursor=excluded.cursor,snapshot=excluded.snapshot,offline=0,last_success_at=excluded.last_success_at,last_attempt_at=excluded.last_attempt_at,last_error=''", (scope, page["next_cursor"], snapshot, now, now))

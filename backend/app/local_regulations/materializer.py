@@ -1,6 +1,7 @@
 """将云端公开 Bundle 幂等物化为本地 ORM 实体。"""
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 from app.models import LegalUnit, LocalRegulationBinding, Regulation, RegulationVersion, Requirement
 
@@ -31,6 +32,9 @@ def materialize_bundle(db: Session, bundle: dict) -> dict[str, int]:
     regulation.name = reg.get("name", regulation.name) or regulation.name
     regulation.jurisdiction = reg.get("jurisdiction", regulation.jurisdiction)
     regulation.status = reg.get("status", regulation.status)
+    regulation.canonical_source_url = reg.get("source_url", regulation.canonical_source_url)
+    if reg.get("effective_at"):
+        regulation.effective_at = datetime.fromisoformat(reg["effective_at"])
     _bind(db, "regulation", reg["key"], regulation.id)
 
     row = _binding(db, "version", ver["key"])
@@ -42,6 +46,10 @@ def materialize_bundle(db: Session, bundle: dict) -> dict[str, int]:
         raise ValueError("版本稳定键归属的法规不一致")
     version.content_hash = ver.get("content_hash", version.content_hash)
     version.is_current = bool(ver.get("is_current", False))
+    version.source_url = ver.get("source_url", version.source_url)
+    for field in ("effective_from", "effective_to"):
+        if ver.get(field):
+            setattr(version, field, datetime.fromisoformat(ver[field]))
     _bind(db, "version", ver["key"], version.id)
     if version.is_current:
         db.execute(RegulationVersion.__table__.update().where(
@@ -80,6 +88,10 @@ def materialize_bundle(db: Session, bundle: dict) -> dict[str, int]:
         req.summary, req.status = item.get("summary", ""), item.get("status", "NEEDS_REVIEW")
         req.conditions_json, req.exceptions_json = item.get("conditions", []), item.get("exceptions", [])
         req.confidence = float(item.get("confidence", 0.0))
+        req.subject_type, req.object_type = item.get("subject_type", ""), item.get("object_type", "")
+        for field in ("effective_from", "effective_to"):
+            if item.get(field):
+                setattr(req, field, datetime.fromisoformat(item[field]))
         _bind(db, "requirement", item["key"], req.id); reqs[item["key"]] = req.id
     db.flush()
     return {"regulation_id": regulation.id, "version_id": version.id, **{f"requirement:{k}": v for k, v in reqs.items()}}

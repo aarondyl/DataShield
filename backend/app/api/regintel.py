@@ -348,10 +348,10 @@ def sync_event_bundle(event_id: str, db: Session = Depends(get_db)) -> dict:
     requirements = db.scalars(select(Requirement).where(Requirement.version_id == version.id).order_by(Requirement.id)).all()
     unit_key = {u.id: f"{version_key}:{u.path or u.unit_number}" for u in units}
     return {"schema_version":"1.0", "event": EventOut.model_validate(event).model_dump(mode="json"),
-      "regulation": {"key":reg_key,"name":regulation.name,"jurisdiction":regulation.jurisdiction,"status":regulation.status},
-      "version": {"key":version_key,"number":version.version_number,"content_hash":version.content_hash,"is_current":version.is_current},
+      "regulation": {"key":reg_key,"name":regulation.name,"jurisdiction":regulation.jurisdiction,"status":regulation.status,"source_url":regulation.canonical_source_url or regulation.source_url,"effective_at":regulation.effective_at},
+      "version": {"key":version_key,"number":version.version_number,"content_hash":version.content_hash,"is_current":version.is_current,"source_url":version.source_url,"effective_from":version.effective_from,"effective_to":version.effective_to},
       "legal_units":[{"key":unit_key[u.id],"unit_number":u.unit_number,"heading":u.heading,"text":u.text,"path":u.path} for u in units],
-      "requirements":[{"key":hashlib.sha256(f'{unit_key.get(r.legal_unit_id, version_key)}:{r.action_type}:{r.summary}'.encode()).hexdigest(),"legal_unit_key":unit_key.get(r.legal_unit_id),"type":r.requirement_type,"action":r.action_type,"summary":r.summary,"status":r.status,"conditions":r.conditions_json,"exceptions":r.exceptions_json} for r in requirements]}
+      "requirements":[{"key":hashlib.sha256(f'{unit_key.get(r.legal_unit_id, version_key)}:{r.action_type}:{r.summary}'.encode()).hexdigest(),"legal_unit_key":unit_key.get(r.legal_unit_id),"type":r.requirement_type,"action":r.action_type,"summary":r.summary,"status":r.status,"conditions":r.conditions_json,"exceptions":r.exceptions_json,"subject_type":r.subject_type,"object_type":r.object_type,"confidence":r.confidence,"effective_from":r.effective_from,"effective_to":r.effective_to} for r in requirements]}
 
 
 @router.get("/events/{event_id}", response_model=EventOut)

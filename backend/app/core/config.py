@@ -3,6 +3,7 @@
 from functools import lru_cache
 import os
 from pathlib import Path
+import json
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -48,6 +49,9 @@ class Settings(BaseSettings):
     legacy_tenant_api_enabled: bool = False
     evaluation_auth_bypass: bool = False
     runtime_token: str = ""
+    # Only public regulation events are fetched from this HTTPS endpoint. Local
+    # Product Twin, evidence and tenant data are never sent to it.
+    cloud_regintel_base_url: str = ""
     # The Cloud API has a deliberately small public read surface.  Operations
     # that can cause a source fetch or mutate RegIntel require this separate
     # operator credential, injected from a secret file in the Cloud compose
@@ -66,14 +70,34 @@ class Settings(BaseSettings):
             self.cloud_admin_token = Path(self.cloud_admin_token_file).read_text(encoding="utf-8").strip()
         if self.runtime_mode == "local":
             self.local_data_dir = self.local_data_dir or default_local_data_dir()
+            public_config = Path(self.local_data_dir) / "cloud-endpoint.json"
+            if not self.cloud_regintel_base_url and public_config.exists():
+                try:
+                    value = json.loads(public_config.read_text(encoding="utf-8")).get("base_url", "")
+                    if isinstance(value, str) and value.startswith("https://"):
+                        self.cloud_regintel_base_url = value
+                except (OSError, ValueError):
+                    pass
             if "DATABASE_URL" not in os.environ:
                 self.database_url = f"sqlite:///{(Path(self.local_data_dir) / 'datashield.db').as_posix()}"
+            # A Desktop launched from a developer shell may inherit Cloud
+            # DATABASE_URL. Never initialize tenant tables on that database.
+            if self.database_url.split(":", 1)[0] not in {"sqlite", "sqlite+pysqlite"}:
+                raise ValueError("Local runtime requires SQLite; Cloud database URLs are not permitted")
             # Desktop 默认保持可重复的离线 mock；只有该显式模式才覆盖 provider。
             # byok/local/cloud 是未来 Desktop 选择边界：本层保留用户 provider
             # 配置，不保存密钥，也不在此实现远程网关或本地模型客户端。
             if self.desktop_ai_mode == "mock":
                 self.llm_provider = "mock"
                 self.embedding_provider = "local"
+            # Desktop 通过主进程持有的短期 runtime token 调用这些业务路由。
+            # 这不是 Web 共享预览的匿名开放：所有 /api/*（健康检查除外）仍由
+            # enforce_local_runtime_token 验证，且数据只在本机 SQLite。
+            self.legacy_tenant_api_enabled = True
+            # Desktop 的 renderer 只能经 Rust bridge 调用受限本地 API；因此本机
+            # 单用户 workspace 不再要求 Web evaluation cookie。它不是共享预览的
+            # 匿名开放，外部进程仍必须持有短期 runtime token。
+            self.evaluation_auth_bypass = True
             self.scheduler_enabled = False
 
     @property
