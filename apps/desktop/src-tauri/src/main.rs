@@ -118,31 +118,33 @@ async fn wait_for_descriptor(state: &DesktopState) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn runtime_health(state: State<'_, DesktopState>) -> RuntimeHealth {
+async fn runtime_health(state: State<'_, DesktopState>) -> Result<RuntimeHealth, String> {
     let descriptor = match descriptor_from_state(&state).await {
         Ok(value) => value,
         Err(message) => {
-            return RuntimeHealth {
+            return Ok(RuntimeHealth {
                 ok: false,
                 message: Some(message),
-            }
+            });
         }
     };
-    match state
-        .client
-        .get(format!("{}/api/health", descriptor.base_url))
-        .send()
-        .await
-    {
-        Ok(response) if response.status().is_success() => RuntimeHealth {
-            ok: true,
-            message: None,
+    Ok(
+        match state
+            .client
+            .get(format!("{}/api/health", descriptor.base_url))
+            .send()
+            .await
+        {
+            Ok(response) if response.status().is_success() => RuntimeHealth {
+                ok: true,
+                message: None,
+            },
+            _ => RuntimeHealth {
+                ok: false,
+                message: Some("本地智能体未响应".to_string()),
+            },
         },
-        _ => RuntimeHealth {
-            ok: false,
-            message: Some("本地智能体未响应".to_string()),
-        },
-    }
+    )
 }
 
 #[tauri::command]
