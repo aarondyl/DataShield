@@ -81,6 +81,28 @@ def create_app() -> FastAPI:
 
 app = create_app()
 
+
+@app.middleware("http")
+async def enforce_cloud_api_compatibility(request, call_next):
+    """Keep the Desktop-facing Cloud contract explicitly versioned.
+
+    Clients which omit the header remain compatible with the first public
+    release.  A client that does send an unsupported major version is rejected
+    before it can apply an incompatible regulation bundle.
+    """
+    if get_settings().runtime_mode == "cloud" and request.url.path.startswith("/api/v1/"):
+        requested = request.headers.get("X-DataShield-Api-Version")
+        if requested and requested.split(".", 1)[0] != "1":
+            return JSONResponse(
+                {"detail": "Unsupported Cloud API version", "supported_version": "1.0"},
+                status_code=426,
+                headers={"X-DataShield-Api-Version": "1.0"},
+            )
+        response = await call_next(request)
+        response.headers["X-DataShield-Api-Version"] = "1.0"
+        return response
+    return await call_next(request)
+
 _LEGACY_TENANT_PREFIXES = (
     "/api/companies", "/api/products", "/api/analysis", "/api/actions",
     "/api/compliance", "/api/developer",
