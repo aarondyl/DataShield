@@ -294,6 +294,13 @@ class TestChangeDetectionFlow:
             assert payload["affected_legal_unit_ids"]
             assert payload["requirement_ids"]
 
+            # Local 同步使用固定快照和事件序号，报文不得包含租户私有字段。
+            sync = client.get("/api/v1/sync/events", params={"limit": 1}).json()
+            assert sync["snapshot_cursor"] >= event["id"]
+            assert sync["events"] and sync["events"][0]["id"] <= sync["snapshot_cursor"]
+            for private in ("company", "product", "twin", "finding", "remediation", "feedback"):
+                assert private not in str(sync).lower()
+
             # 版本未变时再次抓取 → NO_CHANGE
             rerun = client.post(f"/api/v1/sources/{pipl_source['id']}/ingest").json()
             assert rerun["status"] == "NO_CHANGE"

@@ -198,3 +198,12 @@ class EventOut(BaseModel):
     version_id: int | None = None
     payload: dict
     created_at: datetime
+
+
+class SyncPage(BaseModel):
+    """法规同步页；不含任何租户或产品字段。"""
+    schema_version: str = "1.0"
+    snapshot_cursor: int
+    next_cursor: int | None = None
+    has_more: bool
+    events: list[EventOut] = Field(default_factory=list)

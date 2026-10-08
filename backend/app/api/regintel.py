@@ -39,6 +39,7 @@ from app.schemas.regintel import (
     RequirementOut,
     SourceOut,
     VersionOut,
+    SyncPage,
 )
 
 router = APIRouter(prefix="/v1", tags=["regintel"])
@@ -283,6 +284,33 @@ def list_events(db: Session = Depends(get_db)) -> list[EventOut]:
     """已发布的 regulation.change.ready 事件列表。"""
     events = db.scalars(select(RegulationEvent).order_by(RegulationEvent.id)).all()
     return [EventOut.model_validate(e) for e in events]
+
+
+@router.get("/sync/events", response_model=SyncPage)
+def sync_events(
+    cursor: int = 0,
+    snapshot_cursor: int | None = None,
+    limit: int = 100,
+    jurisdiction: str | None = None,
+    db: Session = Depends(get_db),
+) -> SyncPage:
+    """供 Local 拉取法规事件的稳定分页接口。
+
+    首页固定 snapshot_cursor；后续页必须携带该值。排序使用单调数据库事件序号，
+    而非可能相同的时间戳。新事件不会混入已固定的分页范围。
+    """
+    if limit < 1 or limit > 200:
+        raise HTTPException(422, detail="limit 必须在 1 到 200 之间")
+    upper = snapshot_cursor if snapshot_cursor is not None else (db.scalar(select(func.max(RegulationEvent.id))) or 0)
+    if cursor < 0 or cursor > upper:
+        raise HTTPException(422, detail="cursor 超出快照范围")
+    stmt = select(RegulationEvent).where(RegulationEvent.id > cursor, RegulationEvent.id <= upper).order_by(RegulationEvent.id)
+    if jurisdiction:
+        stmt = stmt.join(Regulation, Regulation.id == RegulationEvent.regulation_id).where(Regulation.jurisdiction == jurisdiction)
+    rows = db.scalars(stmt.limit(limit + 1)).all()
+    page_rows, extra = rows[:limit], len(rows) > limit
+    next_cursor = page_rows[-1].id if page_rows else cursor
+    return SyncPage(snapshot_cursor=upper, next_cursor=next_cursor if extra else None, has_more=extra, events=[EventOut.model_validate(row) for row in page_rows])
 
 
 @router.get("/events/{event_id}", response_model=EventOut)
