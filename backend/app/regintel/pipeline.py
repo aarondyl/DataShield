@@ -533,8 +533,12 @@ def _run_pipeline(
 
     # ---- 9. 一切就绪后才发布 regulation.change.ready 事件 ----
     event = None
-    if change_rows:
+    if change_rows or current is None:
         event = persist_change_ready_event(db, regulation, version, change_rows, new_requirement_ids)
+        if current is None:
+            # 首次纳入资料库也必须进入增量同步；这是资料库基线，不是法规修订。
+            event.payload = {**event.payload, "initial_import": True,
+                "affected_legal_unit_ids": [row.id for row in unit_rows if row.unit_type == "article"]}
 
     source.last_success_at = now
     run.status = "COMPLETED"

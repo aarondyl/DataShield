@@ -90,9 +90,12 @@ def test_cloud_http_sync_to_local_finding(tmp_path, monkeypatch):
 
     # 此处仍是明确的测试夹具与 mock；验证同步所得数据继续完成业务闭环。
     from fastapi.testclient import TestClient
-    from app.main import app
+    from app.main import create_app, enforce_local_runtime_token
     monkeypatch.setenv("RUNTIME_TOKEN", "integration-test-token")
     get_settings.cache_clear()
+    # 使用当前 Local 模式构造，避免受先运行的 Cloud 契约测试模块缓存影响。
+    app = create_app()
+    app.middleware("http")(enforce_local_runtime_token)
     def local_db():
         with Local() as db:
             yield db
