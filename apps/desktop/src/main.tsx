@@ -6,6 +6,7 @@ import './styles.css';
 
 type Screen = 'welcome' | 'workspace' | 'intake' | 'today' | 'monitor' | 'findings' | 'actions' | 'twin' | 'settings';
 type WorkspaceRef = { companyId: number; productId: number };
+type RegulationEvent = { event: { event_id: string; payload?: { materiality?: string; topics?: string[] } }; regulation: { name?: string; jurisdiction?: string } };
 const workspaceKey = 'datashield.desktop.workspace';
 
 function savedWorkspace(): WorkspaceRef | null {
@@ -68,7 +69,8 @@ function App() {
       {screen === 'intake' && workspace && <ProductIntake copy={copy} workspace={workspace} onDone={() => setScreen('twin')} />}
       {screen === 'intake' && !workspace && <EmptyPage copy={copy} screen="twin" />}
       {screen === 'twin' && <TwinPage copy={copy} workspace={workspace} />}
-      {(['today', 'monitor', 'findings', 'actions'] as Screen[]).includes(screen) && <EmptyPage copy={copy} screen={screen as 'today' | 'monitor' | 'findings' | 'actions'} />}
+      {screen === 'monitor' && <MonitorPage copy={copy} />}
+      {(['today', 'findings', 'actions'] as Screen[]).includes(screen) && <EmptyPage copy={copy} screen={screen as 'today' | 'findings' | 'actions'} />}
       {screen === 'settings' && <Settings copy={copy} />}
     </section>
   </main>;
@@ -98,6 +100,19 @@ function TwinPage({ copy, workspace }: { copy: ReturnType<typeof useLocale>['cop
   }, [workspace]);
   if (!workspace) return <EmptyPage copy={copy} screen="twin" />;
   return <section className="page empty"><h1>{copy.twin.title}</h1>{!loaded ? <div className="empty-card"><p>{copy.twin.loading}</p></div> : facts.length === 0 ? <div className="empty-card"><p>{copy.twin.empty}</p></div> : <div className="settings-list">{facts.map(fact => <div key={fact.id}><strong>{fact.name}</strong><span>{fact.group} · {fact.status}</span></div>)}</div>}</section>;
+}
+
+function MonitorPage({ copy }: { copy: ReturnType<typeof useLocale>['copy'] }) {
+  const [state, setState] = useState<{ scope: string; using_local_cache: boolean; last_success_at: string; last_error: string } | null>(null);
+  const [events, setEvents] = useState<RegulationEvent[]>([]);
+  const [syncing, setSyncing] = useState(false);
+  const load = async () => {
+    const [nextState, nextEvents] = await Promise.all([localApiRequest<typeof state>('/api/v1/local-regulations/status'), localApiRequest<typeof events>('/api/v1/local-regulations/events')]);
+    setState(nextState); setEvents(nextEvents);
+  };
+  useEffect(() => { void load(); }, []);
+  const sync = async () => { setSyncing(true); try { await localApiRequest('/api/v1/local-regulations/sync', 'POST'); } catch { /* status preserves offline cache reason */ } finally { setSyncing(false); await load(); } };
+  return <section className="page"><h1>{copy.monitor.title}</h1><p>{state?.using_local_cache ? copy.monitor.offline : copy.monitor.body}</p><div className="settings-list"><div><strong>{copy.monitor.lastSync}</strong><span>{state?.last_success_at || copy.monitor.never}</span></div><div><strong>{copy.monitor.scope}</strong><span>{state?.scope || copy.monitor.loading}</span></div>{state?.last_error && <div><strong>{copy.monitor.status}</strong><span>{state.last_error}</span></div>}</div><button className="primary" disabled={syncing} onClick={() => void sync()}>{syncing ? copy.monitor.syncing : copy.monitor.sync}</button><div className="settings-list">{events.length ? events.map(item => <div key={item.event.event_id}><strong>{item.regulation.name || item.event.event_id}</strong><span>{item.regulation.jurisdiction || '—'} · {item.event.payload?.materiality || 'UNKNOWN'} · {(item.event.payload?.topics || []).join(', ')}</span></div>) : <div><span>{copy.monitor.empty}</span></div>}</div></section>;
 }
 
 function Welcome({ copy, onCreate }: { copy: ReturnType<typeof useLocale>['copy']; onCreate: () => void }) {

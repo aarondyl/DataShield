@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     legacy_tenant_api_enabled: bool = False
     evaluation_auth_bypass: bool = False
     runtime_token: str = ""
+    # Only public regulation events are fetched from this HTTPS endpoint. Local
+    # Product Twin, evidence and tenant data are never sent to it.
+    cloud_regintel_base_url: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
