@@ -56,6 +56,9 @@ def run_local() -> None:
     """以已绑定的随机回环 socket 启动，避免端口探测与监听之间的竞争。"""
     import uvicorn
 
+    # 每次启动重新生成，不能继承开发终端或上一次进程的 runtime token。
+    settings.runtime_token = secrets.token_urlsafe(32)
+    os.environ["RUNTIME_TOKEN"] = settings.runtime_token
     listener = allocate_loopback_listener()
     port = listener.getsockname()[1]
     write_runtime_descriptor(port)
@@ -64,6 +67,18 @@ def run_local() -> None:
         server.run(sockets=[listener])
     finally:
         listener.close()
+        remove_owned_runtime_descriptor()
+
+
+def remove_owned_runtime_descriptor() -> None:
+    """仅清理本进程描述文件，保留其他 Desktop 实例的运行时信息。"""
+    destination = settings.local_runtime_descriptor_path
+    try:
+        descriptor = json.loads(destination.read_text(encoding="utf-8"))
+        if descriptor.get("pid") == os.getpid():
+            destination.unlink(missing_ok=True)
+    except (OSError, ValueError):
+        pass
 
 if __name__ == "__main__":
     run_local()

@@ -84,3 +84,61 @@ def test_cloud_http_sync_to_local_finding(tmp_path, monkeypatch):
         assert requirement.object_type == "AI"
         assert requirement.confidence == .9
         assert finding.evidence_links[0].evidence_snapshot_json["source_url"] == "https://eur-lex.europa.eu/eli/reg/2024/1689/oj"
+        tenant_id, product_id, finding_id = finding.tenant_id, finding.product_id, finding.id
+        original_twin_id = db.scalar(select(ProductTwinVersion.id))
+        requirement_id = requirement.id
+
+    # 此处仍是明确的测试夹具与 mock；验证同步所得数据继续完成业务闭环。
+    from fastapi.testclient import TestClient
+    from app.main import create_app, enforce_local_runtime_token
+    monkeypatch.setenv("RUNTIME_TOKEN", "integration-test-token")
+    get_settings.cache_clear()
+    # 使用当前 Local 模式构造，避免受先运行的 Cloud 契约测试模块缓存影响。
+    app = create_app()
+    app.middleware("http")(enforce_local_runtime_token)
+    def local_db():
+        with Local() as db:
+            yield db
+    previous = app.dependency_overrides.copy()
+    app.dependency_overrides[get_db] = local_db
+    try:
+        client = TestClient(app, headers={"X-Runtime-Token": "integration-test-token"})
+        detail = client.get(f"/api/v1/findings/{finding_id}", params={"tenant_id": tenant_id})
+        assert detail.status_code == 200, detail.text
+        assert detail.json()["legal_evidence"] and detail.json()["requirements"]
+        assert detail.json()["agent_run"]["model_provider"] == "mock"
+        for decision, expected in (("approve", "APPROVED"), ("reject", "REJECTED")):
+            created = client.post(f"/api/v1/findings/{finding_id}/remediations", json={
+                "tenant_id": tenant_id, "remediation_type": "DOCUMENT_CHANGE", "document_type": "AI transparency notice"})
+            assert created.status_code == 201, created.text
+            remediation_id = created.json()["remediation"]["id"]
+            decided = client.post(f"/api/v1/remediations/{remediation_id}/{decision}", json={"tenant_id": tenant_id})
+            assert decided.status_code == 200, decided.text
+            assert decided.json()["remediation"]["status"] == expected
+        feedback = client.post("/api/v1/feedback", json={"tenant_id": tenant_id, "product_id": product_id,
+            "finding_id": finding_id, "feedback_type": "FACT_CORRECTION", "raw_text": "我们已经支持 AI告知，并向用户说明使用人工智能。", "created_by": "integration-test"})
+        assert feedback.status_code == 201, feedback.text
+        candidate_id = feedback.json()["candidates"][0]["id"]
+        confirmed = client.post(f"/api/v1/feedback-candidates/{candidate_id}/confirm", json={"tenant_id": tenant_id})
+        assert confirmed.status_code == 200 and confirmed.json()["status"] == "CONFIRMED"
+        applied = client.post(f"/api/v1/feedback-candidates/{candidate_id}/apply", json={"tenant_id": tenant_id})
+        assert applied.status_code == 200, applied.text
+        assert applied.json()["status"] == "APPLIED", applied.text
+        assert applied.json()["applied_twin_version_id"] != original_twin_id
+        assert applied.json()["reanalysis_run_id"]
+        today = client.get("/api/v1/today", params={"tenant_id": tenant_id, "product_id": product_id})
+        assert today.status_code == 200, today.text
+        assert today.json()["latest_run"]["status"] == "COMPLETED"
+        assert today.json()["recently_completed"]
+        # 上面的 Cloud TCP 服务已经退出。离线同步失败仍保留法规和画像版本。
+        import pytest
+        with pytest.raises(ConnectionError):
+            CloudSyncClient(f"http://127.0.0.1:{port}", cache, timeout=.1, retries=1, session_factory=Local).sync()
+        with Local() as db:
+            assert db.get(Finding, finding_id) is not None
+            assert db.get(ProductTwinVersion, applied.json()["applied_twin_version_id"]) is not None
+            assert db.get(Requirement, requirement_id) is not None
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous)
+        get_settings.cache_clear()

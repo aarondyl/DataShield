@@ -1,0 +1,10 @@
+{
+  "requested_url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng",
+  "resolved_url": "https://eur-lex.europa.eu/eli/reg/2024/1689/oj/eng",
+  "retrieved_at": "2026-10-08T18:06:00.332898+00:00",
+  "raw_sha256": "6ea378420e63ff29aef7303f637c0cf57ad67fe7463b9b8e917549a46d83b4b4",
+  "bytes": 1538648,
+  "classification": "OFFICIAL_SOURCE_RETRIEVED_NOT_LEGALLY_REVIEWED",
+  "version": "Original OJ 2024; consolidated current version must be reviewed separately",
+  "reviewer": null
+}

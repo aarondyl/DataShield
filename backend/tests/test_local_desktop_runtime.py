@@ -38,3 +38,36 @@ def test_listener_uses_dynamic_loopback_port():
             listener.close()
     finally:
         first.close()
+
+
+def test_runtime_cleanup_preserves_other_process_descriptor(monkeypatch, tmp_path):
+    from app.core.config import Settings
+    from app.entrypoints import local
+    monkeypatch.setattr(local, "settings", Settings(runtime_mode="local", local_data_dir=str(tmp_path)))
+    path = local.write_runtime_descriptor(23456)
+    other = json.loads(path.read_text())
+    other["pid"] = __import__("os").getpid() + 1
+    path.write_text(json.dumps(other))
+    local.remove_owned_runtime_descriptor()
+    assert path.exists()
+    local.write_runtime_descriptor(23456)
+    local.remove_owned_runtime_descriptor()
+    assert not path.exists()
+
+
+def test_each_launch_rotates_inherited_token_and_cleans_up(monkeypatch, tmp_path):
+    from app.core.config import Settings
+    from app.entrypoints import local
+    import uvicorn
+    monkeypatch.setattr(local, "settings", Settings(runtime_mode="local", local_data_dir=str(tmp_path), runtime_token="inherited"))
+    tokens = []
+    def run(server, sockets):
+        descriptor = json.loads((tmp_path / "runtime.json").read_text())
+        tokens.append(descriptor["runtime_token"])
+        assert sockets[0].getsockname()[0] == "127.0.0.1"
+    monkeypatch.setattr(uvicorn.Server, "run", run)
+    monkeypatch.setenv("RUNTIME_TOKEN", "inherited")
+    local.run_local()
+    assert not (tmp_path / "runtime.json").exists()
+    local.run_local()
+    assert tokens[0] != tokens[1] and "inherited" not in tokens

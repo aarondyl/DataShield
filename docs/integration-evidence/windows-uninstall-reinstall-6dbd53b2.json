@@ -1,0 +1,11 @@
+{
+  "source_commit": "6dbd53b2c6562a9d8c782fe338f7427b210bb4e8",
+  "uninstall": "PASS",
+  "database_retained_unchanged": "PASS",
+  "same_artifact_reinstall": "PASS",
+  "workspace_preserved": "PASS",
+  "token_rotation": "PASS",
+  "legacy_electron": "未操作",
+  "cross_version_upgrade": "NOT_RUN",
+  "classification": "实际 Windows 11 非管理员自动化；独立 RC 目录；同版卸载重装，不等于跨版本升级"
+}

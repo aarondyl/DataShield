@@ -1,0 +1,12 @@
+{
+  "source_commit": "6dbd53b2c6562a9d8c782fe338f7427b210bb4e8",
+  "cold_start_auto_connect": "PASS",
+  "english_navigation_label": "PASS",
+  "restart_english_preference": "PASS",
+  "gui_saved_twin": "PASS",
+  "utc_local_time_versions_checked": 2,
+  "timezone": "China Standard Time",
+  "human_visual_acceptance": "NOT_RUN",
+  "installer_sha256": "ad27a6660fe8bf431a593f53d593d00d6f6d73aed0a9452f774b1f91b1305d0d",
+  "classification": "实际 Windows 11 自动化；演示夹具和 mock；非人工/真实 HTTPS/法律验收"
+}

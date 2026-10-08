@@ -49,7 +49,7 @@ fn valid_loopback_url(url: &str) -> bool {
     let Some(host_port) = url.strip_prefix("http://127.0.0.1:") else {
         return false;
     };
-    !host_port.is_empty() && host_port.parse::<u16>().is_ok()
+    host_port.parse::<u16>().is_ok_and(|port| port > 0)
 }
 
 fn valid_api_path(path: &str) -> bool {
@@ -176,6 +176,7 @@ async fn runtime_health(state: State<'_, DesktopState>) -> Result<RuntimeHealth,
         match state
             .client
             .get(format!("{}/api/health", descriptor.base_url))
+            .timeout(Duration::from_secs(2))
             .send()
             .await
         {
@@ -250,6 +251,7 @@ fn main() {
         // Never forward the process-held runtime token through a redirect.
         client: reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
+            .timeout(Duration::from_secs(60))
             .build()
             .expect("Unable to initialize the local HTTP client"),
         descriptor: Mutex::new(None),
@@ -287,6 +289,19 @@ fn main() {
                 {
                     let _ = child.kill();
                 }
+                // Windows force termination skips Python's finally block.
+                // Remove credentials only when they belong to this instance.
+                if let Ok(path) = runtime_descriptor_path() {
+                    if let Ok(raw) = std::fs::read_to_string(&path) {
+                        if let Ok(descriptor) = serde_json::from_str::<RuntimeDescriptor>(&raw) {
+                            let expected_pid = app.state::<DesktopState>()
+                                .expected_sidecar_pid.lock().ok().and_then(|pid| *pid);
+                            if expected_pid == Some(descriptor.pid) {
+                                let _ = std::fs::remove_file(path);
+                            }
+                        }
+                    }
+                }
             }
         });
 }
@@ -308,6 +323,7 @@ mod tests {
         assert!(valid_loopback_url("http://127.0.0.1:48327"));
         assert!(!valid_loopback_url("http://0.0.0.0:48327"));
         assert!(!valid_loopback_url("https://127.0.0.1:443"));
+        assert!(!valid_loopback_url("http://127.0.0.1:0"));
     }
     #[test]
     fn bridge_rejects_url_and_traversal_paths() {

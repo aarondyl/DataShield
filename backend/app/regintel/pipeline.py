@@ -272,7 +272,7 @@ def run_ingestion(
     *,
     use_llm: bool | None = None,
     default_subject: str = "",
-    language: str = "zh",
+    language: str | None = None,
     sync_legacy: bool = False,
 ) -> IngestionRun:
     """执行一次完整的法规入库/更新流水线，返回运行记录（绝不抛出，失败记为 FAILED）。
@@ -287,6 +287,7 @@ def run_ingestion(
     db.commit()
     db.refresh(run)
     try:
+        language = language or ("en" if source.parser_type in {"eu_english", "gdpr_bilingual"} else "zh")
         _run_pipeline(db, source, run, use_llm=use_llm, default_subject=default_subject,
                       language=language, sync_legacy=sync_legacy)
     except Exception as exc:  # 流水线失败不拖垮服务，运行记录标记 FAILED
@@ -371,6 +372,9 @@ def _run_pipeline(
     articles = article_units(units)
     if not articles:
         raise ValueError("未能从文本中解析出任何法律条款")
+    article_keys = [article_key(article.unit_number) for article in articles]
+    if len(article_keys) != len(set(article_keys)):
+        raise ValueError("解析出重复法律条号，须复核官方文本与解析器，未发布法规事件")
 
     version = RegulationVersion(
         regulation_id=regulation.id,
@@ -530,8 +534,12 @@ def _run_pipeline(
 
     # ---- 9. 一切就绪后才发布 regulation.change.ready 事件 ----
     event = None
-    if change_rows:
+    if change_rows or current is None:
         event = persist_change_ready_event(db, regulation, version, change_rows, new_requirement_ids)
+        if current is None:
+            # 首次纳入资料库也必须进入增量同步；这是资料库基线，不是法规修订。
+            event.payload = {**event.payload, "initial_import": True,
+                "affected_legal_unit_ids": [row.id for row in unit_rows if row.unit_type == "article"]}
 
     source.last_success_at = now
     run.status = "COMPLETED"

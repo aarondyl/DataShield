@@ -56,6 +56,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
+          set -euo pipefail
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git ls-remote origin refs/heads/main | cut -f1)" = "$SOURCE_SHA"
           test "$(tr -d '\r\n\357\273\277' < release-assets/SOURCE_COMMIT.txt)" = "$SOURCE_SHA"
+          test -f release-assets/DataShield_0.1.0_x64-setup.exe
+          (cd release-assets && sha256sum --check SHA256SUMS.txt)
           printf '\nSource Commit: `%s`\n' "$SOURCE_SHA" >> docs/DESKTOP_RELEASE_NOTES.md
           gh release create desktop-v0.1.0 release-assets/* --prerelease --target "$SOURCE_SHA" --title 'DataShield Desktop v0.1.0' --notes-file docs/DESKTOP_RELEASE_NOTES.md

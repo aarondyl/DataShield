@@ -63,7 +63,7 @@ function App() {
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">D</span><span>{copy.productName}</span></div>
       <p className="preview-tag">{copy.labels.demo}</p>
-      <nav aria-label="主导航">
+      <nav aria-label={copy.labels.navigation}>
         {nav.map(item => <button key={item.key} className={screen === item.key ? 'nav-item active' : 'nav-item'} onClick={() => setScreen(item.key)}>{item.label}</button>)}
       </nav>
       <div className={'runtime ' + runtime}><span aria-hidden="true" />{statusText}<button onClick={() => void checkRuntime()}>{copy.labels.retry}</button></div>
@@ -72,7 +72,7 @@ function App() {
       <header><div className="locale" role="group" aria-label={copy.settings.language}>
         {(['zh-CN', 'en-US'] as Locale[]).map(value => <button key={value} className={locale === value ? 'selected' : ''} onClick={() => setLocale(value)}>{value === 'zh-CN' ? copy.labels.chinese : copy.labels.english}</button>)}
       </div></header>
-      {screen === 'welcome' && <Welcome copy={copy} onCreate={() => setScreen('workspace')} />}
+      {screen === 'welcome' && <Welcome copy={copy} onCreate={() => setScreen('workspace')} onPrivacy={() => setScreen('settings')} />}
       {screen === 'workspace' && <Workspace copy={copy} kind={workspaceKind} setKind={setWorkspaceKind} error={workspaceError} onContinue={createWorkspace} />}
       {screen === 'intake' && workspace && <ProductIntake copy={copy} workspace={workspace} onDone={() => setScreen('twin')} />}
       {screen === 'intake' && !workspace && <EmptyPage copy={copy} screen="twin" />}
@@ -118,8 +118,8 @@ function FindingsPage({ copy, workspace, initialFinding, onRemediate }: { copy: 
   return <section className="page"><h1>{copy.findings.title}</h1>{remediationButton}<p>{copy.findings.body}</p><button className="primary" disabled={running} onClick={() => void run()}>{running ? copy.findings.running : copy.findings.run}</button>{message && <p className="form-error">{message}</p>}<div className="settings-list">{findings.length ? findings.map(item => <div key={item.id}><button className="quiet" onClick={() => void open(item.id)}>{item.title}</button><span>{copy.findings.risks[item.impact_level as keyof typeof copy.findings.risks] ?? item.impact_level} · {copy.findings.states[item.status as keyof typeof copy.findings.states] ?? item.status} · {copy.findings.requirements}: {item.requirement_count} · {copy.findings.evidence}: {item.evidence_count} · {copy.findings.twin}: #{item.product_twin_version_id ?? '—'}</span></div>) : <div><span>{copy.findings.empty}</span></div>}</div>{detail && <FindingDetail copy={copy} detail={detail} />}{feedbackPanel}</section>;
 }
 
-function Welcome({ copy, onCreate }: { copy: ReturnType<typeof useLocale>['copy']; onCreate: () => void }) {
-  return <section className="hero"><p className="eyebrow">{copy.welcome.eyebrow}</p><h1>{copy.welcome.title}</h1><p>{copy.welcome.body}</p><div className="buttons"><button className="primary" onClick={onCreate}>{copy.welcome.create}</button><button className="quiet">{copy.welcome.privacy}</button></div></section>;
+function Welcome({ copy, onCreate, onPrivacy }: { copy: ReturnType<typeof useLocale>['copy']; onCreate: () => void; onPrivacy: () => void }) {
+  return <section className="hero"><p className="eyebrow">{copy.welcome.eyebrow}</p><h1>{copy.welcome.title}</h1><p>{copy.welcome.body}</p><div className="buttons"><button className="primary" onClick={onCreate}>{copy.welcome.create}</button><button className="quiet" onClick={onPrivacy}>{copy.welcome.privacy}</button></div></section>;
 }
 
 function Workspace({ copy, kind, setKind, error, onContinue }: { copy: ReturnType<typeof useLocale>['copy']; kind: 'developer' | 'enterprise'; setKind: (kind: 'developer' | 'enterprise') => void; error: boolean; onContinue: (company: string, product: string, description: string) => Promise<void> }) {

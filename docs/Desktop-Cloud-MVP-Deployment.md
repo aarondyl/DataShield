@@ -2,6 +2,8 @@
 
 ## 状态与上线边界
 
+2026-10-09 总集成复核：历史交接的 PASS 不作为本轮验收结果；本轮状态以仓库根目录 `FINAL_INTEGRATION_REPORT.md` 为准。首次入库现在发布 `initial_import` 同步基线；英文官方 HTML 可配置 `parser_type=eu_english`，默认选择英文义务抽取。正文来源与摘要人工核验仍是独立门禁。
+
 当前仓库具备可在受控环境测试的 Cloud → Desktop Local Runtime 数据路径；**尚未获准部署到阿里云，也不应公开暴露 API**。北京服务器上的 `datashield.ltd` 未完成适用的备案/上线手续时，不得把 `api.datashield.ltd` 配置为公开生产服务。不要使用自签名证书，也不要关闭 Desktop 的 TLS 验证。
 
 现有 `backend/data/regulations` 内容在仓库 README 中标为 `DEMO SUMMARY`。因此它不能作为“真实、已核验法规数据”的生产验收证据。上线前须由法规运营人员导入、复核官方来源内容，并保存来源 URL、抓取时间与内容哈希。
@@ -25,7 +27,9 @@ Cloud 在 v1 响应中返回 `X-DataShield-Api-Version: 1.0`。Local 客户端�
 启动命令为：
 
 ```bash
-docker compose -f docker-compose.cloud.yml up --build -d
+export CLOUD_IMAGE='registry.example/datashield-cloud@sha256:经批准的镜像摘要'
+docker compose -f docker-compose.cloud.yml pull
+docker compose -f docker-compose.cloud.yml up -d --no-build
 ```
 
 Cloud 镜像在启动前只运行独立的 `alembic -c alembic-cloud.ini upgrade head`，表版本为 `alembic_version_cloud`；不得运行通用 Alembic 链。PostgreSQL 无宿主端口、位于内部网络且使用持久化 `cloud_postgres_data` volume。两个容器有内存上限、健康检查、`unless-stopped` 重启策略和本地 Docker 日志轮转；在 1.6 GiB 服务器上不部署独立 Worker，scheduler 默认关闭。
@@ -39,4 +43,10 @@ Cloud 镜像在启动前只运行独立的 `alembic -c alembic-cloud.ini upgrade
 3. 从 Windows Desktop 触发 Local `/api/v1/local-regulations/sync`，检查本机 SQLite 中出现法规/义务及同步游标。
 4. 对已同步义务运行本地分析，确认 Finding 的证据链接指向本地物化法规；断开 Cloud 后重复检查，本地缓存仍可读而同步返回可恢复离线状态。
 
-第 2–4 步以及 Windows 安装、正式 HTTPS、真实法规数据验证目前均为 **NOT IMPLEMENTED / 未获生产批准**，不能据此宣称生产验收完成。
+第 2–4 步和 Windows 安装、正式 HTTPS、真实法规数据验证的本轮结果须逐项查看 `FINAL_INTEGRATION_REPORT.md`。实现、临时环境通过和生产验收是不同状态，不能相互替代。
+
+## 隔离环境与批准后的执行材料
+
+使用独立 Compose project、临时凭据及 `CLOUD_BIND_PORT=18080` 可避开已有服务；生产默认仍是 `127.0.0.1:8000`。只允许清理明确属于临时 project 的 volume，不执行全局 Docker 清理。
+
+在 ECS 生产变更前审阅 `docs/PRODUCTION_CHANGE_PLAN.md`，分别批准服务器变更、生产 Secret、迁移、DNS 和 TLS。先准备镜像摘要、提交记录、校验文件、备份恢复结果和回滚指令；在这些材料准备好之前不请求最终发布批准。Desktop Release 工作流不执行 ECS SSH、数据库操作或 Cloud 部署。

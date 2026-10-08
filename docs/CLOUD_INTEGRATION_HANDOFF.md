@@ -1,5 +1,9 @@
 # Cloud / Deployment 集成交接
 
+2026-10-09 总集成复核补充：下文是原 Cloud PR 的历史交接，本轮独立复测和 Windows 构建结果以 `FINAL_INTEGRATION_REPORT.md` 为准。总集成修复了首次法规入库无法进入 Desktop 同步的问题，新增 `initial_import` 基线事件；修复英文官方 HTML 实体解码、英文抽取语言选择、重复条号以及不兼容或停滞的同步页面处理。API 主版本仍为 v1.0。
+
+已在隔离 PostgreSQL/pgvector 环境抓取并技术导入 EUR-Lex 原始文档；官方来源可访问不等于现行版本、全文及抽取义务已经人工核验。该语料没有获准生产导入。生产审批方案见 `docs/PRODUCTION_CHANGE_PLAN.md`。
+
 ## 结论
 
 **BLOCKED — 不具备生产验收或公网发布条件；具备进入总集成的受控代码与本地 Docker 验收条件。**

@@ -70,6 +70,7 @@ _EN_MARKERS = [
 ]
 
 _EN_SUBJECTS = [
+    "provider", "deployer", "importer", "distributor",
     "controller", "processor", "data subject", "supervisory authority",
     "member state", "recipient", "third party", "person",
 ]
@@ -84,6 +85,7 @@ _EN_ACTIONS = [
 ]
 
 _EN_OBJECTS = [
+    "general-purpose ai model", "ai system", "artificial intelligence",
     "personal data", "special categories", "biometric data", "genetic data",
     "health data", "data subject", "processing",
 ]

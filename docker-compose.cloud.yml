@@ -38,7 +38,7 @@ services:
       SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-false}
       CLOUD_ADMIN_TOKEN_FILE: /run/secrets/cloud_admin_token
     ports:
-      - "${CLOUD_BIND_ADDRESS:-127.0.0.1}:8000:8000"
+      - "${CLOUD_BIND_ADDRESS:-127.0.0.1}:${CLOUD_BIND_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
