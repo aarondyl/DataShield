@@ -10,6 +10,7 @@
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+import hashlib
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -39,6 +40,7 @@ from app.schemas.regintel import (
     RequirementOut,
     SourceOut,
     VersionOut,
+    SyncPage,
 )
 
 router = APIRouter(prefix="/v1", tags=["regintel"])
@@ -283,6 +285,53 @@ def list_events(db: Session = Depends(get_db)) -> list[EventOut]:
     """已发布的 regulation.change.ready 事件列表。"""
     events = db.scalars(select(RegulationEvent).order_by(RegulationEvent.id)).all()
     return [EventOut.model_validate(e) for e in events]
+
+
+@router.get("/sync/events", response_model=SyncPage)
+def sync_events(
+    cursor: int = 0,
+    snapshot_cursor: int | None = None,
+    limit: int = 100,
+    jurisdiction: str | None = None,
+    db: Session = Depends(get_db),
+) -> SyncPage:
+    """供 Local 拉取法规事件的稳定分页接口。
+
+    首页固定 snapshot_cursor；后续页必须携带该值。排序使用单调数据库事件序号，
+    而非可能相同的时间戳。新事件不会混入已固定的分页范围。
+    """
+    if limit < 1 or limit > 200:
+        raise HTTPException(422, detail="limit 必须在 1 到 200 之间")
+    upper = snapshot_cursor if snapshot_cursor is not None else (db.scalar(select(func.max(RegulationEvent.id))) or 0)
+    if cursor < 0 or cursor > upper:
+        raise HTTPException(422, detail="cursor 超出快照范围")
+    stmt = select(RegulationEvent).where(RegulationEvent.id > cursor, RegulationEvent.id <= upper).order_by(RegulationEvent.id)
+    if jurisdiction:
+        stmt = stmt.join(Regulation, Regulation.id == RegulationEvent.regulation_id).where(Regulation.jurisdiction == jurisdiction)
+    rows = db.scalars(stmt.limit(limit + 1)).all()
+    page_rows, extra = rows[:limit], len(rows) > limit
+    next_cursor = page_rows[-1].id if page_rows else cursor
+    return SyncPage(snapshot_cursor=upper, next_cursor=next_cursor, has_more=extra, events=[EventOut.model_validate(row) for row in page_rows])
+
+
+@router.get("/sync/events/{event_id}/bundle")
+def sync_event_bundle(event_id: str, db: Session = Depends(get_db)) -> dict:
+    """返回本地缓存一条事件所需的法规对象，使用稳定跨端键而非数据库主键。"""
+    event = db.scalar(select(RegulationEvent).where(RegulationEvent.event_id == event_id))
+    if event is None: raise HTTPException(404, detail="法规事件不存在")
+    regulation = db.get(Regulation, event.regulation_id)
+    version = db.get(RegulationVersion, event.version_id)
+    if regulation is None or version is None: raise HTTPException(409, detail="法规事件引用未就绪")
+    reg_key = regulation.official_identifier or f"{regulation.jurisdiction}:{regulation.name}"
+    version_key = f"{reg_key}:v{version.version_number}"
+    units = db.scalars(select(LegalUnit).where(LegalUnit.version_id == version.id).order_by(LegalUnit.order_index)).all()
+    requirements = db.scalars(select(Requirement).where(Requirement.version_id == version.id).order_by(Requirement.id)).all()
+    unit_key = {u.id: f"{version_key}:{u.path or u.unit_number}" for u in units}
+    return {"schema_version":"1.0", "event": EventOut.model_validate(event).model_dump(mode="json"),
+      "regulation": {"key":reg_key,"name":regulation.name,"jurisdiction":regulation.jurisdiction,"status":regulation.status},
+      "version": {"key":version_key,"number":version.version_number,"content_hash":version.content_hash,"is_current":version.is_current},
+      "legal_units":[{"key":unit_key[u.id],"unit_number":u.unit_number,"heading":u.heading,"text":u.text,"path":u.path} for u in units],
+      "requirements":[{"key":hashlib.sha256(f'{unit_key.get(r.legal_unit_id, version_key)}:{r.action_type}:{r.summary}'.encode()).hexdigest(),"legal_unit_key":unit_key.get(r.legal_unit_id),"type":r.requirement_type,"action":r.action_type,"summary":r.summary,"status":r.status,"conditions":r.conditions_json,"exceptions":r.exceptions_json} for r in requirements]}
 
 
 @router.get("/events/{event_id}", response_model=EventOut)
