@@ -106,6 +106,8 @@ def parse_legal_text(text: str, parser_type: str) -> list[ParsedUnit]:
     """按 parser_type 解析法规文本，返回扁平单元列表（order_index 按出现顺序）。"""
     if parser_type == "gdpr_bilingual":
         units = _parse_gdpr_bilingual(text)
+    elif parser_type == "eu_english":
+        units = _parse_gdpr_bilingual(text, bilingual=False)
     else:
         units = _parse_cn_law(text)
     for i, unit in enumerate(units):
@@ -235,8 +237,11 @@ def _split_bilingual(rest: str) -> tuple[str, str]:
     return rest.strip(), ""
 
 
-def _parse_gdpr_bilingual(text: str) -> list[ParsedUnit]:
+def _parse_gdpr_bilingual(text: str, *, bilingual: bool = True) -> list[ParsedUnit]:
     """解析 GDPR 中英对照文本（CHAPTER / Section / Article + 双语标题，正文按行成款）。"""
+    def is_heading(match: re.Match[str] | None) -> bool:
+        # 英文官网只接受独立的编号行；正文中的 Article 3(4) 等引用不切段。
+        return _is_gdpr_heading(match) if bilingual else match is not None and not match.group(2).strip()
     lines = [line.strip() for line in text.split("\n") if line.strip()]
 
     units: list[ParsedUnit] = []
@@ -252,8 +257,11 @@ def _parse_gdpr_bilingual(text: str) -> list[ParsedUnit]:
             article = None
 
     for line in lines:
+        if not bilingual and re.fullmatch(r"ANNEX(?:\s+[IVXLC]+)?", line):
+            # 附件不属于最后一条正文；本解析器不自动提取附件中的义务。
+            break
         m = _RE_GDPR_CHAPTER.match(line)
-        if _is_gdpr_heading(m):
+        if is_heading(m):
             flush_article()
             en, zh = _split_bilingual(m.group(2))
             heading = f"{en} / {zh}" if zh else en
@@ -263,7 +271,7 @@ def _parse_gdpr_bilingual(text: str) -> list[ParsedUnit]:
             section = None
             continue
         m = _RE_GDPR_SECTION.match(line)
-        if _is_gdpr_heading(m):
+        if is_heading(m):
             flush_article()
             en, zh = _split_bilingual(m.group(2))
             heading = f"{en} / {zh}" if zh else en
@@ -273,7 +281,7 @@ def _parse_gdpr_bilingual(text: str) -> list[ParsedUnit]:
             units.append(section)
             continue
         m = _RE_GDPR_ARTICLE.match(line)
-        if _is_gdpr_heading(m):
+        if is_heading(m):
             flush_article()
             en, zh = _split_bilingual(m.group(2))
             heading = f"{en} / {zh}" if zh else en

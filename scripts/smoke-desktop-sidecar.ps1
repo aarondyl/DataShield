@@ -6,6 +6,8 @@ $env:LOCAL_DATA_DIR = $dataDirectory
 $env:RUNTIME_MODE = 'local'
 $env:RUN_SEED = 'false'
 $env:DATASHIELD_SIDECAR_DIAGNOSTICS = '1'
+$previousToken = $env:RUNTIME_TOKEN
+$env:RUNTIME_TOKEN = 'smoke-inherited-token-must-not-be-used'
 $process = Start-Process -FilePath (Resolve-Path $Executable) -PassThru
 try {
   $descriptorPath = Join-Path $dataDirectory 'runtime.json'
@@ -15,6 +17,7 @@ try {
     if (Test-Path $descriptorPath) {
       $descriptor = Get-Content $descriptorPath -Raw | ConvertFrom-Json
       if ($descriptor.pid -ne $process.Id) { throw 'Runtime PID mismatch' }
+      if ($descriptor.runtime_token -eq $env:RUNTIME_TOKEN) { throw 'Runtime reused an inherited token' }
       if ($descriptor.base_url -notmatch '^http://127\.0\.0\.1:[0-9]+$') { throw 'Runtime must use dynamic loopback' }
       try {
         $health = Invoke-RestMethod ($descriptor.base_url + '/api/health') -TimeoutSec 2
@@ -40,4 +43,5 @@ try {
   if (-not $process.HasExited) { Stop-Process -Id $process.Id; $process.WaitForExit() }
   Remove-Item Env:LOCAL_DATA_DIR
   Remove-Item Env:DATASHIELD_SIDECAR_DIAGNOSTICS
+  if ($null -eq $previousToken) { Remove-Item Env:RUNTIME_TOKEN } else { $env:RUNTIME_TOKEN = $previousToken }
 }

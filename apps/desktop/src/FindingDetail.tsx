@@ -20,6 +20,7 @@ export function FindingDetail({ copy, detail }: { copy: Copy; detail: FindingDet
     <p>{c.runRef}: #{detail.agent_run.id}</p>{detail.agent_run.model_provider === 'mock' && <p role="note">{c.mock}</p>}
     <p>{c.twin}: {detail.product_twin_version ? `v${detail.product_twin_version.version_number ?? '—'} (#${detail.product_twin_version.id})` : c.unavailable}</p>
     <h3>{c.applicability}</h3><p>{detail.finding.applicability_summary || c.unavailable}</p><h3>{c.gap}</h3><p>{detail.finding.gap_summary || c.unavailable}</p>
+    <p>{c.sourceBoundary}</p>
     <h3>{c.requirements}</h3>{detail.requirements.length ? detail.requirements.map(r => <section key={r.id}><h4>#{r.id} · {r.regulation_name}</h4><p>{r.summary}</p><p>{c.regulationVersion}: {r.regulation_version ?? '—'} (#{r.version_id}) · {c.legalUnit}: #{r.legal_unit_id ?? '—'}</p>{source(r.source_url)}</section>) : <p>{c.noEvidence}</p>}
     <h3>{c.evidence}</h3>{evidence.length ? evidence.map(e => <section key={e.key}><h4>{e.regulation_name} · {e.article} · {e.heading}</h4><p>{c.regulationVersion}: {e.version} (#{e.version_id}) · {c.legalUnit}: #{e.legal_unit_id}</p><p>{c.requirements}: {(e.requirement_ids ?? []).map(id => `#${id}`).join(', ')}</p><p>{e.content}</p>{source(e.source_url)}</section>) : <p>{c.noEvidence}</p>}
   </article>;

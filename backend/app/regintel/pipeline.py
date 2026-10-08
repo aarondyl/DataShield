@@ -371,6 +371,9 @@ def _run_pipeline(
     articles = article_units(units)
     if not articles:
         raise ValueError("未能从文本中解析出任何法律条款")
+    article_keys = [article_key(article.unit_number) for article in articles]
+    if len(article_keys) != len(set(article_keys)):
+        raise ValueError("解析出重复法律条号，须复核官方文本与解析器，未发布法规事件")
 
     version = RegulationVersion(
         regulation_id=regulation.id,

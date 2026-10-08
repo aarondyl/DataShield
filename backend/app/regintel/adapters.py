@@ -95,12 +95,14 @@ class HttpTextAdapter(SourceAdapter):
         return RawDocument(content=resp.text, origin_url=url, content_type="text/html")
 
     def extract_content(self, raw: RawDocument) -> str:
+        import html
         import re
 
         text = raw.content
         if raw.content_type == "text/html":
             text = re.sub(r"(?s)<(script|style).*?</\1>", " ", text)
             text = re.sub(r"<[^>]+>", "\n", text)
+            text = html.unescape(text).replace("\xa0", " ")
         return normalize_text(text)
 
 
