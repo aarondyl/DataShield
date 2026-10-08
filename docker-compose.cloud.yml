@@ -24,6 +24,10 @@ services:
     # 故意不发布宿主机端口：生产数据库只能由 cloud 服务访问。
 
   cloud:
+    # Production must set CLOUD_IMAGE to a registry digest, for example
+    # registry.example/datashield-cloud@sha256:... and use `up --no-build`.
+    # The local default keeps the Compose file usable for non-production tests.
+    image: ${CLOUD_IMAGE:-datashield-cloud:local}
     build:
       context: .
       dockerfile: backend/Dockerfile.cloud
