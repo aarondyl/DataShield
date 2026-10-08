@@ -1,0 +1,31 @@
+{
+  "tested_at_utc": "2026-10-08T18:26:08.014224+00:00",
+  "source_commit": "79d1c513203dccb1a8d5d9cd3d7f15d83106c524",
+  "environment": "隔离本机 Compose，loopback，非生产",
+  "cloud_image_digest": "sha256:518f906e58b19df5ab092842332d02b8d08f0cc3c2ff616ccd119ea6d707a38c",
+  "health": {
+    "status": "ok",
+    "db": "postgresql",
+    "llm_provider": "mock",
+    "embedding_provider": "local"
+  },
+  "api_version": "1.0",
+  "incompatible_version_status": 426,
+  "private_route_status": 404,
+  "unauthorized_operator_status": 401,
+  "initial_import_event": "evt_000001",
+  "article_count": 113,
+  "requirement_count": 578,
+  "chunk_count": 512,
+  "unchanged_retry": "NO_CHANGE",
+  "restore_drill": {
+    "status": "PASS",
+    "migration_revision": "c0001",
+    "article_count": 113,
+    "requirement_count": 578,
+    "event_count": 1,
+    "normalized_sha256": "19439df728ce7bc3eafc74f645a1d3bdb0965429272f72a0bfdc3dea20c99dc8"
+  },
+  "corpus_classification": "官方原始文档已获取；现行版本和人工法律核验未完成",
+  "real_https_acceptance": "NOT_RUN"
+}
