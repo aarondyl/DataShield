@@ -5,8 +5,9 @@ ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 RUNTIM
 
 COPY backend/requirements.txt .
 RUN pip install -r requirements.txt
+# 构建上下文由 .dockerignore 排除凭证、测试、虚拟环境和桌面构建产物。
 COPY backend/ .
 
 EXPOSE 8000
 # 云端镜像只暴露公共法规 API；不复制 React 产物，也不载入私有业务路由。
-CMD ["sh", "-c", "alembic upgrade head && exec python -m app.entrypoints.cloud"]
+CMD ["sh", "-c", "alembic -c alembic-cloud.ini upgrade head && exec python -m app.entrypoints.cloud"]
