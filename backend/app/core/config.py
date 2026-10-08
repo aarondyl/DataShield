@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     local_data_dir: str = ""
     app_name: str = "DataShield API"
     database_url: str = _DEFAULT_DATABASE_URL
+    database_url_file: str = ""
     llm_api_key: str = ""
     llm_base_url: str = "https://api.deepseek.com/v1"
     llm_model: str = "deepseek-chat"
@@ -50,6 +51,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     def model_post_init(self, __context) -> None:
+        # 容器部署从 Docker/Kubernetes Secret 文件读取连接串，避免把密码写入
+        # Compose 环境、镜像层或命令行日志。显式 DATABASE_URL 仍用于开发和 CI。
+        if self.database_url_file:
+            self.database_url = Path(self.database_url_file).read_text(encoding="utf-8").strip()
         if self.runtime_mode == "local":
             self.local_data_dir = self.local_data_dir or default_local_data_dir()
             if "DATABASE_URL" not in os.environ:
