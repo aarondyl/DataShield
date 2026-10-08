@@ -46,7 +46,30 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         scheduler.shutdown(wait=False)
 
 
-app = FastAPI(title="DataShield API", version="3.0.0", lifespan=lifespan)
+def create_app() -> FastAPI:
+    """按运行模式装载路由；云端法规进程不暴露私有业务 API。"""
+    app = FastAPI(title="DataShield API", version="3.0.0", lifespan=lifespan)
+    mode = get_settings().runtime_mode
+    app.include_router(health.router, prefix="/api")
+    if mode == "cloud":
+        app.include_router(regintel.router, prefix="/api")
+        return app
+    for module in (companies, products, regulations, analysis, actions, compliance, developer):
+        app.include_router(module.router, prefix="/api")
+    if mode == "web":
+        app.include_router(regintel.router, prefix="/api")
+    for module in (evaluation, tenant_agent, findings, remediations, feedback, today, ui_understanding):
+        app.include_router(module.router, prefix="/api")
+    app.include_router(website_understanding.router)
+    app.include_router(website_understanding.router, prefix="/api", include_in_schema=False)
+    app.include_router(repository_understanding.router)
+    app.include_router(repository_understanding.router, prefix="/api", include_in_schema=False)
+    app.include_router(product_twin.router)
+    app.include_router(product_twin.router, prefix="/api", include_in_schema=False)
+    return app
+
+
+app = create_app()
 
 _LEGACY_TENANT_PREFIXES = (
     "/api/companies", "/api/products", "/api/analysis", "/api/actions",
@@ -81,23 +104,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (health, companies, products, regulations, regintel, analysis, actions, compliance, developer):
-    app.include_router(module.router, prefix="/api")
-
-for module in (evaluation, tenant_agent, findings, remediations, feedback, today, ui_understanding):
-    app.include_router(module.router, prefix="/api")
-
-app.include_router(website_understanding.router)
-app.include_router(website_understanding.router, prefix="/api", include_in_schema=False)
-app.include_router(repository_understanding.router)
-app.include_router(repository_understanding.router, prefix="/api", include_in_schema=False)
-app.include_router(product_twin.router)
-app.include_router(product_twin.router, prefix="/api", include_in_schema=False)
+# 路由由 create_app 按模式装载。
 
 # The production image serves the compiled React frontend from the same origin.
 # During development Vite runs separately and proxies /api to this service.
 static_dir = Path(__file__).resolve().parents[1] / "static"
-if static_dir.exists():
+if get_settings().runtime_mode == "web" and static_dir.exists():
     assets_dir = static_dir / "assets"
     if assets_dir.exists():
         app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")

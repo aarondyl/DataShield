@@ -2,6 +2,8 @@
 
 from functools import lru_cache
 import os
+from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -11,7 +13,20 @@ _DEFAULT_DATABASE_URL = (
 )
 
 
+def default_local_data_dir() -> str:
+    """返回本地模式唯一可写根目录，不依赖安装目录或当前目录。"""
+    if os.name == "nt":
+        base = Path(os.getenv("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+    elif sys_platform := os.getenv("XDG_DATA_HOME"):
+        base = Path(sys_platform)
+    else:
+        base = Path.home() / ".local" / "share"
+    return str(base / "DataShield")
+
+
 class Settings(BaseSettings):
+    runtime_mode: Literal["web", "cloud", "local"] = "web"
+    local_data_dir: str = ""
     app_name: str = "DataShield API"
     database_url: str = _DEFAULT_DATABASE_URL
     llm_api_key: str = ""
@@ -32,6 +47,15 @@ class Settings(BaseSettings):
     evaluation_auth_bypass: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    def model_post_init(self, __context) -> None:
+        if self.runtime_mode == "local":
+            self.local_data_dir = self.local_data_dir or default_local_data_dir()
+            if "DATABASE_URL" not in os.environ:
+                self.database_url = f"sqlite:///{(Path(self.local_data_dir) / 'datashield.db').as_posix()}"
+            self.llm_provider = "mock"
+            self.embedding_provider = "local"
+            self.scheduler_enabled = False
 
 
 @lru_cache
