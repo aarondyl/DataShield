@@ -10,6 +10,11 @@ on:
       - 'backend/requirements*.txt'
       - '.github/workflows/desktop-windows.yml'
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      source_ref:
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -20,6 +25,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_ref || github.sha }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -47,8 +54,19 @@ jobs:
         run: npm --prefix apps/desktop ci
       - name: 验证 Desktop 业务交互与中英文词条
         run: npm --prefix apps/desktop test -- --maxWorkers=1
+      - name: 验证 Rust Bridge 安全边界
+        run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
       - name: 构建 NSIS 当前用户安装包
         run: npm --prefix apps/desktop run tauri -- build
+      - name: 生成安装包校验值及来源记录
+        shell: pwsh
+        run: |
+          $directory = 'apps/desktop/src-tauri/target/release/bundle/nsis'
+          Get-ChildItem $directory -Filter '*.exe' | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)" | Set-Content (Join-Path $directory ($_.Name + '.sha256')) -Encoding utf8
+          }
+          git rev-parse HEAD | Set-Content (Join-Path $directory 'SOURCE_COMMIT.txt') -Encoding utf8
       - name: 上传 Windows 安装产物
         uses: actions/upload-artifact@v4
         with:
@@ -57,3 +75,5 @@ jobs:
           path: |
             apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
             apps/desktop/src-tauri/target/release/bundle/nsis/*.nsis.zip
+            apps/desktop/src-tauri/target/release/bundle/nsis/*.sha256
+            apps/desktop/src-tauri/target/release/bundle/nsis/SOURCE_COMMIT.txt

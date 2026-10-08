@@ -7,6 +7,9 @@ import { RemediationPage } from './RemediationPage';
 import { FeedbackPanel } from './FeedbackPanel';
 import { TodayPage } from './TodayPage';
 import { UnderstandingPage } from './UnderstandingPage';
+import { FindingDetail, type FindingDetailData } from './FindingDetail';
+import { TwinPage } from './TwinPage';
+import { CloudSettings } from './CloudSettings';
 
 type Screen = 'welcome' | 'workspace' | 'intake' | 'today' | 'monitor' | 'findings' | 'actions' | 'twin' | 'settings';
 type WorkspaceRef = { companyId: number; productId: number };
@@ -84,31 +87,20 @@ function App() {
 }
 
 function ProductIntake({ copy, workspace, onDone }: { copy: ReturnType<typeof useLocale>['copy']; workspace: WorkspaceRef; onDone: () => void }) {
+  const [group, setGroup] = useState('features'); const [factStatus, setFactStatus] = useState('PRESENT');
   const [fact, setFact] = useState(''); const [saving, setSaving] = useState(false); const [error, setError] = useState(false);
   const submit = async (event: FormEvent) => {
     event.preventDefault(); setSaving(true); setError(false);
     try {
       await localApiRequest(`/api/v1/ui/understanding/products/${workspace.productId}/twin/facts`, 'POST', {
-        company_id: workspace.companyId, group: 'features', fact: { name: fact, status: 'PRESENT', confidence: 0.8 }, note: 'Desktop onboarding',
+        company_id: workspace.companyId, group, fact: { name: fact, status: factStatus, confidence: 0.8 }, note: 'Desktop user-confirmed fact',
       });
       onDone();
     } catch { setError(true); } finally { setSaving(false); }
   };
-  return <section className="page business-page"><p className="eyebrow">{copy.intake.eyebrow}</p><h1>{copy.intake.title}</h1><p>{copy.intake.body}</p><form className="workspace-form" onSubmit={submit}><label>{copy.intake.fact}<input value={fact} required onChange={e => setFact(e.target.value)} placeholder={copy.intake.placeholder} /></label>{error && <p className="form-error">{copy.intake.error}</p>}<button className="primary" disabled={saving}>{saving ? copy.intake.saving : copy.intake.continue}</button></form><UnderstandingPage copy={copy} workspace={workspace} onDone={onDone} /></section>;
+  return <section className="page business-page"><p className="eyebrow">{copy.intake.eyebrow}</p><h1>{copy.intake.title}</h1><p>{copy.intake.body}</p><form className="workspace-form" onSubmit={submit}><label>{copy.twin.title}<select value={group} onChange={e => setGroup(e.target.value)}>{Object.entries(copy.twin.groups).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label><label>{copy.intake.fact}<input value={fact} required onChange={e => setFact(e.target.value)} placeholder={copy.intake.placeholder} /></label><label>{copy.twin.title}<select value={factStatus} onChange={e => setFactStatus(e.target.value)}>{Object.entries(copy.twin.states).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>{error && <p className="form-error">{copy.intake.error}</p>}<button className="primary" disabled={saving}>{saving ? copy.intake.saving : copy.intake.continue}</button></form><UnderstandingPage copy={copy} workspace={workspace} onDone={onDone} /></section>;
 }
 
-function TwinPage({ copy, workspace, onIntake }: { copy: ReturnType<typeof useLocale>['copy']; workspace: WorkspaceRef | null; onIntake: () => void }) {
-  const [facts, setFacts] = useState<Array<{ id: number; group: string; name: string; status: string }>>([]);
-  const [loaded, setLoaded] = useState(false);
-  useEffect(() => {
-    if (!workspace) return;
-    void localApiRequest<{ facts?: Array<{ id: number; group: string; name: string; status: string }> }>(`/api/v1/ui/understanding/products/${workspace.productId}/twin?company_id=${workspace.companyId}`)
-      .then(value => setFacts(value.facts ?? [])).finally(() => setLoaded(true));
-  }, [workspace]);
-  if (!workspace) return <EmptyPage copy={copy} screen="twin" />;
-  const intakeButton = <button className="primary" onClick={onIntake}>{copy.understanding.title}</button>;
-  return <section className="page empty"><h1>{copy.twin.title}</h1>{intakeButton}{!loaded ? <div className="empty-card"><p>{copy.twin.loading}</p></div> : facts.length === 0 ? <div className="empty-card"><p>{copy.twin.empty}</p></div> : <div className="settings-list">{facts.map(fact => <div key={fact.id}><strong>{fact.name}</strong><span>{fact.group} · {fact.status}</span></div>)}</div>}</section>;
-}
 
 function MonitorPage({ copy }: { copy: ReturnType<typeof useLocale>['copy'] }) {
   const [state, setState] = useState<{ scope: string; using_local_cache: boolean; last_success_at: string; last_error: string } | null>(null);
@@ -126,7 +118,7 @@ function MonitorPage({ copy }: { copy: ReturnType<typeof useLocale>['copy'] }) {
 function FindingsPage({ copy, workspace, initialFinding, onRemediate }: { copy: ReturnType<typeof useLocale>['copy']; workspace: WorkspaceRef | null; initialFinding: number | null; onRemediate: (id: number) => void }) {
   const [findings, setFindings] = useState<Array<{ id: number; title: string; impact_level: string; status: string; requirement_count: number; evidence_count: number; product_twin_version_id?: number }>>([]);
   const [message, setMessage] = useState(''); const [running, setRunning] = useState(false);
-  const [detail, setDetail] = useState<{ finding: { id: number; status: string; title: string; applicability_summary: string; gap_summary: string; product_twin_version_id?: number; created_at: string }; requirements: Array<{ summary: string; regulation_name?: string; version_id?: number }>; legal_evidence: Array<{ regulation_name: string; article: string; heading: string; source_url: string }>; agent_run: { id: number; created_at: string } } | null>(null);
+  const [detail, setDetail] = useState<FindingDetailData | null>(null);
   useEffect(() => { if (workspace && initialFinding) void localApiRequest<typeof detail>(`/api/v1/findings/${initialFinding}?tenant_id=${workspace.companyId}`).then(setDetail).catch(() => setMessage(copy.findings.loadError)); }, [workspace, initialFinding]);
   const load = async () => { if (!workspace) return; try { setFindings(await localApiRequest<typeof findings>(`/api/v1/findings?tenant_id=${workspace.companyId}&product_id=${workspace.productId}`)); } catch { setMessage(copy.findings.loadError); } };
   useEffect(() => { void load(); }, [workspace]);
@@ -135,7 +127,7 @@ function FindingsPage({ copy, workspace, initialFinding, onRemediate }: { copy: 
   const open = async (id: number) => { try { setDetail(await localApiRequest<typeof detail>(`/api/v1/findings/${id}?tenant_id=${workspace.companyId}`)); } catch { setMessage(copy.findings.loadError); } };
   const remediationButton = detail?.finding.status === 'OPEN' ? <button className="primary" onClick={() => onRemediate(detail.finding.id)}>{copy.actions.create}</button> : null;
   const feedbackPanel = detail ? <FeedbackPanel key={detail.finding.id} copy={copy} workspace={workspace} findingId={detail.finding.id} /> : null;
-  return <section className="page"><h1>{copy.findings.title}</h1>{remediationButton}<p>{copy.findings.body}</p><button className="primary" disabled={running} onClick={() => void run()}>{running ? copy.findings.running : copy.findings.run}</button>{message && <p className="form-error">{message}</p>}<div className="settings-list">{findings.length ? findings.map(item => <div key={item.id}><button className="quiet" onClick={() => void open(item.id)}>{item.title}</button><span>{item.impact_level} · {item.status} · {copy.findings.requirements}: {item.requirement_count} · {copy.findings.evidence}: {item.evidence_count} · {copy.findings.twin}: v{item.product_twin_version_id ?? '—'}</span></div>) : <div><span>{copy.findings.empty}</span></div>}</div>{detail && <div className="settings-list"><div><strong>{copy.findings.applicability}</strong><span>{detail.finding.applicability_summary}</span></div><div><strong>{copy.findings.gap}</strong><span>{detail.finding.gap_summary}</span></div><div><strong>{copy.findings.runRef}</strong><span>#{detail.agent_run.id} · {detail.agent_run.created_at}</span></div><div><strong>{copy.findings.requirements}</strong><span>{detail.requirements.map(item => `${item.regulation_name || ''} ${item.summary}`).join('；') || copy.findings.noEvidence}</span></div><div><strong>{copy.findings.evidence}</strong><span>{detail.legal_evidence.map(item => `${item.regulation_name} ${item.article} ${item.heading} ${item.source_url}`).join('；') || copy.findings.noEvidence}</span></div></div>}{feedbackPanel}</section>;
+  return <section className="page"><h1>{copy.findings.title}</h1>{remediationButton}<p>{copy.findings.body}</p><button className="primary" disabled={running} onClick={() => void run()}>{running ? copy.findings.running : copy.findings.run}</button>{message && <p className="form-error">{message}</p>}<div className="settings-list">{findings.length ? findings.map(item => <div key={item.id}><button className="quiet" onClick={() => void open(item.id)}>{item.title}</button><span>{copy.findings.risks[item.impact_level as keyof typeof copy.findings.risks] ?? item.impact_level} · {copy.findings.states[item.status as keyof typeof copy.findings.states] ?? item.status} · {copy.findings.requirements}: {item.requirement_count} · {copy.findings.evidence}: {item.evidence_count} · {copy.findings.twin}: v{item.product_twin_version_id ?? '—'}</span></div>) : <div><span>{copy.findings.empty}</span></div>}</div>{detail && <FindingDetail copy={copy} detail={detail} />}{feedbackPanel}</section>;
 }
 
 function Welcome({ copy, onCreate }: { copy: ReturnType<typeof useLocale>['copy']; onCreate: () => void }) {
@@ -156,7 +148,7 @@ function EmptyPage({ copy, screen }: { copy: ReturnType<typeof useLocale>['copy'
 }
 
 function Settings({ copy }: { copy: ReturnType<typeof useLocale>['copy'] }) {
-  return <section className="page"><h1>{copy.settings.title}</h1><div className="settings-list"><div><strong>{copy.settings.ai}</strong><span>DESKTOP_AI_MODE</span></div><div><strong>{copy.settings.privacy}</strong><span>Local SQLite · Local FastAPI</span></div><div><strong>{copy.settings.update}</strong><span>Tauri updater（后续阶段）</span></div></div></section>;
+  return <section className="page"><h1>{copy.settings.title}</h1><CloudSettings copy={copy} /><div className="settings-list"><div><strong>{copy.settings.ai}</strong><span>{copy.settings.aiBoundary}</span></div><div><strong>{copy.settings.privacy}</strong><span>{copy.settings.privacyBody}</span></div><div><strong>{copy.settings.update}</strong><span>{copy.settings.updateBody}</span></div></div></section>;
 }
 
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);

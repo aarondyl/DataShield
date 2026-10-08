@@ -5,6 +5,7 @@ New-Item -ItemType Directory $dataDirectory | Out-Null
 $env:LOCAL_DATA_DIR = $dataDirectory
 $env:RUNTIME_MODE = 'local'
 $env:RUN_SEED = 'false'
+$env:DATASHIELD_SIDECAR_DIAGNOSTICS = '1'
 $process = Start-Process -FilePath (Resolve-Path $Executable) -PassThru
 try {
   $descriptorPath = Join-Path $dataDirectory 'runtime.json'
@@ -31,7 +32,12 @@ try {
   if (-not $denied) { throw 'Private API accepted a request without runtime token' }
   Invoke-RestMethod ($descriptor.base_url + '/api/v1/companies') -Headers @{'X-Runtime-Token'=$descriptor.runtime_token} -TimeoutSec 5 | Out-Null
   Write-Host 'Packaged sidecar readiness, PID, loopback and runtime authorization passed'
+} catch {
+  $logFile = Join-Path $dataDirectory 'sidecar-startup.log'
+  if (Test-Path $logFile) { Get-Content $logFile -Tail 60 | Write-Host }
+  throw
 } finally {
   if (-not $process.HasExited) { Stop-Process -Id $process.Id; $process.WaitForExit() }
   Remove-Item Env:LOCAL_DATA_DIR
+  Remove-Item Env:DATASHIELD_SIDECAR_DIAGNOSTICS
 }

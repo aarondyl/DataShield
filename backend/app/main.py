@@ -95,7 +95,9 @@ def create_app() -> FastAPI:
     if mode == "web":
         from app.api import regintel
         app.include_router(regintel.router, prefix="/api")
-    for module in (evaluation, tenant_agent, findings, remediations, feedback, today, ui_understanding, local_regulations):
+    if mode == "local":
+        app.include_router(local_regulations.router, prefix="/api")
+    for module in (evaluation, tenant_agent, findings, remediations, feedback, today, ui_understanding):
         app.include_router(module.router, prefix="/api")
     from app.api import product_twin, repository_understanding, website_understanding
     app.include_router(website_understanding.router)

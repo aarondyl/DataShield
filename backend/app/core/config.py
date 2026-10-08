@@ -3,6 +3,7 @@
 from functools import lru_cache
 import os
 from pathlib import Path
+import json
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -69,6 +70,14 @@ class Settings(BaseSettings):
             self.cloud_admin_token = Path(self.cloud_admin_token_file).read_text(encoding="utf-8").strip()
         if self.runtime_mode == "local":
             self.local_data_dir = self.local_data_dir or default_local_data_dir()
+            public_config = Path(self.local_data_dir) / "cloud-endpoint.json"
+            if not self.cloud_regintel_base_url and public_config.exists():
+                try:
+                    value = json.loads(public_config.read_text(encoding="utf-8")).get("base_url", "")
+                    if isinstance(value, str) and value.startswith("https://"):
+                        self.cloud_regintel_base_url = value
+                except (OSError, ValueError):
+                    pass
             if "DATABASE_URL" not in os.environ:
                 self.database_url = f"sqlite:///{(Path(self.local_data_dir) / 'datashield.db').as_posix()}"
             # Desktop 默认保持可重复的离线 mock；只有该显式模式才覆盖 provider。

@@ -28,7 +28,11 @@ class CloudSyncClient:
             except ConnectionError:
                 self.cache.mark_offline(scope); raise
             page["cursor"]=cursor
-            bundles=[self.get_json(f"/api/v1/sync/events/{e['event_id']}/bundle",{}) for e in page["events"]]
+            try:
+                bundles=[self.get_json(f"/api/v1/sync/events/{e['event_id']}/bundle",{}) for e in page["events"]]
+            except ConnectionError:
+                self.cache.mark_offline(scope)
+                raise
             self._commit_page(page, bundles, scope); cursor=page["next_cursor"]
             if not page["has_more"]:
                 from app.local_regulations.tasks import run_pending
