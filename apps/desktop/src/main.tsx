@@ -4,7 +4,16 @@ import { getRuntimeHealth, localApiRequest } from './local-api';
 import { type Locale, useLocale } from './i18n';
 import './styles.css';
 
-type Screen = 'welcome' | 'workspace' | 'today' | 'monitor' | 'findings' | 'actions' | 'twin' | 'settings';
+type Screen = 'welcome' | 'workspace' | 'intake' | 'today' | 'monitor' | 'findings' | 'actions' | 'twin' | 'settings';
+type WorkspaceRef = { companyId: number; productId: number };
+const workspaceKey = 'datashield.desktop.workspace';
+
+function savedWorkspace(): WorkspaceRef | null {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(workspaceKey) ?? 'null');
+    return Number.isInteger(value?.companyId) && Number.isInteger(value?.productId) ? value : null;
+  } catch { return null; }
+}
 
 function App() {
   const { locale, setLocale, copy } = useLocale();
@@ -12,6 +21,7 @@ function App() {
   const [runtime, setRuntime] = useState<'checking' | 'connected' | 'offline'>('checking');
   const [workspaceKind, setWorkspaceKind] = useState<'developer' | 'enterprise'>('developer');
   const [workspaceError, setWorkspaceError] = useState(false);
+  const [workspace, setWorkspace] = useState<WorkspaceRef | null>(savedWorkspace);
 
   const checkRuntime = async () => {
     setRuntime('checking');
@@ -33,8 +43,10 @@ function App() {
     try {
       const company = await localApiRequest<{ id: number }>('/api/companies', 'POST', { name: companyName });
       const product = await localApiRequest<{ id: number }>('/api/products', 'POST', { company_id: company.id, name: productName, description });
-      window.localStorage.setItem('datashield.desktop.workspace', JSON.stringify({ companyId: company.id, productId: product.id }));
-      setScreen('twin');
+      const next = { companyId: company.id, productId: product.id };
+      window.localStorage.setItem(workspaceKey, JSON.stringify(next));
+      setWorkspace(next);
+      setScreen('intake');
     } catch { setWorkspaceError(true); }
   };
 
@@ -53,10 +65,26 @@ function App() {
       </div></header>
       {screen === 'welcome' && <Welcome copy={copy} onCreate={() => setScreen('workspace')} />}
       {screen === 'workspace' && <Workspace copy={copy} kind={workspaceKind} setKind={setWorkspaceKind} error={workspaceError} onContinue={createWorkspace} />}
+      {screen === 'intake' && workspace && <ProductIntake copy={copy} workspace={workspace} onDone={() => setScreen('twin')} />}
+      {screen === 'intake' && !workspace && <EmptyPage copy={copy} screen="twin" />}
       {(['today', 'monitor', 'findings', 'actions', 'twin'] as Screen[]).includes(screen) && <EmptyPage copy={copy} screen={screen as 'today' | 'monitor' | 'findings' | 'actions' | 'twin'} />}
       {screen === 'settings' && <Settings copy={copy} />}
     </section>
   </main>;
+}
+
+function ProductIntake({ copy, workspace, onDone }: { copy: ReturnType<typeof useLocale>['copy']; workspace: WorkspaceRef; onDone: () => void }) {
+  const [fact, setFact] = useState(''); const [saving, setSaving] = useState(false); const [error, setError] = useState(false);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault(); setSaving(true); setError(false);
+    try {
+      await localApiRequest(`/api/v1/ui/understanding/products/${workspace.productId}/twin/facts`, 'POST', {
+        company_id: workspace.companyId, group: 'features', fact: { name: fact, status: 'PRESENT', confidence: 0.8 }, note: 'Desktop onboarding',
+      });
+      onDone();
+    } catch { setError(true); } finally { setSaving(false); }
+  };
+  return <section className="page"><p className="eyebrow">{copy.intake.eyebrow}</p><h1>{copy.intake.title}</h1><p>{copy.intake.body}</p><form className="workspace-form" onSubmit={submit}><label>{copy.intake.fact}<input value={fact} required onChange={e => setFact(e.target.value)} placeholder={copy.intake.placeholder} /></label>{error && <p className="form-error">{copy.intake.error}</p>}<button className="primary" disabled={saving}>{saving ? copy.intake.saving : copy.intake.continue}</button></form></section>;
 }
 
 function Welcome({ copy, onCreate }: { copy: ReturnType<typeof useLocale>['copy']; onCreate: () => void }) {
