@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: datashield_cloud
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?必须通过部署平台 Secret 注入 POSTGRES_PASSWORD}
+      POSTGRES_DB: datashield_cloud
+    volumes:
+      - cloud_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U datashield_cloud -d datashield_cloud"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks: [cloud_internal]
+    # 故意不发布宿主机端口：生产数据库只能由 cloud 服务访问。
+
+  cloud:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.cloud
+    environment:
+      DATABASE_URL: postgresql+psycopg://datashield_cloud:${POSTGRES_PASSWORD}@postgres:5432/datashield_cloud
+      RUNTIME_MODE: cloud
+      RUN_SEED: "false"
+      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-false}
+    ports:
+      - "${CLOUD_BIND_ADDRESS:-127.0.0.1}:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; assert urlopen('http://127.0.0.1:8000/api/health').status == 200"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks: [cloud_internal]
+
+networks:
+  cloud_internal:
+    internal: true
+
+volumes:
+  cloud_postgres_data:
