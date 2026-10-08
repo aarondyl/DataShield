@@ -18,11 +18,15 @@ class CloudSyncClient:
             except Exception as exc: last=exc; time.sleep(min(.1*(2**n),1))
         raise ConnectionError("法规同步不可用，保留本地缓存") from last
     def sync(self, scope="all", jurisdiction=None):
+        scope = f"{scope}:jurisdiction={jurisdiction or '*'}"
         cursor,snapshot,_=self.cache.progress(scope); params={"cursor":cursor,"limit":100}
         if snapshot: params["snapshot_cursor"]=snapshot
         if jurisdiction: params["jurisdiction"]=jurisdiction
         while True:
-            page=self.get_json("/api/v1/sync/events",params); page["cursor"]=cursor
+            try: page=self.get_json("/api/v1/sync/events",params)
+            except ConnectionError:
+                self.cache.mark_offline(scope); raise
+            page["cursor"]=cursor
             bundles=[self.get_json(f"/api/v1/sync/events/{e['event_id']}/bundle",{}) for e in page["events"]]
             self.cache.apply(page,bundles,scope); cursor=page["next_cursor"]
             if not page["has_more"]: return cursor

@@ -20,6 +20,9 @@ class LocalRegulationCache:
     def progress(self, scope="all"):
         with self.connect() as db:
             return db.execute("SELECT cursor,snapshot,offline FROM sync_state WHERE scope=?",(scope,)).fetchone() or (0,0,0)
+    def mark_offline(self, scope="all"):
+        with self.connect() as db:
+            db.execute("INSERT INTO sync_state(scope,cursor,snapshot,offline) VALUES (?,0,0,1) ON CONFLICT(scope) DO UPDATE SET offline=1",(scope,))
     def apply(self, page: dict, bundles: list[dict], scope="all"):
         """同一事务写法规、事件和最后页游标；异常时全部回滚。"""
         required={e["event_id"] for e in page["events"]}
@@ -42,4 +45,6 @@ class LocalRegulationCache:
                 for u in b["legal_units"]: db.execute("INSERT OR REPLACE INTO cached_legal_units VALUES (?,?,?)",(u["key"],v["key"],json.dumps(u)))
                 for q in b["requirements"]: db.execute("INSERT OR REPLACE INTO cached_requirements VALUES (?,?,?)",(q["key"],v["key"],json.dumps(q)))
             for e in page["events"]: db.execute("INSERT OR REPLACE INTO cached_events VALUES (?,?,?)",(e["event_id"],e["id"],json.dumps(e)))
-            db.execute("INSERT INTO sync_state(scope,cursor,snapshot,offline) VALUES (?,?,?,0) ON CONFLICT(scope) DO UPDATE SET cursor=excluded.cursor,snapshot=excluded.snapshot,offline=0",(scope,page["next_cursor"],page["snapshot_cursor"]))
+            # 完成时清除快照，下一轮可取得新的上界；未完成时保留以恢复分页。
+            snapshot = page["snapshot_cursor"] if page.get("has_more") else 0
+            db.execute("INSERT INTO sync_state(scope,cursor,snapshot,offline) VALUES (?,?,?,0) ON CONFLICT(scope) DO UPDATE SET cursor=excluded.cursor,snapshot=excluded.snapshot,offline=0",(scope,page["next_cursor"],snapshot))
