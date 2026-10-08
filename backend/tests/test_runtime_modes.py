@@ -11,6 +11,7 @@ def test_local_mode_defaults_to_offline_mock_processing(monkeypatch, tmp_path):
         assert settings.database_url.endswith("datashield.db")
         assert settings.local_regulation_cache_path == tmp_path / "datashield.db"
         assert settings.llm_provider == "mock" and settings.embedding_provider == "local"
+        assert settings.legacy_tenant_api_enabled is True
         assert settings.scheduler_enabled is False
     finally: get_settings.cache_clear()
 

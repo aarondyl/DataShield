@@ -1,6 +1,6 @@
-import { StrictMode, useEffect, useState } from 'react';
+import { FormEvent, StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { getRuntimeHealth } from './local-api';
+import { getRuntimeHealth, localApiRequest } from './local-api';
 import { type Locale, useLocale } from './i18n';
 import './styles.css';
 
@@ -11,6 +11,7 @@ function App() {
   const [screen, setScreen] = useState<Screen>('welcome');
   const [runtime, setRuntime] = useState<'checking' | 'connected' | 'offline'>('checking');
   const [workspaceKind, setWorkspaceKind] = useState<'developer' | 'enterprise'>('developer');
+  const [workspaceError, setWorkspaceError] = useState(false);
 
   const checkRuntime = async () => {
     setRuntime('checking');
@@ -27,6 +28,16 @@ function App() {
   const nav = navScreens.map((key, index) => ({ key, label: copy.nav[index] }));
   const statusText = runtime === 'connected' ? copy.status.connected : runtime === 'checking' ? copy.status.checking : copy.status.offline;
 
+  const createWorkspace = async (companyName: string, productName: string, description: string) => {
+    setWorkspaceError(false);
+    try {
+      const company = await localApiRequest<{ id: number }>('/api/companies', 'POST', { name: companyName });
+      const product = await localApiRequest<{ id: number }>('/api/products', 'POST', { company_id: company.id, name: productName, description });
+      window.localStorage.setItem('datashield.desktop.workspace', JSON.stringify({ companyId: company.id, productId: product.id }));
+      setScreen('twin');
+    } catch { setWorkspaceError(true); }
+  };
+
   return <main className="app-shell">
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">D</span><span>{copy.productName}</span></div>
@@ -41,7 +52,7 @@ function App() {
         {(['zh-CN', 'en-US'] as Locale[]).map(value => <button key={value} className={locale === value ? 'selected' : ''} onClick={() => setLocale(value)}>{value === 'zh-CN' ? copy.labels.chinese : copy.labels.english}</button>)}
       </div></header>
       {screen === 'welcome' && <Welcome copy={copy} onCreate={() => setScreen('workspace')} />}
-      {screen === 'workspace' && <Workspace copy={copy} kind={workspaceKind} setKind={setWorkspaceKind} onContinue={() => setScreen('twin')} />}
+      {screen === 'workspace' && <Workspace copy={copy} kind={workspaceKind} setKind={setWorkspaceKind} error={workspaceError} onContinue={createWorkspace} />}
       {(['today', 'monitor', 'findings', 'actions', 'twin'] as Screen[]).includes(screen) && <EmptyPage copy={copy} screen={screen as 'today' | 'monitor' | 'findings' | 'actions' | 'twin'} />}
       {screen === 'settings' && <Settings copy={copy} />}
     </section>
@@ -52,10 +63,12 @@ function Welcome({ copy, onCreate }: { copy: ReturnType<typeof useLocale>['copy'
   return <section className="hero"><p className="eyebrow">{copy.welcome.eyebrow}</p><h1>{copy.welcome.title}</h1><p>{copy.welcome.body}</p><div className="buttons"><button className="primary" onClick={onCreate}>{copy.welcome.create}</button><button className="quiet">{copy.welcome.privacy}</button></div></section>;
 }
 
-function Workspace({ copy, kind, setKind, onContinue }: { copy: ReturnType<typeof useLocale>['copy']; kind: 'developer' | 'enterprise'; setKind: (kind: 'developer' | 'enterprise') => void; onContinue: () => void }) {
+function Workspace({ copy, kind, setKind, error, onContinue }: { copy: ReturnType<typeof useLocale>['copy']; kind: 'developer' | 'enterprise'; setKind: (kind: 'developer' | 'enterprise') => void; error: boolean; onContinue: (company: string, product: string, description: string) => Promise<void> }) {
+  const [company, setCompany] = useState(''); const [product, setProduct] = useState(''); const [description, setDescription] = useState(''); const [submitting, setSubmitting] = useState(false);
+  const submit = async (event: FormEvent) => { event.preventDefault(); setSubmitting(true); await onContinue(company, product, description); setSubmitting(false); };
   return <section className="page"><h1>{copy.workspace.title}</h1><p>{copy.workspace.body}</p><div className="cards">
     {(['developer', 'enterprise'] as const).map(option => <button className={'card ' + (kind === option ? 'chosen' : '')} key={option} onClick={() => setKind(option)}><strong>{copy.workspace[option]}</strong><span>{copy.workspace[`${option}Body`]}</span></button>)}
-  </div><button className="primary" onClick={onContinue}>{copy.workspace.continue}</button></section>;
+  </div><form className="workspace-form" onSubmit={submit}><label>{copy.workspace.workspaceName}<input value={company} required onChange={e => setCompany(e.target.value)} /></label><label>{copy.workspace.productName}<input value={product} required onChange={e => setProduct(e.target.value)} /></label><label>{copy.workspace.description}<textarea value={description} onChange={e => setDescription(e.target.value)} /></label>{error && <p className="form-error">{copy.workspace.createError}</p>}<button className="primary" disabled={submitting}>{submitting ? copy.workspace.creating : copy.workspace.continue}</button></form></section>;
 }
 
 function EmptyPage({ copy, screen }: { copy: ReturnType<typeof useLocale>['copy']; screen: 'today' | 'monitor' | 'findings' | 'actions' | 'twin' }) {
