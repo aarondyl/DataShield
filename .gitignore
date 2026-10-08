@@ -38,3 +38,4 @@ desktop/release/
 deploy/pkg/
 deploy/pkg.bin
 NEXT_TASKS.md
+backend/app/core/bundled_key.py

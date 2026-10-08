@@ -31,9 +31,20 @@ logs_dir = data_dir / "logs"
 logs_dir.mkdir(parents=True, exist_ok=True)
 db_path = data_dir / "datashield.db"
 os.environ["DATABASE_URL"] = f"sqlite:///{db_path.as_posix()}"
-# 桌面版默认离线可跑
+# 桌面版默认离线可跑；打包时若生成了内置 LLM 凭证（deploy/gen_bundled_key.py，
+# 文件被 gitignore 仅存在于构建机），则默认启用真实模型。环境变量始终优先。
 os.environ.setdefault("LLM_PROVIDER", "mock")
 os.environ.setdefault("EMBEDDING_PROVIDER", "local")
+try:
+    from app.core.bundled_key import get_bundled_llm_key
+
+    if not os.environ.get("LLM_API_KEY"):
+        os.environ["LLM_API_KEY"] = get_bundled_llm_key()
+        os.environ["LLM_PROVIDER"] = "api"
+        os.environ.setdefault("LLM_BASE_URL", "https://api.deepseek.com/v1")
+        os.environ.setdefault("LLM_MODEL", "deepseek-flash")
+except ImportError:
+    pass  # 源码仓库内没有内置凭证（该文件不入库），保持 mock 演示模式
 
 # PyInstaller onedir 模式下打包资源在 sys._MEIPASS；源码运行时在 backend/ 目录
 _bundle_root = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
