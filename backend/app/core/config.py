@@ -70,6 +70,10 @@ class Settings(BaseSettings):
             # 这不是 Web 共享预览的匿名开放：所有 /api/*（健康检查除外）仍由
             # enforce_local_runtime_token 验证，且数据只在本机 SQLite。
             self.legacy_tenant_api_enabled = True
+            # Desktop 的 renderer 只能经 Rust bridge 调用受限本地 API；因此本机
+            # 单用户 workspace 不再要求 Web evaluation cookie。它不是共享预览的
+            # 匿名开放，外部进程仍必须持有短期 runtime token。
+            self.evaluation_auth_bypass = True
             self.scheduler_enabled = False
 
     @property

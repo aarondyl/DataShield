@@ -7,6 +7,10 @@ from pathlib import Path
 
 os.environ.setdefault("RUNTIME_MODE", "local")
 os.environ.setdefault("RUNTIME_TOKEN", secrets.token_urlsafe(32))
+# Product-understanding facade uses this per-process secret internally. It is
+# generated only in memory, never packaged, persisted, logged, or exposed to
+# the Desktop renderer.
+os.environ.setdefault("UNDERSTANDING_API_KEY", secrets.token_urlsafe(32))
 from app.core.config import get_settings
 
 settings = get_settings()
