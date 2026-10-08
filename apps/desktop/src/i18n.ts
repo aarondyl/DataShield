@@ -30,7 +30,7 @@ const zh = {
   monitor: { title: '法规动态', empty: '连接 Cloud 法规服务后，最新法规变化会先同步到本地缓存，再由本地智能体评估。' },
   findings: { title: '合规发现', empty: '尚未运行合规检查。法规变化本身不会直接作为合规发现。' },
   actions: { title: '整改事项', empty: '确认合规发现后，整改建议会显示在这里。' },
-  twin: { title: '产品画像', empty: '添加网站、选择代码仓库或手动描述产品后，可在这里确认产品画像。' },
+  twin: { title: '产品画像', empty: '添加网站、选择代码仓库或手动描述产品后，可在这里确认产品画像。', loading: '正在读取本地产品画像…' },
   settings: { title: '设置', language: '语言', ai: 'AI 服务提供方', privacy: '数据与隐私', update: '安装与更新提醒' },
   labels: { chinese: '简体中文', english: 'English', retry: '重新检查', demo: '开发预览' },
 } as const;
@@ -70,7 +70,7 @@ const en: Copy = {
   monitor: { title: 'Monitor', empty: 'After connecting to Cloud RegIntel, changes sync to the local cache before the Local Agent evaluates them.' },
   findings: { title: 'Findings', empty: 'No compliance assessment has run yet. A regulatory change is not itself a finding.' },
   actions: { title: 'Actions', empty: 'Remediation suggestions appear here after you confirm a finding.' },
-  twin: { title: 'Product Twin', empty: 'Add a website, select a code repository, or describe the product to confirm its Product Twin here.' },
+  twin: { title: 'Product Twin', empty: 'Add a website, select a code repository, or describe the product to confirm its Product Twin here.', loading: 'Loading the local Product Twin…' },
   settings: { title: 'Settings', language: 'Language', ai: 'AI provider', privacy: 'Data and privacy', update: 'Install and update notifications' },
   labels: { chinese: '简体中文', english: 'English', retry: 'Check again', demo: 'Development preview' },
 };
