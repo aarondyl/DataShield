@@ -1,4 +1,4 @@
-# DataShield Desktop v0.2.0-rc.1 — Windows 预发布
+# DataShield Desktop v0.2.0-rc.2 — Windows 预发布
 
 ## 本版本包含
 
@@ -24,7 +24,7 @@ Windows 桌面版当前提供本机离线工作区。产品资料、Product Twin
 
 ## English
 
-DataShield Desktop v0.2.0-rc.1 restores the Chinese-first product experience: welcome and edition selection, account entry, three-stage product onboarding, Today, regulation monitoring and library, findings and evidence, remediation and feedback, Product Twin, workspace/product switching, and settings. Simplified Chinese and English are available.
+DataShield Desktop v0.2.0-rc.2 restores the Chinese-first product experience: welcome and edition selection, account entry, three-stage product onboarding, Today, regulation monitoring and library, findings and evidence, remediation and feedback, Product Twin, workspace/product switching, and settings. Simplified Chinese and English are available.
 
 The Windows desktop build currently provides a private local offline workspace. Product details, Product Twin, findings, and evidence are stored in local SQLite. Regulations sync over HTTPS with the configured Cloud RegIntel API. An offline workspace is not a DataShield Cloud account. Cloud identity sign-in, enterprise invitations and role management, Cloud AI Gateway, BYOK, and Ollama configuration are not enabled in this desktop pre-release. Analysis depends on the available local rules and service configuration; deterministic rule output is not a legal conclusion.
 
@@ -36,7 +36,7 @@ The Windows desktop build currently provides a private local offline workspace. 
 
 ### Install and update
 
-Download `DataShield_*_x64-setup.exe` and verify its SHA256 using the accompanying `.sha256` file. Run the installer and follow the prompts. To update, run the newer installer; it replaces application files and preserves the local database in the user data directory. Back up local data before uninstalling.
+During an in-place update, the installer asks Windows to close any DataShield process holding the local sidecar runtime before replacing it. Save work and close DataShield before updating. Download `DataShield_*_x64-setup.exe` and verify its SHA256 using the accompanying `.sha256` file. Run the installer and follow the prompts. To update, run the newer installer; it replaces application files and preserves the local database in the user data directory. Back up local data before uninstalling.
 
 ### First use
 

@@ -71,7 +71,38 @@ jobs:
           $installation = Start-Process -FilePath $installer.FullName -ArgumentList '/S',"/D=$installDirectory" -Wait -PassThru
           if ($installation.ExitCode -ne 0) { throw 'NSIS silent installation failed' }
           if (-not (Test-Path (Join-Path $installDirectory '_internal'))) { throw 'Installed PyInstaller payload is missing' }
-          ./scripts/smoke-desktop-sidecar.ps1 -Executable (Join-Path $installDirectory 'datashield-local.exe')
+          # Keep the installed sidecar alive with its VCRUNTIME DLL loaded, then
+          # update in place. The NSIS preinstall hook must release the file lock.
+          $dataDirectory = Join-Path $env:RUNNER_TEMP 'DataShield-upgrade-data'
+          New-Item -ItemType Directory -Force $dataDirectory | Out-Null
+          $env:LOCAL_DATA_DIR = $dataDirectory
+          $env:RUNTIME_MODE = 'local'
+          $env:RUN_SEED = 'false'
+          $sidecar = Start-Process -FilePath (Join-Path $installDirectory 'datashield-local.exe') -PassThru
+          try {
+            $descriptorPath = Join-Path $dataDirectory 'runtime.json'
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 30; $attempt++) {
+              if ($sidecar.HasExited) { throw 'Installed sidecar exited before upgrade test' }
+              if (Test-Path $descriptorPath) {
+                $descriptor = Get-Content $descriptorPath -Raw | ConvertFrom-Json
+                try { Invoke-RestMethod ($descriptor.base_url + '/api/health') -TimeoutSec 2 | Out-Null; $ready = $true; break } catch { }
+              }
+              Start-Sleep -Seconds 1
+            }
+            if (-not $ready) { throw 'Installed sidecar did not start for upgrade test' }
+            $upgrade = Start-Process -FilePath $installer.FullName -ArgumentList '/P',"/D=$installDirectory" -Wait -PassThru
+            if ($upgrade.ExitCode -ne 0) { throw 'In-place NSIS update failed while sidecar was running' }
+            $sidecar.Refresh()
+            if (-not $sidecar.HasExited) { throw 'NSIS update did not stop the installed sidecar process' }
+            if (-not (Test-Path (Join-Path $installDirectory '_internal/VCRUNTIME140.dll'))) { throw 'Update did not restore the sidecar runtime DLL' }
+            ./scripts/smoke-desktop-sidecar.ps1 -Executable (Join-Path $installDirectory 'datashield-local.exe')
+          } finally {
+            if (-not $sidecar.HasExited) { Stop-Process -Id $sidecar.Id -Force }
+            Remove-Item Env:LOCAL_DATA_DIR -ErrorAction SilentlyContinue
+            Remove-Item Env:RUNTIME_MODE -ErrorAction SilentlyContinue
+            Remove-Item Env:RUN_SEED -ErrorAction SilentlyContinue
+          }
       - name: 生成安装包校验值及来源记录
         shell: pwsh
         run: |
