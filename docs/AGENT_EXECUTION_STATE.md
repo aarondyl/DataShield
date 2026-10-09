@@ -32,6 +32,8 @@ Continue the in-progress DataShield delivery from the existing repository state.
 
 ## This continuation's changes
 
+- Added an authenticated DeepSeek Cloud AI Gateway endpoint to the isolated Identity service. It uses a server-only key file, limits each account to 12 calls per minute, caps input/output, rejects non-object JSON, and does not log prompts. The route is implemented, but no production key has been configured and no live vendor inference has been run.
+
 - Fixed the Cloud startup source-catalog test to enter FastAPI's lifespan context; source seeding happens at startup (commit `15beaba`).
 - Made full-application Alembic migration `0012` for `regulation_versions.review_status` idempotent. The Cloud-only Alembic chain remains separate (commit `15beaba`).
 - Carried legal-version review status through change events, Tenant Agent source/requirement context, Finding legal evidence, and persisted evidence snapshots. Fixed a duplicate-field DTO error and added regression assertions.
@@ -65,6 +67,9 @@ Continue the in-progress DataShield delivery from the existing repository state.
 - No new release has been created by this continuation.
 
 ## Remaining work
+
+- PR #25, `feat/cloud-identity-service`, is under CI review and now includes account/session/org APIs plus the authenticated Cloud AI Gateway; its latest pushed code commit is `d62b9b5`. Email delivery, server SMTP/Identity database configuration, and a DeepSeek platform API key are not present in the accessible GitHub secrets.
+- Desktop sign-in securely stores Identity tokens, but a complete token-refreshing route from the OS credential store into each local Tenant Agent inference has not been implemented; do not claim Cloud AI is end-to-end ready.
 
 1. Push the raw-source archive, migrations, Docker volume, legal-review propagation, and ECS audit workflow; verify all PR #24 checks and merge only after green checks.
 2. Run the read-only ECS inspection workflow from main and use its evidence before any deployment change.
