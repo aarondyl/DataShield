@@ -245,6 +245,7 @@ export default {
       roles: { owner: 'Owner', admin: 'Administrator', member: 'Member' },
       memberRole: 'Member role', removeMember: 'Remove member', roleUpdated: 'Member role updated.',
       confirmRemoveMember: 'Remove {{email}} from this organization?', memberRemoved: 'Member removed.',
+      deviceSessions: 'Signed-in devices', currentSession: 'This device', revokeSession: 'Revoke device session', sessionRevoked: 'Device session revoked.',
       newPassword: 'New password (at least 12 characters)', requestReset: 'Send reset code', resetPassword: 'Reset password',
       passwordResetDone: 'Password reset. Sign in with your new password.', forgotPassword: 'Forgot password?',
       backToLogin: 'Back to sign in', resendVerification: 'Resend verification email', verificationResent: 'Verification email resent.',

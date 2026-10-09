@@ -156,6 +156,13 @@ struct IdentityMemberRoleInput {
     role: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IdentitySessionActionInput {
+    base_url: String,
+    session_id: i64,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct IdentityAuthView {
@@ -772,6 +779,36 @@ async fn cloud_identity_change_member_role(
 }
 
 #[tauri::command]
+async fn cloud_identity_sessions(
+    input: IdentityEndpointInput,
+    state: State<'_, DesktopState>,
+) -> Result<serde_json::Value, String> {
+    identity_authenticated_request(
+        &input.base_url,
+        "/v1/auth/sessions",
+        Method::GET,
+        None,
+        &state,
+    )
+    .await
+}
+
+#[tauri::command]
+async fn cloud_identity_revoke_session(
+    input: IdentitySessionActionInput,
+    state: State<'_, DesktopState>,
+) -> Result<serde_json::Value, String> {
+    identity_authenticated_request(
+        &input.base_url,
+        &format!("/v1/auth/sessions/{}", input.session_id),
+        Method::DELETE,
+        None,
+        &state,
+    )
+    .await
+}
+
+#[tauri::command]
 async fn cloud_identity_me(
     input: IdentityEndpointInput,
     state: State<'_, DesktopState>,
@@ -1088,7 +1125,9 @@ fn main() {
             cloud_identity_invite,
             cloud_identity_accept_invitation,
             cloud_identity_remove_member,
-            cloud_identity_change_member_role
+            cloud_identity_change_member_role,
+            cloud_identity_sessions,
+            cloud_identity_revoke_session
         ])
         .build(tauri::generate_context!())
         .expect("启动 DataShield Desktop 失败")

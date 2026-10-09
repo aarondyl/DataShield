@@ -7,6 +7,7 @@ import { identityErrorMessage } from '../features/auth/identityErrors';
 type IdentityView = { userId?: number; email: string; name?: string; organization?: { id: number; name: string; edition: string; role: string } };
 type Organization = { id: number; name: string; edition: string; role: string; active: boolean };
 type Member = { user_id: number; email: string; name: string; role: string };
+type DeviceSession = { id: number; device_name: string; created_at: string; last_used_at: string; current: boolean };
 
 export default function CloudIdentitySettings() {
   const { t } = useTranslation();
@@ -19,6 +20,7 @@ export default function CloudIdentitySettings() {
   const [members, setMembers] = useState<Member[]>([]);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteCode, setInviteCode] = useState('');
+  const [sessions, setSessions] = useState<DeviceSession[]>([]);
 
   const load = async () => {
     try {
@@ -28,6 +30,7 @@ export default function CloudIdentitySettings() {
       if (!endpoint) { setStatus('unavailable'); return; }
       const value = await invoke<IdentityView>('cloud_identity_me', { input: { baseUrl: endpoint } });
       setAccount(value); setStatus('signed-in');
+      setSessions(await invoke<DeviceSession[]>('cloud_identity_sessions', { input: { baseUrl: endpoint } }));
       const orgs = await invoke<Organization[]>('cloud_identity_organizations', { input: { baseUrl: endpoint } });
       setOrganizations(orgs);
       if (value.organization?.id) setMembers(await invoke<Member[]>('cloud_identity_members', { input: { baseUrl: endpoint, organizationId: value.organization.id } }));
@@ -87,6 +90,16 @@ export default function CloudIdentitySettings() {
     } catch (error) { setMessage(identityErrorMessage(error, t)); }
     finally { setBusy(false); }
   };
+
+  const revokeSession = async (sessionId: number) => {
+    setBusy(true); setMessage('');
+    try {
+      await invoke('cloud_identity_revoke_session', { input: { baseUrl, sessionId } });
+      setSessions(await invoke<DeviceSession[]>('cloud_identity_sessions', { input: { baseUrl } }));
+      setMessage(t('appnew.desktopAccount.sessionRevoked'));
+    } catch (error) { setMessage(identityErrorMessage(error, t)); }
+    finally { setBusy(false); }
+  };
   useEffect(() => { void load(); }, []);
 
   const signOut = async () => {
@@ -109,6 +122,7 @@ export default function CloudIdentitySettings() {
       <form onSubmit={acceptInvitation}><label>{t('appnew.desktopAccount.invitationCode')}<input required maxLength={256} value={inviteCode} onChange={event => setInviteCode(event.target.value)} /></label><button className="ds-button quiet" disabled={busy}>{t('appnew.desktopAccount.acceptInvitation')}</button></form>
     </>}
     {account && <button className="ds-button quiet" disabled={busy} onClick={signOut}>{busy ? t('appnew.settings.signingOut') : t('appnew.settings.logOut')}</button>}
+    {account && <><h3>{t('appnew.desktopAccount.deviceSessions')}</h3><ul>{sessions.map(item => <li key={item.id}>{item.device_name} · {new Date(item.last_used_at).toLocaleString()} · {item.current ? t('appnew.desktopAccount.currentSession') : <button className="ds-button quiet" disabled={busy} onClick={() => void revokeSession(item.id)}>{t('appnew.desktopAccount.revokeSession')}</button>}</li>)}</ul></>}
     {message && <p role="status" className="ds-cloud-notice">{message}</p>}
   </div></section>;
 }
