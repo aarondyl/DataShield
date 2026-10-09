@@ -57,6 +57,35 @@ services:
     mem_limit: 550m
     logging: *json_logging
 
+  identity:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile.identity
+    environment:
+      IDENTITY_DATABASE_URL_FILE: /run/secrets/identity_database_url
+      IDENTITY_EMAIL_VERIFY_REQUIRED: "true"
+      IDENTITY_SMTP_HOST: ${IDENTITY_SMTP_HOST:?Set the account email SMTP host}
+      IDENTITY_SMTP_PORT: ${IDENTITY_SMTP_PORT:-587}
+      IDENTITY_SMTP_USER: ${IDENTITY_SMTP_USER:?Set the account email SMTP username}
+      IDENTITY_SMTP_PASSWORD_FILE: /run/secrets/identity_smtp_password
+      IDENTITY_EMAIL_FROM: ${IDENTITY_EMAIL_FROM:?Set the verified DataShield sender address}
+      IDENTITY_SMTP_STARTTLS: "true"
+    ports:
+      - "${IDENTITY_BIND_ADDRESS:-127.0.0.1}:8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; assert urlopen('http://127.0.0.1:8001/health').status == 200"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    secrets: [identity_database_url, identity_smtp_password]
+    networks: [cloud_database, cloud_egress]
+    restart: unless-stopped
+    mem_limit: 260m
+    logging: *json_logging
+
 networks:
   cloud_database:
     internal: true
@@ -70,6 +99,10 @@ secrets:
     file: ${CLOUD_SECRETS_DIR:?Set CLOUD_SECRETS_DIR to an absolute, deploy-user-only directory}/cloud_database_url
   cloud_admin_token:
     file: ${CLOUD_SECRETS_DIR:?Set CLOUD_SECRETS_DIR to an absolute, deploy-user-only directory}/cloud_admin_token
+  identity_database_url:
+    file: ${CLOUD_SECRETS_DIR:?Set CLOUD_SECRETS_DIR to an absolute, deploy-user-only directory}/identity_database_url
+  identity_smtp_password:
+    file: ${CLOUD_SECRETS_DIR:?Set CLOUD_SECRETS_DIR to an absolute, deploy-user-only directory}/identity_smtp_password
 
 volumes:
   cloud_postgres_data:
