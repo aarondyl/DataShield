@@ -111,7 +111,7 @@ class CloudLLMClient(BaseLLMClient):
         if not settings.llm_base_url.startswith("https://"):
             raise LLMError("尚未配置 DataShield Cloud Identity 服务地址")
         self.base_url = settings.llm_base_url.rstrip("/")
-        self.model_name = settings.llm_model or "deepseek-chat"
+        self.model_name = settings.llm_model or "deepseek-flash"
 
     def chat_json(self, system_prompt: str, user_prompt: str, *, context: dict[str, Any] | None = None) -> dict[str, Any]:
         from app.core.cloud_ai import current_cloud_identity_token

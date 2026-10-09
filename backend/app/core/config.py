@@ -101,9 +101,6 @@ class Settings(BaseSettings):
             elif self.desktop_ai_mode == "cloud":
                 self.llm_provider = "cloud"
                 self.embedding_provider = "local"
-            elif self.desktop_ai_mode == "cloud":
-                self.llm_provider = "cloud"
-                self.embedding_provider = "local"
             # Desktop 通过主进程持有的短期 runtime token 调用这些业务路由。
             # 这不是 Web 共享预览的匿名开放：所有 /api/*（健康检查除外）仍由
             # enforce_local_runtime_token 验证，且数据只在本机 SQLite。

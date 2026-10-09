@@ -350,10 +350,16 @@ fn valid_ai_endpoint(provider: &str, base_url: &str) -> bool {
             })
             .unwrap_or(false),
         "ollama" => base_url == "http://127.0.0.1:11434/v1",
-        "cloud" => reqwest::Url::parse(base_url).map(|url| {
-            url.scheme() == "https" && url.host().is_some() && url.username().is_empty()
-                && url.password().is_none() && url.query().is_none() && url.fragment().is_none()
-        }).unwrap_or(false),
+        "cloud" => reqwest::Url::parse(base_url)
+            .map(|url| {
+                url.scheme() == "https"
+                    && url.host().is_some()
+                    && url.username().is_empty()
+                    && url.password().is_none()
+                    && url.query().is_none()
+                    && url.fragment().is_none()
+            })
+            .unwrap_or(false),
         "mock" => true,
         _ => false,
     }
@@ -1029,7 +1035,8 @@ async fn local_api_request(
             Method::GET,
             None,
             &state,
-        ).await?;
+        )
+        .await?;
     }
     let mut builder = state
         .client
