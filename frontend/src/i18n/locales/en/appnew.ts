@@ -832,7 +832,7 @@ export default {
       endpoint: 'OpenAI-compatible API URL', model: 'Model name', apiKey: 'API key', keySaved: 'A key is saved; leave blank to keep it', keyRequired: 'Enter an API key',
       consent: 'I agree to send the minimum product context needed for each analysis to this model provider. The full repository and local database are not uploaded automatically.',
       cloudConsent: 'I agree to send the product profile and relevant evidence needed for this analysis to DataShield Cloud for DeepSeek processing. The full repository and local database are not uploaded automatically.',
-      cloudHelp: 'Uses your DataShield account and the platform DeepSeek service. Product profile and relevant evidence for each analysis leave this device.', cloudUnavailable: 'Connect to Cloud and sign in to a DataShield account first.',
+      cloudHelp: 'Uses your DataShield account and the platform DeepSeek service. Product profile and relevant evidence for each analysis leave this device.', cloudUnavailable: 'Connect to Cloud and sign in to a DataShield account first.', cloudModel: 'Model:',
       keyStorage: 'The key is stored only in Windows Credential Manager, never in frontend storage or the DataShield config file.',
       ollamaHelp: 'Install and start Ollama first. DataShield connects only to this local address:', loadModels: 'Load local models', availableModels: 'Installed models', noOllamaModels: 'Ollama is reachable, but no models were found. Download one with ollama pull first.',
       save: 'Save and apply', saving: 'Saving…', test: 'Test real inference', saved: 'Configuration saved securely. Fully quit and reopen DataShield before testing.', restart: 'Configuration saved. Fully quit and reopen DataShield to apply it.',

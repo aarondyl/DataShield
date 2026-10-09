@@ -832,7 +832,7 @@ export default {
       endpoint: 'OpenAI 兼容 API 地址', model: '模型名称', apiKey: 'API Key', keySaved: '已保存密钥；留空则沿用当前密钥', keyRequired: '请输入 API Key',
       consent: '我同意将每次分析所需的最少产品上下文发送给此模型服务商。不会自动上传完整仓库或本地数据库。',
       cloudConsent: '我同意将本次分析所需的产品画像与相关证据发送至 DataShield Cloud，由 DeepSeek 处理。完整代码仓库与本地数据库不会自动上传。',
-      cloudHelp: '使用 DataShield 账户与平台 DeepSeek 服务。分析所需的产品画像与相关证据会离开本机。', cloudUnavailable: '请先连接 Cloud 服务并登录 DataShield 账户。',
+      cloudHelp: '使用 DataShield 账户与平台 DeepSeek 服务。分析所需的产品画像与相关证据会离开本机。', cloudUnavailable: '请先连接 Cloud 服务并登录 DataShield 账户。', cloudModel: '模型：',
       keyStorage: '密钥仅保存于 Windows 凭据管理器，不会写入前端存储或 DataShield 配置文件。',
       ollamaHelp: '请先安装并启动 Ollama；DataShield 只连接本机地址：', loadModels: '读取本机模型', availableModels: '已安装模型', noOllamaModels: 'Ollama 已连接，但尚未发现模型。请先使用 ollama pull 下载模型。',
       save: '保存并应用', saving: '正在保存…', test: '测试真实推理', saved: '配置已安全保存。请完全退出并重新打开 DataShield 后测试。', restart: '配置已保存；请完全退出并重新打开 DataShield 后生效。',

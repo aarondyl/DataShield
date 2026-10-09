@@ -87,7 +87,9 @@ export default function AIProviderSettings() {
         {config.provider === 'byok' && <label>{t('appnew.settings.aiProvider.endpoint')}<input value={config.baseUrl} onChange={e => update({ baseUrl: e.target.value })} placeholder="https://api.deepseek.com" autoComplete="url" /></label>}
         {config.provider === 'cloud' && <p>{t('appnew.settings.aiProvider.cloudHelp')} <code>{config.baseUrl || t('appnew.settings.aiProvider.cloudUnavailable')}</code></p>}
         {config.provider === 'ollama' && <p>{t('appnew.settings.aiProvider.ollamaHelp')} <code>http://127.0.0.1:11434</code></p>}
-        <label>{t('appnew.settings.aiProvider.model')}<input value={config.model} onChange={e => update({ model: e.target.value })} placeholder={config.provider === 'ollama' ? '模型名称' : 'deepseek-flash'} autoComplete="off" /></label>
+        {config.provider === 'cloud'
+          ? <p>{t('appnew.settings.aiProvider.cloudModel')} <code>deepseek-flash</code></p>
+          : <label>{t('appnew.settings.aiProvider.model')}<input value={config.model} onChange={e => update({ model: e.target.value })} placeholder={config.provider === 'ollama' ? '模型名称' : 'deepseek-flash'} autoComplete="off" /></label>}
       </>}
       {config.provider === 'byok' && <>
         <label>{t('appnew.settings.aiProvider.apiKey')}<input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder={config.keyConfigured ? t('appnew.settings.aiProvider.keySaved') : t('appnew.settings.aiProvider.keyRequired')} autoComplete="new-password" /></label>
