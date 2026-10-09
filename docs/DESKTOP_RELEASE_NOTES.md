@@ -1,45 +1,51 @@
-# DataShield Desktop v0.2.0-rc.2 — Windows 预发布
+# DataShield Desktop v0.2.0-rc.3 — Windows 预发布
 
-## 本版本包含
+## 本版本
 
-恢复 DataShield 原版中文优先体验：欢迎页、版本选择、账户入口、三阶段产品引导、Today、法规监控与资料库、Finding 与证据、整改和反馈、Product Twin、工作区/产品切换及设置。支持简体中文和英文切换。
+恢复 DataShield 中文优先的桌面体验，支持简体中文和英文，包括版本选择、账户入口、产品引导、Today、法规监控与资料库、Finding 与证据、整改、反馈、Product Twin、工作区和设置。
 
-Windows 桌面版当前提供本机离线工作区。产品资料、Product Twin、Finding 与证据保存在本机 SQLite；法规通过配置的 HTTPS Cloud RegIntel API 同步。离线工作区不是 DataShield Cloud 账户。Cloud 身份登录、企业成员邀请与角色管理、Cloud AI Gateway、BYOK 和 Ollama 配置尚未在此桌面预发布版启用。法规分析依赖当前本地可用的规则和服务配置，不能把确定性规则结果理解为法律结论。
+产品资料、画像、Finding、证据、整改和反馈默认保存在本机 SQLite。法规可通过 HTTPS 同步并缓存到本机；法规同步不会上传私人产品资料。DataShield Cloud 登录、组织与成员角色由独立身份服务管理。Cloud AI 经用户选择并确认后会把当前分析所需上下文发送至 Cloud。用户也可配置 OpenAI-compatible BYOK 服务或本机 Ollama；BYOK 凭据保存在 Windows Credential Manager。
+
+Cloud 登录、Cloud AI 和法规同步需要已运行并正确配置的 DataShield Cloud 服务。Cloud API 默认地址为 `https://api.datashield.ltd`。如果该服务尚未对你的账户开放，可以先使用离线工作区；不得将离线工作区视为 Cloud 账户。
+
+AI 输出与自动提取内容应由用户核验，不是法律意见。法规原文来源及核验状态在产品中分别呈现。
 
 ## 系统要求
 
 - Windows 10 1809 或更新版本，或 Windows 11，64 位 x64。
-- Microsoft Edge WebView2 Runtime。Windows 11 通常已包含；若系统提示，可通过 Microsoft 官方安装程序安装。
-- 安装和首次启动需要足够磁盘空间，用于本地数据库和法规缓存。
+- Microsoft Edge WebView2 Runtime。Windows 11 通常已包含；若系统提示，可安装 Microsoft 官方运行时。
+- 足够磁盘空间用于本地数据库、法规缓存和附件。
 
 ## 安装与更新
 
-下载 `DataShield_*_x64-setup.exe` 后，使用同目录的 `.sha256` 文件校验 SHA256。运行安装程序并按提示安装。更新时运行新版本安装程序；它会覆盖应用文件，保留用户目录中的本地数据库。卸载前请先备份本地数据目录。
+下载 `DataShield_*_x64-setup.exe` 并用同目录 `.sha256` 文件校验。运行安装程序并按提示操作。更新时运行较新版本安装包；本地数据库位于用户数据目录，更新会保留该目录。卸载前请备份本地数据。
 
 ## 首次使用
 
-启动后选择开发者版或企业版入口，创建离线工作区并添加产品。可填写产品信息、目标市场及功能，也可输入公开网站地址或本机授权仓库路径。检查并确认 Product Twin 后运行合规检查，再查看 Finding、证据和整改建议。可在法规监控页面配置 Cloud RegIntel 服务地址并同步法规；设置页会显示本地服务和数据状态。
+启动后选择开发者版或企业版。可注册/登录 Cloud 账户，也可创建离线工作区。添加产品并输入产品描述、公开网站或有权访问的本地仓库。审阅事实及来源，确认 Product Twin 后同步法规、运行分析，并检查 Finding、证据和整改建议。通过反馈修正画像后可重新分析。
 
-此版本为预发布，尚未完成 Windows 11 人工图形界面验收。它不构成法律建议。
+设置中的 AI 模型可选择 DataShield Cloud、BYOK 或 Ollama。Cloud 模式要求 Cloud 账户和管理员已配置模型服务；BYOK 需要兼容的模型 API 地址、模型名和个人 API Key；Ollama 需要本机 Ollama 服务及已下载模型。发送上下文至远程模型前请阅读并确认界面提示。
+
+此版本为预发布版本，尚未完成 Windows 图形界面人工验收；不构成法律建议。
 
 ## English
 
-DataShield Desktop v0.2.0-rc.2 restores the Chinese-first product experience: welcome and edition selection, account entry, three-stage product onboarding, Today, regulation monitoring and library, findings and evidence, remediation and feedback, Product Twin, workspace/product switching, and settings. Simplified Chinese and English are available.
+DataShield Desktop v0.2.0-rc.3 restores the Chinese-first desktop experience with Simplified Chinese and English, edition selection, account entry, product onboarding, Today, regulation monitoring and library, findings and evidence, remediation, feedback, Product Twin, workspace, and settings.
 
-The Windows desktop build currently provides a private local offline workspace. Product details, Product Twin, findings, and evidence are stored in local SQLite. Regulations sync over HTTPS with the configured Cloud RegIntel API. An offline workspace is not a DataShield Cloud account. Cloud identity sign-in, enterprise invitations and role management, Cloud AI Gateway, BYOK, and Ollama configuration are not enabled in this desktop pre-release. Analysis depends on the available local rules and service configuration; deterministic rule output is not a legal conclusion.
+Product details, Twin, findings, evidence, remediation, and feedback are stored in local SQLite by default. Regulations can be synchronized over HTTPS and cached locally; syncing regulations does not upload private product data. Cloud accounts, organizations, and member roles are managed by the separate Identity service. Cloud AI sends the context needed for the selected analysis only after user selection and consent. Users may also configure an OpenAI-compatible BYOK service or local Ollama. BYOK credentials are stored in Windows Credential Manager.
 
-### System requirements
+Cloud sign-in, Cloud AI, and regulation sync require a running and configured DataShield Cloud service. The default API URL is `https://api.datashield.ltd`. An offline workspace is available when Cloud is unavailable and is not a Cloud account.
 
-- 64-bit x64 Windows 10 version 1809 or later, or Windows 11.
-- Microsoft Edge WebView2 Runtime. It is usually included with Windows 11; install it from Microsoft if prompted.
-- Sufficient disk space for the local database and regulation cache.
+AI output and automatically extracted content require human review and are not legal advice. The product distinguishes source text from review status.
 
-### Install and update
+### Requirements and installation
 
-During an in-place update, the installer asks Windows to close any DataShield process holding the local sidecar runtime before replacing it. Save work and close DataShield before updating. Download `DataShield_*_x64-setup.exe` and verify its SHA256 using the accompanying `.sha256` file. Run the installer and follow the prompts. To update, run the newer installer; it replaces application files and preserves the local database in the user data directory. Back up local data before uninstalling.
+64-bit Windows 10 version 1809 or later, or Windows 11, and Microsoft Edge WebView2 Runtime. Download `DataShield_*_x64-setup.exe`, verify it with the accompanying `.sha256` file, and run the installer. An in-place update preserves the local database in the user data directory. Back up local data before uninstalling.
 
 ### First use
 
-Choose the Developer or Enterprise entry, create an offline workspace, and add a product. Enter product details and markets, or provide a public website URL or an authorized local repository path. Review and confirm the Product Twin, run a compliance check, then inspect findings, evidence, and remediation suggestions. Configure the Cloud RegIntel service URL in Regulation Monitoring and sync regulations. Settings shows local service and data status.
+Choose Developer or Enterprise, then register/sign in to a Cloud account or create an offline workspace. Add a product using a description, public website, or an authorized local repository. Review facts and sources, confirm the Product Twin, sync regulations, run analysis, and review findings, evidence, and remediation. Submit feedback to correct the Twin and run scoped reanalysis.
 
-This is a pre-release and has not received manual Windows 11 GUI acceptance. It is not legal advice.
+Settings offers DataShield Cloud, BYOK, and Ollama. Cloud requires an account and a configured Cloud model service. BYOK requires an OpenAI-compatible endpoint, model name, and personal API key. Ollama requires a local service and downloaded model. Review the consent notice before sending context to a remote model.
+
+This is a pre-release and has not received manual Windows GUI acceptance. It is not legal advice.
