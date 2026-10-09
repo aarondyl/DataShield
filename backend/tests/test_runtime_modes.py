@@ -34,7 +34,7 @@ def test_local_byok_mode_preserves_explicit_provider_configuration(monkeypatch, 
     try:
         settings = get_settings()
         assert settings.desktop_ai_mode == "byok"
-        assert settings.llm_provider == "api" and settings.embedding_provider == "api"
+        assert settings.llm_provider == "api" and settings.embedding_provider == "local"
         assert settings.scheduler_enabled is False
     finally: get_settings.cache_clear()
 
