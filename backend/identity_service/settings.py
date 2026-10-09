@@ -19,6 +19,8 @@ class IdentitySettings:
     login_window_minutes: int
     login_max_attempts: int
     email_verify_required: bool
+    llm_api_key_file: str
+    llm_model: str
 
     @classmethod
     def load(cls) -> "IdentitySettings":
@@ -39,9 +41,15 @@ class IdentitySettings:
             login_window_minutes=max(1, min(60, int(os.getenv("IDENTITY_LOGIN_WINDOW_MINUTES", "15")))),
             login_max_attempts=max(3, min(20, int(os.getenv("IDENTITY_LOGIN_MAX_ATTEMPTS", "8")))),
             email_verify_required=os.getenv("IDENTITY_EMAIL_VERIFY_REQUIRED", "true").lower() == "true",
+            llm_api_key_file=os.getenv("IDENTITY_LLM_API_KEY_FILE", ""),
+            llm_model=os.getenv("IDENTITY_LLM_MODEL", "deepseek-chat"),
         )
 
     @property
     def email_ready(self) -> bool:
         password_file_ok = bool(self.smtp_password_file and Path(self.smtp_password_file).is_file())
         return bool(self.smtp_host and self.email_from and self.smtp_user and password_file_ok)
+
+    @property
+    def llm_api_key(self) -> str:
+        return Path(self.llm_api_key_file).read_text(encoding="utf-8").strip() if self.llm_api_key_file and Path(self.llm_api_key_file).is_file() else ""

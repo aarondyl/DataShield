@@ -24,6 +24,7 @@ from identity_service.main import app
 def client(monkeypatch):
     IdentityBase.metadata.drop_all(engine)
     IdentityBase.metadata.create_all(engine)
+    identity_api._ai_calls.clear()
     sent_codes = []
     monkeypatch.setattr(identity_api, "send_security_code",
                         lambda settings, email, purpose, code: sent_codes.append((email, purpose, code)))
@@ -144,3 +145,42 @@ def test_platform_account_disable_requires_admin_and_revokes_sessions(client):
     assert http.get("/v1/auth/me", headers=target_headers).status_code == 401
     assert http.post("/v1/auth/login", json={"email": target_email,
                                               "password": "correct horse battery staple 42"}).status_code == 401
+
+
+def test_cloud_ai_gateway_requires_account_and_validates_json(monkeypatch, client, tmp_path):
+    http, codes = client
+    email = _register_verified(http, codes)
+    tokens = http.post("/v1/auth/login", json={"email": email,
+        "password": "correct horse battery staple 42"}).json()
+    headers = {"Authorization": f"Bearer {tokens['access_token']}"}
+    key_path = tmp_path / "platform-key"
+    key_path.write_text("test-only-deepseek-key", encoding="utf-8")
+    monkeypatch.setenv("IDENTITY_LLM_API_KEY_FILE", str(key_path))
+    requests = []
+
+    class Response:
+        status_code = 200
+        def raise_for_status(self): pass
+        def json(self):
+            return {"choices": [{"message": {"content": '{"ok":true}'}}]}
+
+    class AsyncClient:
+        def __init__(self, **kwargs): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *args): pass
+        async def post(self, url, **kwargs):
+            requests.append((url, kwargs))
+            return Response()
+
+    monkeypatch.setattr(identity_api.httpx, "AsyncClient", AsyncClient)
+    payload = {"system_prompt": "Return JSON", "user_prompt": "Check"}
+    assert http.post("/v1/ai/chat-json", json=payload).status_code == 401
+    result = http.post("/v1/ai/chat-json", headers=headers, json=payload)
+    assert result.status_code == 200 and result.json()["result"] == {"ok": True}
+    assert requests[0][0] == "https://api.deepseek.com/chat/completions"
+    assert requests[0][1]["headers"]["Authorization"] == "Bearer test-only-deepseek-key"
+    assert requests[0][1]["json"]["model"] == "deepseek-chat"
+    for _ in range(11):
+        assert http.post("/v1/ai/chat-json", headers=headers, json=payload).status_code == 200
+    limited = http.post("/v1/ai/chat-json", headers=headers, json=payload)
+    assert limited.status_code == 429 and limited.headers["Retry-After"] == "60"

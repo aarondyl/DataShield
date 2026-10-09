@@ -8,10 +8,14 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import hashlib
 import hmac
+import json
 import re
 import secrets
+import threading
+from collections import defaultdict, deque
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
+import httpx
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -30,6 +34,25 @@ from identity_service.settings import IdentitySettings
 router = APIRouter(prefix="/v1", tags=["Identity"])
 _EMAIL_CODE = re.compile(r"^\d{6}$")
 _EMAIL_PATTERN = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
+_ai_lock = threading.Lock()
+_ai_calls: dict[int, deque[datetime]] = defaultdict(deque)
+
+
+class AIChatRequest(BaseModel):
+    system_prompt: str = Field(min_length=1, max_length=12_000)
+    user_prompt: str = Field(min_length=1, max_length=48_000)
+
+
+def _limit_ai_calls(user_id: int) -> None:
+    now = datetime.now(UTC)
+    with _ai_lock:
+        calls = _ai_calls[user_id]
+        while calls and (now - calls[0]).total_seconds() > 60:
+            calls.popleft()
+        if len(calls) >= 12:
+            raise HTTPException(429, "AI request limit reached. Try again shortly.",
+                                headers={"Retry-After": "60"})
+        calls.append(now)
 
 
 def _now() -> datetime:
@@ -145,6 +168,43 @@ def require_platform_admin(principal: Principal = Depends(require_principal)) ->
     if not principal.user.is_platform_admin:
         raise HTTPException(403, "Platform administrator access required")
     return principal
+
+
+@router.post("/ai/chat-json")
+async def cloud_ai_chat_json(payload: AIChatRequest,
+                             principal: Principal = Depends(require_principal)):
+    """Authenticated, rate-limited DataShield inference; prompts are never logged."""
+    settings = IdentitySettings.load()
+    if not settings.llm_api_key:
+        raise HTTPException(503, "DataShield Cloud AI is not configured")
+    _limit_ai_calls(principal.user.id)
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(45.0, connect=8.0), follow_redirects=False) as client:
+            response = await client.post(
+                "https://api.deepseek.com/chat/completions",
+                headers={"Authorization": f"Bearer {settings.llm_api_key}"},
+                json={
+                    "model": settings.llm_model,
+                    "messages": [
+                        {"role": "system", "content": payload.system_prompt},
+                        {"role": "user", "content": payload.user_prompt},
+                    ],
+                    "response_format": {"type": "json_object"},
+                    "temperature": 0.2,
+                    "max_tokens": 4096,
+                },
+            )
+            response.raise_for_status()
+            content = response.json()["choices"][0]["message"]["content"]
+        value = json.loads(content)
+        if not isinstance(value, dict):
+            raise ValueError("model response must be a JSON object")
+    except HTTPException:
+        raise
+    except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
+        raise HTTPException(502, "Cloud AI inference failed or returned invalid structured output") from None
+    return {"provider": "deepseek", "model": settings.llm_model, "result": value}
+
 
 
 class RegisterInput(BaseModel):

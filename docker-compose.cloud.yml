@@ -71,6 +71,8 @@ services:
       IDENTITY_SMTP_PASSWORD_FILE: /run/secrets/identity_smtp_password
       IDENTITY_EMAIL_FROM: ${IDENTITY_EMAIL_FROM:-}
       IDENTITY_SMTP_STARTTLS: "true"
+      IDENTITY_LLM_API_KEY_FILE: /run/secrets/identity_llm_api_key
+      IDENTITY_LLM_MODEL: ${IDENTITY_LLM_MODEL:-deepseek-chat}
     ports:
       - "${IDENTITY_BIND_ADDRESS:-127.0.0.1}:8001:8001"
     depends_on:
@@ -81,7 +83,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-    secrets: [identity_database_url, identity_smtp_password]
+    secrets: [identity_database_url, identity_smtp_password, identity_llm_api_key]
     networks: [cloud_database, cloud_egress]
     restart: unless-stopped
     mem_limit: 260m
@@ -104,6 +106,8 @@ secrets:
     file: ${CLOUD_SECRETS_DIR:?Set CLOUD_SECRETS_DIR to an absolute, deploy-user-only directory}/identity_database_url
   identity_smtp_password:
     file: ${CLOUD_SECRETS_DIR:?Set CLOUD_SECRETS_DIR to an absolute, deploy-user-only directory}/identity_smtp_password
+  identity_llm_api_key:
+    file: ${CLOUD_SECRETS_DIR:?Set CLOUD_SECRETS_DIR to an absolute, deploy-user-only directory}/identity_llm_api_key
 
 volumes:
   cloud_postgres_data:
