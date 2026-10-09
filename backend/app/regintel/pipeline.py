@@ -383,6 +383,7 @@ def _run_pipeline(
         content_hash=digest,
         retrieved_at=now,
         is_current=True,
+        review_status="UNREVIEWED",
     )
     db.add(version)
     db.flush()

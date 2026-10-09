@@ -32,6 +32,10 @@ class RegulationVersion(Base):
     raw_document_uri: Mapped[str] = mapped_column(String(500), default="", comment="原始快照文件路径")
     normalized_text: Mapped[str] = mapped_column(Text, nullable=False, comment="规范化后的全文")
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, comment="SHA256(normalized_text)，用于版本检测")
+    review_status: Mapped[str] = mapped_column(
+        String(32), default="UNREVIEWED", nullable=False,
+        comment="法律内容审核状态；自动抓取不得标记为已人工核验",
+    )
     retrieved_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="抓取入库时间")
     is_current: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否为当前生效版本")
 

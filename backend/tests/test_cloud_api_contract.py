@@ -33,3 +33,12 @@ def test_cloud_does_not_mount_private_tenant_routes(monkeypatch):
     client = _client(monkeypatch)
     assert client.get("/api/companies").status_code == 404
     assert client.get("/api/v1/today?tenant_id=1&product_id=1").status_code == 404
+
+
+def test_cloud_startup_registers_official_sources_without_claiming_review(monkeypatch):
+    client = _client(monkeypatch)
+    sources = client.get("/api/v1/sources").json()
+    assert {source["source_name"] for source in sources} >= {"PIPL", "DSL", "GDPR"}
+    # The public regulation bundle lists ingested versions only. Catalog entries
+    # must not be presented as usable law before the official text is parsed.
+    assert client.get("/api/v1/regulations").json() == []

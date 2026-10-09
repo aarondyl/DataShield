@@ -94,6 +94,7 @@ class VersionOut(BaseModel):
     content_hash: str
     retrieved_at: datetime
     is_current: bool
+    review_status: str = "UNREVIEWED"
 
 
 class RegulationInfoOut(BaseModel):

@@ -136,3 +136,12 @@ def init_regintel_db() -> None:
         with engine.begin() as connection:
             connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
     Base.metadata.create_all(bind=engine, tables=tables)
+    # Keep the Cloud-only startup fallback compatible with databases initialized
+    # before legal-review provenance was added. Alembic c0002 owns production
+    # upgrades; this additive guard supports explicit runtime initialization.
+    version_columns = {column["name"] for column in inspect(engine).get_columns("regulation_versions")}
+    if "review_status" not in version_columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE regulation_versions ADD COLUMN review_status VARCHAR(32) NOT NULL DEFAULT 'UNREVIEWED'")
+            )

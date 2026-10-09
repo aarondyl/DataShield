@@ -95,12 +95,39 @@ class HttpTextAdapter(SourceAdapter):
         return RawDocument(content=resp.text, origin_url=url, content_type="text/html")
 
     def extract_content(self, raw: RawDocument) -> str:
-        import re
-
         text = raw.content
         if raw.content_type == "text/html":
-            text = re.sub(r"(?s)<(script|style).*?</\1>", " ", text)
-            text = re.sub(r"<[^>]+>", "\n", text)
+            from html.parser import HTMLParser
+
+            class _TextExtractor(HTMLParser):
+                _BLOCKS = {"article", "br", "div", "h1", "h2", "h3", "h4", "li", "p", "section", "tr"}
+                _IGNORED = {"script", "style", "noscript", "nav", "footer"}
+
+                def __init__(self) -> None:
+                    super().__init__(convert_charrefs=True)
+                    self.parts: list[str] = []
+                    self.ignored_depth = 0
+
+                def handle_starttag(self, tag: str, attrs) -> None:
+                    if tag in self._IGNORED:
+                        self.ignored_depth += 1
+                    elif self.ignored_depth == 0 and tag in self._BLOCKS:
+                        self.parts.append("\n")
+
+                def handle_endtag(self, tag: str) -> None:
+                    if tag in self._IGNORED and self.ignored_depth:
+                        self.ignored_depth -= 1
+                    elif self.ignored_depth == 0 and tag in self._BLOCKS:
+                        self.parts.append("\n")
+
+                def handle_data(self, data: str) -> None:
+                    if self.ignored_depth == 0:
+                        self.parts.append(data)
+
+            parser = _TextExtractor()
+            parser.feed(text)
+            parser.close()
+            text = "".join(parser.parts)
         return normalize_text(text)
 
 
