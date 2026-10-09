@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import type { RiskLevel } from '../types';
 
 const styles: Record<string, string> = {
@@ -8,11 +9,11 @@ const styles: Record<string, string> = {
 };
 
 export default function RiskBadge({ level }: { level: RiskLevel | null | undefined }) {
+  const { t } = useTranslation();
   const key = level ?? 'unknown';
-  const labels = { high: '高', medium: '中', low: '低', unknown: '未知' };
   return (
     <span className={`inline-block px-2 py-0.5 text-xs font-medium border rounded ${styles[key]}`}>
-      {labels[key as keyof typeof labels]}
+      {t(`common.status.${key}`)}
     </span>
   );
 }

@@ -93,8 +93,9 @@ def create_app() -> FastAPI:
     for module in (companies, products, regulations, analysis, actions, compliance, developer):
         app.include_router(module.router, prefix="/api")
     if mode == "web":
-        from app.api import regintel
+        from app.api import auth, regintel
         app.include_router(regintel.router, prefix="/api")
+        app.include_router(auth.router, prefix="/api")
     if mode == "local":
         app.include_router(local_regulations.router, prefix="/api")
     for module in (evaluation, tenant_agent, findings, remediations, feedback, today, ui_understanding):

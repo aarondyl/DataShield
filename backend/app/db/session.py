@@ -74,6 +74,13 @@ def init_db() -> None:
             connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
 
     Base.metadata.create_all(bind=engine)
+    # Account linkage was added after desktop SQLite files were already in use.
+    # Keep the local runtime's additive startup migration safe for existing files.
+    evaluation_columns = {column["name"] for column in inspect(engine).get_columns("evaluation_sessions")}
+    if "user_id" not in evaluation_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE evaluation_sessions ADD COLUMN user_id INTEGER REFERENCES users(id)"))
+            connection.execute(text("CREATE INDEX IF NOT EXISTS ix_evaluation_sessions_user_id ON evaluation_sessions (user_id)"))
     # Existing Vercel databases may have the pre-Alembic understanding job table.
     # Migration 0005 owns the schema; retain the established startup compatibility
     # path for deployments that start the ASGI app without invoking Alembic.

@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'apps/desktop/**'
+      - 'frontend/**'
       - 'backend/app/**'
       - 'backend/desktop_sidecar.py'
       - 'backend/datashield-local.spec'
@@ -34,7 +35,9 @@ jobs:
         with:
           node-version: '20'
           cache: npm
-          cache-dependency-path: apps/desktop/package-lock.json
+          cache-dependency-path: |
+            apps/desktop/package-lock.json
+            frontend/package-lock.json
       - name: 安装 sidecar 构建依赖
         working-directory: backend
         run: python -m pip install -r requirements-desktop.txt
@@ -52,6 +55,8 @@ jobs:
         run: ./scripts/smoke-desktop-sidecar.ps1 -Executable backend/dist/datashield-local/datashield-local.exe
       - name: 安装 Desktop 依赖
         run: npm --prefix apps/desktop ci
+      - name: 验证旧版完整产品界面构建
+        run: npm --prefix frontend ci && npm --prefix frontend run build
       - name: 验证 Desktop 业务交互与中英文词条
         run: npm --prefix apps/desktop test -- --maxWorkers=1
       - name: 验证 Rust Bridge 安全边界

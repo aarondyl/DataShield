@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.ds-shell,.ds-public { color:var(--ds-ink); background:var(--ds-paper); font-family:Inter,ui-sans-serif,system-ui,-apple-system,sans-serif; }
+
+body {
+  @apply antialiased;
+  margin: 0;
+  background: #050a12;
+  color: #f4f7fb;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+a { color: inherit; text-decoration: none; }
+button, a, select, input, textarea, label { transition: color .22s ease, background .22s ease, border-color .22s ease, transform .22s ease, opacity .22s ease; }
+button, a, select, input[type="checkbox"], input[type="radio"], label:has(input) { cursor:pointer; }
+
+:focus-visible{outline:3px solid rgba(36,93,67,.25);outline-offset:3px}button:disabled{cursor:not-allowed;opacity:.55}.ds-button,.ds-nav-link,.ds-attention,.ds-finding-list>a,.ds-action-list>a{-webkit-tap-highlight-color:transparent}
+@media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}

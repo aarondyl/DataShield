@@ -27,6 +27,7 @@ from app.models.remediation import Remediation, RemediationEvidence, Remediation
 from app.models.feedback import Feedback, FeedbackCandidate, FeedbackCandidateRequirement
 from app.models.evaluation import EvaluationSession
 from app.models.local_sync import LocalReevaluationTask, LocalRegulationBinding
+from app.models.user import User
 
 __all__ = [
     "AgentMemory",
@@ -65,4 +66,5 @@ __all__ = [
     "RemediationRequirement",
     "Feedback", "FeedbackCandidate", "FeedbackCandidateRequirement", "EvaluationSession",
     "LocalReevaluationTask", "LocalRegulationBinding",
+    "User",
 ]

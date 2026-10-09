@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.datashield.desktop",
   "build": {
-    "frontendDist": "../dist",
-    "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "frontendDist": "../../../frontend/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm --prefix ../../frontend run dev -- --host 127.0.0.1",
+    "beforeBuildCommand": "npm --prefix ../../frontend ci && npm --prefix ../../frontend run build"
   },
   "app": {
     "windows": [{ "title": "DataShield", "width": 1180, "height": 760, "minWidth": 900, "minHeight": 620 }],

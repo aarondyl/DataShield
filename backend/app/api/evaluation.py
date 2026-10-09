@@ -6,6 +6,7 @@ from fastapi import APIRouter,Depends,HTTPException,Request,Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from app.core.config import get_settings
 from app.core.evaluation_auth import COOKIE,CurrentPrincipal,issue_session,require_principal,require_product_access,validate_browser_origin
 from app.db.session import get_db
 from app.models import Company,EvaluationSession,Product,ProductTwinFact,ProductTwinVersion,Regulation,RegulationVersion,LegalUnit,Requirement
@@ -17,7 +18,7 @@ class Start(BaseModel):
     email: str = Field(min_length=3, max_length=320, pattern=r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
     company_name: str = Field(min_length=1, max_length=200)
     edition: Literal["developer", "enterprise"] = "developer"
-class ProductInput(BaseModel): name:str=Field(min_length=1,max_length=200);description:str=Field(default="",max_length=10000);markets:list[str]=Field(default_factory=list);category:str=Field(default="",max_length=100)
+class ProductInput(BaseModel): name:str=Field(min_length=1,max_length=200);description:str=Field(default="",max_length=10000);markets:list[str]=Field(default_factory=list);category:str=Field(default="",max_length=100);company_id:int|None=None
 def secure(request:Request): return request.url.scheme=="https" and request.url.hostname not in {"localhost","127.0.0.1"}
 @router.post("/start",status_code=201,dependencies=[Depends(validate_browser_origin)])
 def start(payload:Start,request:Request,response:Response,db:Session=Depends(get_db)):
@@ -26,7 +27,12 @@ def start(payload:Start,request:Request,response:Response,db:Session=Depends(get
 def me(principal:CurrentPrincipal=Depends(require_principal)): return {"company_id":principal.company_id,"edition":principal.edition,"session":"evaluation"}
 @router.post("/products",status_code=201,dependencies=[Depends(validate_browser_origin)])
 def product(payload:ProductInput,principal:CurrentPrincipal=Depends(require_principal),db:Session=Depends(get_db)):
-    row=Product(company_id=principal.company_id,name=payload.name,description=payload.description,target_markets=payload.markets,category=payload.category);db.add(row);db.commit();db.refresh(row);return row
+    company_id=principal.company_id
+    if principal.session_id == 0 and get_settings().evaluation_auth_bypass:
+        if payload.company_id is None or db.get(Company,payload.company_id) is None:
+            raise HTTPException(400,"A valid local workspace is required")
+        company_id=payload.company_id
+    row=Product(company_id=company_id,name=payload.name,description=payload.description,target_markets=payload.markets,category=payload.category);db.add(row);db.commit();db.refresh(row);return row
 
 def _demo_requirement(db: Session) -> Requirement:
     existing = db.scalar(select(Requirement).join(Regulation).where(Regulation.official_identifier == "DATASHIELD-DEMO-AI-TRANSPARENCY"))
