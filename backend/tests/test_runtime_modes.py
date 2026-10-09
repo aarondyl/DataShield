@@ -26,6 +26,14 @@ def test_local_mode_defaults_to_offline_mock_processing(monkeypatch, tmp_path):
     finally: get_settings.cache_clear()
 
 
+def test_desktop_mode_has_public_cloud_default_without_uploading_local_data(monkeypatch, tmp_path):
+    from app.core.config import Settings
+    settings = Settings(runtime_mode="local", desktop_mode=True, local_data_dir=str(tmp_path))
+    assert settings.cloud_regintel_base_url == "https://api.datashield.ltd"
+    assert settings.desktop_ai_mode == "mock"
+    assert settings.llm_cloud_consent is False
+
+
 def test_local_byok_mode_preserves_explicit_provider_configuration(monkeypatch, tmp_path):
     monkeypatch.setenv("RUNTIME_MODE", "local"); monkeypatch.setenv("LOCAL_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("DESKTOP_AI_MODE", "byok"); monkeypatch.setenv("LLM_PROVIDER", "api")

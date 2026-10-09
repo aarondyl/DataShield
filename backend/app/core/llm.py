@@ -99,6 +99,47 @@ class ApiLLMClient(BaseLLMClient):
         return _parse_json_object(content)
 
 
+class CloudLLMClient(BaseLLMClient):
+    """Authenticated DataShield inference gateway; prompt context is uploaded only after consent."""
+
+    provider_name = "cloud"
+
+    def __init__(self) -> None:
+        settings = get_settings()
+        if not settings.llm_cloud_consent:
+            raise LLMError("使用 DataShield Cloud AI 前请先同意将本次分析上下文发送到云端模型服务")
+        if not settings.llm_base_url.startswith("https://"):
+            raise LLMError("尚未配置 DataShield Cloud Identity 服务地址")
+        self.base_url = settings.llm_base_url.rstrip("/")
+        self.model_name = settings.llm_model or "deepseek-flash"
+
+    def chat_json(self, system_prompt: str, user_prompt: str, *, context: dict[str, Any] | None = None) -> dict[str, Any]:
+        from app.core.cloud_ai import current_cloud_identity_token
+        token = current_cloud_identity_token.get()
+        if not token:
+            raise LLMError("Cloud AI 需要有效的 DataShield 云端登录会话")
+        import httpx
+        try:
+            response = httpx.post(
+                f"{self.base_url}/v1/ai/chat-json",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"system_prompt": system_prompt, "user_prompt": user_prompt},
+                timeout=httpx.Timeout(50.0, connect=8.0),
+                follow_redirects=False,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            result = payload.get("result")
+            if not isinstance(result, dict):
+                raise ValueError("invalid structured response")
+            self.model_name = str(payload.get("model") or self.model_name)
+            return result
+        except Exception as exc:
+            if isinstance(exc, LLMError):
+                raise
+            raise LLMError("DataShield Cloud AI 请求失败；请检查登录会话和云端服务状态") from exc
+
+
 def _parse_json_object(content: str) -> dict[str, Any]:
     """从 LLM 文本输出中解析 JSON 对象（容忍 ```json 代码围栏与前后杂文本）。"""
     text = content.strip()
@@ -564,6 +605,8 @@ def get_llm_client() -> BaseLLMClient:
     调用方（节点）需捕获异常并走降级路径。
     """
     settings = get_settings()
+    if settings.llm_provider == "cloud":
+        return CloudLLMClient()
     if settings.llm_provider == "api":
         if settings.runtime_mode == "local" and settings.desktop_ai_mode == "byok" and not settings.llm_cloud_consent:
             raise LLMError("使用 BYOK 前请先确认本次分析所需上下文会发送给你选择的模型服务商")

@@ -91,3 +91,15 @@ git diff --check
 ```
 
 These validations completed using `/tmp/datashield-uv/uv` because the host has no system pytest installation. The most recent ECS SSH inspection reached the host but could not read Docker state; direct and passwordless-sudo Docker checks both returned unavailable.
+
+## Current continuation checkpoint (2026-10-09)
+
+- Current main: `fbb685842ea56c945c03675dc725a6feb66e7266`.
+- Active branch `feat/cloud-identity-service`, latest pushed commit `b516231`; PR #25 is aligned with current main and has CI pending for that commit.
+- PR #25 adds isolated Cloud Identity (verified-email registration, login, refresh/revoke, password reset, organizations, memberships/RBAC, invitations and platform account status), plus an authenticated DeepSeek JSON gateway. Usage is persisted without prompts and capped at 12 calls/minute/account.
+- Desktop Cloud AI is wired to the local Agent provider through a per-request token from Windows Credential Manager, carried only by the Rust-protected loopback bridge. AI analysis paths refresh the cloud session before forwarding. Explicit consent is required before private analysis context is sent. The default Desktop Cloud URL is `https://api.datashield.ltd`; offline/mock remains the initial mode.
+- Local full backend suite: 349 passed. Focused AI/Identity/runtime suite: 16 passed. Frontend production build passed before the final fixed-model presentation adjustment; rebuild is pending. Cloud/Identity PostgreSQL migrations and Windows installer are being validated by the current PR checks.
+- Gateway tests use a mocked DeepSeek response. No platform API key is available in the GitHub Actions secret names, no live DeepSeek response has been verified, and SMTP/Identity DB production configuration is not available. No private key or prompt text is recorded.
+- ECS checks confirm SSH as `deploy`, local API HTTP 200, secrets-directory mode 700/owner `admin` without reading files. Docker and passwordless sudo are unavailable to `deploy`; containers/PostgreSQL remain uninspected and external HTTPS is unavailable from the host.
+- Continue after checks: merge PR #25 only after all workflows pass; deploy Identity and its separate database through an authorized admin/Docker path; configure required server-side mail and DeepSeek secrets; verify public HTTPS and real inference; connect/regression-test Cloud regulation sync and Finding workflow; then build a fixed-commit NSIS Pre-release with SHA256 and bilingual notes after Windows acceptance evidence.
+- No credentials or private product data are stored in this file.

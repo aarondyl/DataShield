@@ -62,6 +62,46 @@ def test_byok_uses_real_openai_compatible_client_and_provider_identity(monkeypat
         get_llm_client.cache_clear()
 
 
+def test_cloud_gateway_requires_consent_session_and_returns_validated_result(monkeypatch, tmp_path):
+    from app.core.cloud_ai import current_cloud_identity_token
+    from app.core.config import Settings
+    import httpx
+
+    settings = Settings(runtime_mode="local", local_data_dir=str(tmp_path), desktop_ai_mode="cloud",
+                        llm_base_url="https://api.datashield.test/identity", llm_model="deepseek-flash",
+                        llm_cloud_consent=False)
+    monkeypatch.setattr("app.core.llm.get_settings", lambda: settings)
+    get_llm_client.cache_clear()
+    try:
+        with pytest.raises(LLMError, match="同意"):
+            get_llm_client()
+        settings.llm_cloud_consent = True
+        client = get_llm_client()
+        with pytest.raises(LLMError, match="登录会话"):
+            client.chat_json("system", "input")
+        calls = {}
+
+        class Response:
+            def raise_for_status(self): pass
+            def json(self): return {"result": {"ok": True}, "model": "deepseek-flash"}
+
+        def post(url, **kwargs):
+            calls.update(url=url, **kwargs)
+            return Response()
+
+        monkeypatch.setattr(httpx, "post", post)
+        context = current_cloud_identity_token.set("short-lived-test-token")
+        try:
+            assert client.chat_json("system", "private product facts") == {"ok": True}
+        finally:
+            current_cloud_identity_token.reset(context)
+        assert calls["url"] == "https://api.datashield.test/identity/v1/ai/chat-json"
+        assert calls["headers"]["Authorization"] == "Bearer short-lived-test-token"
+        assert calls["json"]["user_prompt"] == "private product facts"
+    finally:
+        get_llm_client.cache_clear()
+
+
 def test_ollama_discovery_uses_configured_local_endpoint(monkeypatch, tmp_path):
     from app.core.config import Settings
 
