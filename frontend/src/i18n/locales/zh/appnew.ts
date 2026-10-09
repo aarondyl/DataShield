@@ -223,6 +223,18 @@ export default {
     signUp: '注册',
     tryDemo: '先试试演示（无需注册）',
     preparingDemo: '正在准备演示环境…',
+    desktopAccount: {
+      registerTitle: '注册 DataShield 云端账户', loginTitle: '登录 DataShield 云端账户',
+      privacy: '身份信息仅用于账户和组织授权。产品资料、代码仓库、Finding 与证据继续保存在本机，不会自动上传。',
+      privateWorkspace: '我的本地工作区', endpointMissing: '请先在设置中配置并验证 HTTPS Cloud 服务地址。',
+      verificationCode: '邮箱验证码', verifiedThenLogin: '邮箱已验证，请返回登录页面登录。',
+      requestFailed: '云端身份服务请求失败。', working: '正在连接身份服务…',
+      verify: '验证邮箱', register: '注册账户', login: '登录并继续',
+      accountSettings: '云端账户', signedIn: '已登录 {{email}}（{{organization}}）',
+      signedOutState: '当前设备未登录云端账户。你仍可继续使用本地工作区。', signedOut: '已退出云端账户。',
+      signOutError: '退出云端账户失败，请检查网络后重试。',
+      statusUnavailable: '暂时无法连接身份服务，账户状态未知。', checking: '正在检查云端账户状态…',
+    },
     localMode: {
       eyebrow: '离线工作区',
       tagline: '在这台 Windows 设备上创建私有工作区。此操作不会创建 DataShield 云端账户。',

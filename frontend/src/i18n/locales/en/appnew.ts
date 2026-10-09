@@ -223,6 +223,18 @@ export default {
     signUp: 'Sign up',
     tryDemo: 'Try the demo first (no sign-up required)',
     preparingDemo: 'Preparing your demo…',
+    desktopAccount: {
+      registerTitle: 'Create a DataShield Cloud account', loginTitle: 'Sign in to DataShield Cloud',
+      privacy: 'Identity is used for account and organization access. Product details, repositories, findings, and evidence stay on this device and are not uploaded automatically.',
+      privateWorkspace: 'My local workspace', endpointMissing: 'Configure and verify an HTTPS Cloud service address in Settings first.',
+      verificationCode: 'Email verification code', verifiedThenLogin: 'Email verified. Return to the login page and sign in.',
+      requestFailed: 'The Cloud identity request failed.', working: 'Contacting identity service…',
+      verify: 'Verify email', register: 'Create account', login: 'Sign in and continue',
+      accountSettings: 'Cloud account', signedIn: 'Signed in as {{email}} ({{organization}})',
+      signedOutState: 'No Cloud account is signed in on this device. Your local workspace remains available.', signedOut: 'Signed out of the Cloud account.',
+      signOutError: 'Cloud sign-out failed. Check your network and retry.',
+      statusUnavailable: 'The identity service is unavailable; account status is unknown.', checking: 'Checking Cloud account status…',
+    },
     localMode: {
       eyebrow: 'Offline workspace',
       tagline: 'Create a private workspace on this Windows device. This does not create a DataShield Cloud account.',

@@ -11,6 +11,7 @@ use tauri_plugin_shell::{process::CommandChild, ShellExt};
 
 const AI_CREDENTIAL_SERVICE: &str = "com.datashield.desktop";
 const AI_CREDENTIAL_USER: &str = "local-ai-api-key";
+const IDENTITY_CREDENTIAL_SERVICE: &str = "com.datashield.desktop.identity";
 
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -73,6 +74,43 @@ struct RuntimeHealth {
     message: Option<String>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IdentityAuthInput {
+    base_url: String,
+    email: String,
+    password: String,
+    name: Option<String>,
+    organization_name: Option<String>,
+    edition: Option<String>,
+    device_name: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IdentityVerificationInput {
+    base_url: String,
+    email: String,
+    code: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IdentityEndpointInput {
+    base_url: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct IdentityAuthView {
+    user_id: Option<i64>,
+    email: String,
+    name: Option<String>,
+    email_verified: bool,
+    organization: Option<serde_json::Value>,
+    verification_required: bool,
+}
+
 struct DesktopState {
     client: reqwest::Client,
     descriptor: Mutex<Option<RuntimeDescriptor>>,
@@ -116,6 +154,70 @@ fn read_ai_config() -> AiProviderConfig {
 fn credential_entry() -> Result<Entry, String> {
     Entry::new(AI_CREDENTIAL_SERVICE, AI_CREDENTIAL_USER)
         .map_err(|_| "KEYSTORE_UNAVAILABLE".to_string())
+}
+
+#[cfg(windows)]
+fn identity_credential_entry(name: &str) -> Result<Entry, String> {
+    Entry::new(IDENTITY_CREDENTIAL_SERVICE, name).map_err(|_| "KEYSTORE_UNAVAILABLE".to_string())
+}
+
+#[cfg(windows)]
+fn store_identity_secret(name: &str, value: &str) -> Result<(), String> {
+    identity_credential_entry(name)?
+        .set_password(value)
+        .map_err(|_| "IDENTITY_CREDENTIAL_SAVE_FAILED".into())
+}
+
+#[cfg(not(windows))]
+fn store_identity_secret(_name: &str, _value: &str) -> Result<(), String> {
+    Err("IDENTITY_CREDENTIAL_STORE_UNSUPPORTED".into())
+}
+
+#[cfg(windows)]
+fn read_identity_secret(name: &str) -> Result<String, String> {
+    identity_credential_entry(name)?
+        .get_password()
+        .map_err(|_| "IDENTITY_SESSION_MISSING".into())
+}
+
+#[cfg(not(windows))]
+fn read_identity_secret(_name: &str) -> Result<String, String> {
+    Err("IDENTITY_CREDENTIAL_STORE_UNSUPPORTED".into())
+}
+
+#[cfg(windows)]
+fn delete_identity_secret(name: &str) -> Result<(), String> {
+    match identity_credential_entry(name)?.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(_) => Err("IDENTITY_CREDENTIAL_DELETE_FAILED".into()),
+    }
+}
+
+#[cfg(not(windows))]
+fn delete_identity_secret(_name: &str) -> Result<(), String> {
+    Err("IDENTITY_CREDENTIAL_STORE_UNSUPPORTED".into())
+}
+
+fn store_identity_tokens(value: &serde_json::Value) -> Result<(), String> {
+    let access = value
+        .get("access_token")
+        .and_then(|v| v.as_str())
+        .ok_or("IDENTITY_RESPONSE_INVALID")?;
+    let refresh = value
+        .get("refresh_token")
+        .and_then(|v| v.as_str())
+        .ok_or("IDENTITY_RESPONSE_INVALID")?;
+    store_identity_secret("access-token", access)?;
+    if let Err(error) = store_identity_secret("refresh-token", refresh) {
+        let _ = delete_identity_secret("access-token");
+        return Err(error);
+    }
+    Ok(())
+}
+
+fn clear_identity_tokens() -> Result<(), String> {
+    delete_identity_secret("access-token")?;
+    delete_identity_secret("refresh-token")
 }
 
 #[cfg(not(windows))]
@@ -251,6 +353,207 @@ fn valid_api_path(path: &str) -> bool {
         && !path.contains("..")
         && !path.contains("://")
         && !path.contains('\\')
+}
+
+fn valid_identity_endpoint(base_url: &str) -> bool {
+    reqwest::Url::parse(base_url)
+        .map(|url| {
+            url.scheme() == "https"
+                && url.host_str().is_some()
+                && url.username().is_empty()
+                && url.password().is_none()
+                && url.query().is_none()
+                && url.fragment().is_none()
+        })
+        .unwrap_or(false)
+}
+
+fn identity_url(base_url: &str, path: &str) -> Result<String, String> {
+    let base = base_url.trim().trim_end_matches('/');
+    if !valid_identity_endpoint(base) || !path.starts_with("/v1/") || path.contains("..") {
+        return Err("IDENTITY_ENDPOINT_INVALID".into());
+    }
+    Ok(format!("{base}{path}"))
+}
+
+async fn identity_response(response: reqwest::Response) -> Result<serde_json::Value, String> {
+    let status = response.status();
+    let body = response
+        .json::<serde_json::Value>()
+        .await
+        .unwrap_or_default();
+    if !status.is_success() {
+        let detail = body
+            .get("detail")
+            .and_then(|v| v.as_str())
+            .unwrap_or("IDENTITY_REQUEST_FAILED");
+        return Err(format!("{detail} (HTTP {})", status.as_u16()));
+    }
+    Ok(body)
+}
+
+fn identity_view(
+    value: &serde_json::Value,
+    verification_required: bool,
+) -> Result<IdentityAuthView, String> {
+    Ok(IdentityAuthView {
+        user_id: value.get("user_id").and_then(|v| v.as_i64()),
+        email: value
+            .get("email")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_owned(),
+        name: value
+            .get("name")
+            .and_then(|v| v.as_str())
+            .map(str::to_owned),
+        email_verified: value
+            .get("email_verified")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        organization: value.get("organization").cloned(),
+        verification_required,
+    })
+}
+
+#[tauri::command]
+async fn cloud_identity_register(
+    input: IdentityAuthInput,
+    state: State<'_, DesktopState>,
+) -> Result<IdentityAuthView, String> {
+    let url = identity_url(&input.base_url, "/v1/auth/register")?;
+    let response = state
+        .client
+        .post(url)
+        .json(&serde_json::json!({
+            "email": input.email,
+            "password": input.password,
+            "name": input.name.unwrap_or_default(),
+            "organization_name": input.organization_name.unwrap_or_default(),
+            "edition": input.edition.unwrap_or_else(|| "developer".into()),
+        }))
+        .send()
+        .await
+        .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
+    let value = identity_response(response).await?;
+    if value.get("access_token").is_some() {
+        store_identity_tokens(&value)?;
+    }
+    identity_view(
+        &value,
+        value
+            .get("verification_required")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+    )
+}
+
+#[tauri::command]
+async fn cloud_identity_verify_email(
+    input: IdentityVerificationInput,
+    state: State<'_, DesktopState>,
+) -> Result<bool, String> {
+    let url = identity_url(&input.base_url, "/v1/auth/verify-email")?;
+    let response = state
+        .client
+        .post(url)
+        .json(&serde_json::json!({"email": input.email, "code": input.code}))
+        .send()
+        .await
+        .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
+    let value = identity_response(response).await?;
+    Ok(value
+        .get("verified")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false))
+}
+
+#[tauri::command]
+async fn cloud_identity_login(
+    input: IdentityAuthInput,
+    state: State<'_, DesktopState>,
+) -> Result<IdentityAuthView, String> {
+    let url = identity_url(&input.base_url, "/v1/auth/login")?;
+    let response = state
+        .client
+        .post(url)
+        .json(&serde_json::json!({
+            "email": input.email,
+            "password": input.password,
+            "device_name": input.device_name.unwrap_or_else(|| "DataShield Desktop".into()),
+        }))
+        .send()
+        .await
+        .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
+    let value = identity_response(response).await?;
+    store_identity_tokens(&value)?;
+    identity_view(&value, false)
+}
+
+async fn identity_refresh(base_url: &str, state: &DesktopState) -> Result<(), String> {
+    let refresh = read_identity_secret("refresh-token")?;
+    let url = identity_url(base_url, "/v1/auth/refresh")?;
+    let response = state
+        .client
+        .post(url)
+        .json(&serde_json::json!({"refresh_token": refresh}))
+        .send()
+        .await
+        .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
+    let value = identity_response(response).await?;
+    store_identity_tokens(&value)
+}
+
+#[tauri::command]
+async fn cloud_identity_me(
+    input: IdentityEndpointInput,
+    state: State<'_, DesktopState>,
+) -> Result<IdentityAuthView, String> {
+    let url = identity_url(&input.base_url, "/v1/auth/me")?;
+    let access = read_identity_secret("access-token")?;
+    let response = state
+        .client
+        .get(&url)
+        .bearer_auth(&access)
+        .send()
+        .await
+        .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
+    if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+        identity_refresh(&input.base_url, &state).await?;
+        let access = read_identity_secret("access-token")?;
+        let response = state
+            .client
+            .get(&url)
+            .bearer_auth(access)
+            .send()
+            .await
+            .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
+        return identity_view(&identity_response(response).await?, false);
+    }
+    identity_view(&identity_response(response).await?, false)
+}
+
+#[tauri::command]
+async fn cloud_identity_logout(
+    input: IdentityEndpointInput,
+    state: State<'_, DesktopState>,
+) -> Result<(), String> {
+    let result = match read_identity_secret("access-token") {
+        Ok(access) => {
+            let url = identity_url(&input.base_url, "/v1/auth/logout")?;
+            let response = state
+                .client
+                .post(url)
+                .bearer_auth(access)
+                .send()
+                .await
+                .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
+            identity_response(response).await.map(|_| ())
+        }
+        Err(_) => Ok(()),
+    };
+    clear_identity_tokens()?;
+    result
 }
 
 #[tauri::command]
@@ -498,7 +801,12 @@ fn main() {
             select_repository,
             get_ai_provider_config,
             set_ai_provider_config,
-            delete_ai_provider_key
+            delete_ai_provider_key,
+            cloud_identity_register,
+            cloud_identity_verify_email,
+            cloud_identity_login,
+            cloud_identity_me,
+            cloud_identity_logout
         ])
         .build(tauri::generate_context!())
         .expect("启动 DataShield Desktop 失败")
@@ -519,7 +827,9 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{valid_api_path, valid_loopback_url, valid_method};
+    use super::{
+        identity_url, valid_api_path, valid_identity_endpoint, valid_loopback_url, valid_method,
+    };
     #[test]
     fn renderer_has_no_shell_spawn_permission() {
         let capability: serde_json::Value =
@@ -547,6 +857,19 @@ mod tests {
     fn bridge_only_allows_expected_http_methods() {
         assert!(valid_method("POST"));
         assert!(!valid_method("CONNECT"));
+    }
+
+    #[test]
+    fn identity_bridge_requires_https_endpoint_and_fixed_api_paths() {
+        assert!(valid_identity_endpoint(
+            "https://api.datashield.ltd/identity"
+        ));
+        assert!(!valid_identity_endpoint(
+            "http://api.datashield.ltd/identity"
+        ));
+        assert!(!valid_identity_endpoint("https://user:secret@example.test"));
+        assert!(identity_url("https://api.datashield.ltd/identity", "/v1/auth/login").is_ok());
+        assert!(identity_url("https://api.datashield.ltd/identity", "/v1/../private").is_err());
     }
 
     #[test]
