@@ -14,7 +14,7 @@ The first platform administrator must be provisioned out of band after registrat
 
 ## Network boundary
 
-The service listens on container port 8001; Compose publishes it only on `127.0.0.1:8001`. A trusted TLS reverse proxy may route `/identity/` to that loopback port. It must set/overwrite `X-Forwarded-For` from the observed peer (the rate limiter uses the right-most proxy-appended address). Do not expose port 8001 or PostgreSQL directly to the Internet. The desktop client must use verified HTTPS and secure OS credential storage for session tokens.
+The service listens on container port 8001; Compose publishes it only on `127.0.0.1:8001`. The reviewed example `deploy/nginx/api.datashield.ltd.conf.example` routes `/identity/` to the loopback service and `/api/` to RegIntel, enforces HTTPS, and rate-limits Identity auth routes. Install it only after DNS/TLS/ICP prerequisites are verified. It sets `X-Forwarded-For` to the observed peer; the Identity rate limiter reads the right-most address. Do not expose ports 8000/8001 or PostgreSQL directly to the Internet. The desktop client requires verified HTTPS and stores session tokens in Windows Credential Manager.
 
 ## Local validation
 
