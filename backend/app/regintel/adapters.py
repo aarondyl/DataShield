@@ -15,6 +15,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+import time
 from typing import TYPE_CHECKING
 
 from app.regintel.normalization import normalize_text
@@ -78,12 +79,34 @@ class LocalFileAdapter(SourceAdapter):
 class HttpTextAdapter(SourceAdapter):
     """HTTP 抓取适配器（html / pdf 来源的在线抓取路径）。"""
 
+    MAX_DOCUMENT_BYTES = 20 * 1024 * 1024
+
     def fetch(self, document: str | None = None) -> RawDocument:
         import httpx
 
         url = document or self.source.fetch_url
-        resp = httpx.get(url, timeout=30, follow_redirects=True)
-        resp.raise_for_status()
+        resp = None
+        for attempt in range(3):
+            try:
+                candidate = httpx.get(
+                    url,
+                    timeout=20,
+                    follow_redirects=True,
+                    headers={"User-Agent": "DataShield-RegIntel/1.0 (+https://datashield.ltd)"},
+                )
+                if candidate.status_code == 429 or candidate.status_code >= 500:
+                    candidate.raise_for_status()
+                candidate.raise_for_status()
+                resp = candidate
+                break
+            except httpx.HTTPError:
+                if attempt == 2:
+                    raise
+                time.sleep(0.5 * (2**attempt))
+        if resp is None:  # pragma: no cover - loop either returns or raises
+            raise RuntimeError("法规来源抓取未能完成")
+        if len(resp.content) > self.MAX_DOCUMENT_BYTES:
+            raise ValueError(f"法规来源响应超过 {self.MAX_DOCUMENT_BYTES // (1024 * 1024)} MiB 上限")
         content_type = resp.headers.get("content-type", "")
         if "pdf" in content_type or url.lower().endswith(".pdf"):
             import io

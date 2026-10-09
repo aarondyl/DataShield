@@ -37,6 +37,21 @@ def test_html_extraction_skips_navigation_and_decodes_entities():
     assert "伪造内容" not in text
 
 
+def test_http_source_retries_transient_server_errors(monkeypatch):
+    import httpx
+    import app.regintel.adapters as adapters
+
+    replies = iter([
+        httpx.Response(503, request=httpx.Request("GET", "https://example.org/law")),
+        httpx.Response(200, text="<p>正文</p>", headers={"content-type": "text/html"},
+                       request=httpx.Request("GET", "https://example.org/law")),
+    ])
+    monkeypatch.setattr(httpx, "get", lambda *args, **kwargs: next(replies))
+    monkeypatch.setattr(adapters.time, "sleep", lambda _: None)
+    raw = HttpTextAdapter(type("Source", (), {"fetch_url": "https://example.org/law"})()).fetch()
+    assert raw.content == "<p>正文</p>"
+
+
 def test_scheduler_registers_warmup_and_daily_single_instance_jobs(monkeypatch):
     from app.core.config import get_settings
 
