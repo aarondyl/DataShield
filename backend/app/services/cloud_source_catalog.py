@@ -4,6 +4,8 @@
 版本在采集时统一标记 UNREVIEWED，直到未来的人工审核流程明确更新状态。
 """
 
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -22,6 +24,8 @@ OFFICIAL_SOURCES = (
         "fetch_url": "https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm",
         "parser_type": "cn_law",
         "original_language": "ZH",
+        "published_at": datetime(2021, 8, 20),
+        "effective_at": datetime(2021, 11, 1),
         "description": "全国人大网公布的法律全文，由国家互联网信息办公室转载。自动采集版本须经人工核验。",
     },
     {
@@ -35,6 +39,8 @@ OFFICIAL_SOURCES = (
         "fetch_url": "https://www.cac.gov.cn/2021-06/11/c_1624994566919140.htm",
         "parser_type": "cn_law",
         "original_language": "ZH",
+        "published_at": datetime(2021, 6, 10),
+        "effective_at": datetime(2021, 9, 1),
         "description": "全国人大网公布的法律全文，由国家互联网信息办公室转载。自动采集版本须经人工核验。",
     },
     {
@@ -48,6 +54,8 @@ OFFICIAL_SOURCES = (
         "fetch_url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32016R0679",
         "parser_type": "gdpr_bilingual",
         "original_language": "EN",
+        "published_at": datetime(2016, 5, 4),
+        "effective_at": datetime(2018, 5, 25),
         "active": False,
         "description": "EUR-Lex 官方法律文本入口。自动采集版本须经人工核验。",
     },
@@ -72,6 +80,8 @@ def seed_cloud_official_sources(db: Session) -> int:
                 document_type="law" if item["jurisdiction"] == "CN" else "regulation",
                 status="in_force",
                 original_language=item["original_language"],
+                published_at=item["published_at"],
+                effective_at=item["effective_at"],
                 source_url=item["canonical_url"],
                 canonical_source_url=item["canonical_url"],
                 description=item["description"],

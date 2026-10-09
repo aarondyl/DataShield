@@ -17,6 +17,7 @@ def test_official_source_catalog_is_idempotent_and_only_records_source_metadata(
         regs = db.scalars(select(Regulation)).all()
         sources = db.scalars(select(RegulatorySource)).all()
         assert {reg.short_name for reg in regs} == {"PIPL", "DSL", "GDPR"}
+        assert all(reg.published_at and reg.effective_at for reg in regs)
         assert len(sources) == 3
         assert {source.source_name for source in sources if source.is_active} == {"PIPL", "DSL"}
         assert all(source.source_type == "html" for source in sources)
