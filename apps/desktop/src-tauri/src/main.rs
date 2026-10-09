@@ -1,11 +1,56 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::{path::PathBuf, sync::Mutex, time::Duration};
+use std::{fs, path::PathBuf, sync::Mutex, time::Duration};
 
+#[cfg(windows)]
+use keyring::Entry;
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use tauri::{Manager, RunEvent, State};
 use tauri_plugin_shell::{process::CommandChild, ShellExt};
+
+const AI_CREDENTIAL_SERVICE: &str = "com.datashield.desktop";
+const AI_CREDENTIAL_USER: &str = "local-ai-api-key";
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AiProviderConfig {
+    provider: String,
+    base_url: String,
+    model: String,
+    cloud_consent: bool,
+}
+
+impl Default for AiProviderConfig {
+    fn default() -> Self {
+        Self {
+            provider: "mock".into(),
+            base_url: "https://api.deepseek.com".into(),
+            model: "deepseek-flash".into(),
+            cloud_consent: false,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AiProviderUpdate {
+    provider: String,
+    base_url: String,
+    model: String,
+    api_key: Option<String>,
+    cloud_consent: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AiProviderView {
+    provider: String,
+    base_url: String,
+    model: String,
+    cloud_consent: bool,
+    key_configured: bool,
+}
 
 #[derive(Clone, Deserialize)]
 struct RuntimeDescriptor {
@@ -43,6 +88,153 @@ fn runtime_descriptor_path() -> Result<PathBuf, String> {
     }
     .ok_or_else(|| "无法定位当前用户的数据目录".to_string())?;
     Ok(data_dir.join("DataShield").join("runtime.json"))
+}
+
+fn app_data_dir() -> Result<PathBuf, String> {
+    let base = if cfg!(target_os = "windows") {
+        dirs_next::data_local_dir()
+    } else {
+        dirs_next::data_dir()
+    }
+    .ok_or_else(|| "无法定位当前用户的数据目录".to_string())?;
+    Ok(base.join("DataShield"))
+}
+
+fn ai_config_path() -> Result<PathBuf, String> {
+    Ok(app_data_dir()?.join("ai-provider.json"))
+}
+
+fn read_ai_config() -> AiProviderConfig {
+    ai_config_path()
+        .ok()
+        .and_then(|path| fs::read(path).ok())
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default()
+}
+
+#[cfg(windows)]
+fn credential_entry() -> Result<Entry, String> {
+    Entry::new(AI_CREDENTIAL_SERVICE, AI_CREDENTIAL_USER)
+        .map_err(|_| "KEYSTORE_UNAVAILABLE".to_string())
+}
+
+#[cfg(not(windows))]
+fn get_stored_key() -> Result<String, String> {
+    Err("KEYSTORE_WINDOWS_ONLY".into())
+}
+
+#[cfg(windows)]
+fn get_stored_key() -> Result<String, String> {
+    credential_entry()?
+        .get_password()
+        .map_err(|_| "KEY_NOT_SAVED".into())
+}
+
+#[cfg(not(windows))]
+fn save_stored_key(_key: &str) -> Result<(), String> {
+    Err("KEYSTORE_WINDOWS_ONLY".into())
+}
+
+#[cfg(windows)]
+fn save_stored_key(key: &str) -> Result<(), String> {
+    credential_entry()?
+        .set_password(key)
+        .map_err(|_| "KEY_SAVE_FAILED".into())
+}
+
+#[cfg(not(windows))]
+fn remove_stored_key() -> Result<(), String> {
+    Err("KEYSTORE_WINDOWS_ONLY".into())
+}
+
+#[cfg(windows)]
+fn remove_stored_key() -> Result<(), String> {
+    match credential_entry()?.delete_credential() {
+        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Err(_) => Err("KEY_DELETE_FAILED".into()),
+    }
+}
+
+fn ai_provider_view(config: AiProviderConfig) -> AiProviderView {
+    let key_configured = get_stored_key().is_ok();
+    AiProviderView {
+        provider: config.provider,
+        base_url: config.base_url,
+        model: config.model,
+        cloud_consent: config.cloud_consent,
+        key_configured,
+    }
+}
+
+#[tauri::command]
+fn get_ai_provider_config() -> AiProviderView {
+    ai_provider_view(read_ai_config())
+}
+
+fn valid_ai_endpoint(provider: &str, base_url: &str) -> bool {
+    match provider {
+        "byok" => reqwest::Url::parse(base_url)
+            .map(|url| {
+                url.scheme() == "https"
+                    && url.host().is_some()
+                    && url.username().is_empty()
+                    && url.password().is_none()
+                    && url.query().is_none()
+                    && url.fragment().is_none()
+            })
+            .unwrap_or(false),
+        "ollama" => base_url == "http://127.0.0.1:11434/v1",
+        "mock" => true,
+        _ => false,
+    }
+}
+
+#[tauri::command]
+fn set_ai_provider_config(update: AiProviderUpdate) -> Result<AiProviderView, String> {
+    let provider = update.provider.trim();
+    let base_url = update.base_url.trim().trim_end_matches('/');
+    let model = update.model.trim();
+    if !valid_ai_endpoint(provider, base_url) {
+        return Err("AI_ENDPOINT_INVALID".into());
+    }
+    if provider != "mock" && model.is_empty() {
+        return Err("AI_MODEL_REQUIRED".into());
+    }
+    if provider == "byok" && !update.cloud_consent {
+        return Err("AI_CONSENT_REQUIRED".into());
+    }
+
+    let provided_key = update.api_key.unwrap_or_default();
+    if provider == "byok" && !provided_key.is_empty() {
+        save_stored_key(provided_key.trim())?;
+    }
+    if provider == "byok" && get_stored_key().is_err() {
+        return Err("AI_KEY_REQUIRED".into());
+    }
+    if provider == "mock" {
+        remove_stored_key()?;
+    }
+
+    let config = AiProviderConfig {
+        provider: provider.to_string(),
+        base_url: base_url.to_string(),
+        model: model.to_string(),
+        cloud_consent: update.cloud_consent,
+    };
+    let path = ai_config_path()?;
+    fs::create_dir_all(path.parent().ok_or("AI_CONFIG_PATH_INVALID")?)
+        .map_err(|_| "AI_CONFIG_DIRECTORY_FAILED".to_string())?;
+    fs::write(
+        &path,
+        serde_json::to_vec(&config).map_err(|_| "AI_CONFIG_ENCODE_FAILED")?,
+    )
+    .map_err(|_| "AI_CONFIG_SAVE_FAILED".to_string())?;
+    Ok(ai_provider_view(config))
+}
+
+#[tauri::command]
+fn delete_ai_provider_key() -> Result<(), String> {
+    remove_stored_key()
 }
 
 fn valid_loopback_url(url: &str) -> bool {
@@ -232,13 +424,40 @@ async fn local_api_request(
 }
 
 fn start_sidecar(app: &tauri::AppHandle, state: &DesktopState) -> Result<(), String> {
-    let command = app
+    let ai = read_ai_config();
+    let mut command = app
         .shell()
         .sidecar("datashield-local")
-        .map_err(|_| "未找到已打包的本地智能体 sidecar".to_string())?;
-    let (_events, child) = command
+        .map_err(|_| "未找到已打包的本地智能体 sidecar".to_string())?
         .env("RUNTIME_MODE", "local")
         .env("RUN_SEED", "false")
+        .env("LLM_API_KEY", "")
+        .env("LLM_CLOUD_CONSENT", "false");
+    match ai.provider.as_str() {
+        "byok" => {
+            command = command
+                .env("DESKTOP_AI_MODE", "byok")
+                .env("LLM_PROVIDER", "api")
+                .env("LLM_BASE_URL", &ai.base_url)
+                .env("LLM_MODEL", &ai.model)
+                .env("LLM_CLOUD_CONSENT", ai.cloud_consent.to_string());
+            #[cfg(windows)]
+            {
+                if let Ok(key) = get_stored_key() {
+                    command = command.env("LLM_API_KEY", key);
+                }
+            }
+        }
+        "ollama" => {
+            command = command
+                .env("DESKTOP_AI_MODE", "local")
+                .env("LLM_PROVIDER", "api")
+                .env("LLM_BASE_URL", &ai.base_url)
+                .env("LLM_MODEL", &ai.model);
+        }
+        _ => command = command.env("DESKTOP_AI_MODE", "mock"),
+    }
+    let (_events, child) = command
         .spawn()
         .map_err(|_| "无法启动本地智能体 sidecar".to_string())?;
     *state
@@ -276,7 +495,10 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             runtime_health,
             local_api_request,
-            select_repository
+            select_repository,
+            get_ai_provider_config,
+            set_ai_provider_config,
+            delete_ai_provider_key
         ])
         .build(tauri::generate_context!())
         .expect("启动 DataShield Desktop 失败")
@@ -325,5 +547,32 @@ mod tests {
     fn bridge_only_allows_expected_http_methods() {
         assert!(valid_method("POST"));
         assert!(!valid_method("CONNECT"));
+    }
+
+    #[test]
+    fn byok_requires_https_without_embedded_credentials_or_query() {
+        assert!(super::valid_ai_endpoint("byok", "https://api.deepseek.com"));
+        assert!(super::valid_ai_endpoint("byok", "https://example.test/v1"));
+        assert!(!super::valid_ai_endpoint("byok", "http://example.test/v1"));
+        assert!(!super::valid_ai_endpoint(
+            "byok",
+            "https://user:secret@example.test/v1"
+        ));
+        assert!(!super::valid_ai_endpoint(
+            "byok",
+            "https://example.test/v1?key=secret"
+        ));
+    }
+
+    #[test]
+    fn ollama_endpoint_is_confined_to_loopback() {
+        assert!(super::valid_ai_endpoint(
+            "ollama",
+            "http://127.0.0.1:11434/v1"
+        ));
+        assert!(!super::valid_ai_endpoint(
+            "ollama",
+            "http://192.168.1.20:11434/v1"
+        ));
     }
 }

@@ -26,4 +26,9 @@ def health() -> HealthOut:
         db=db_kind(),
         llm_provider=settings.llm_provider,
         embedding_provider=settings.embedding_provider,
+        ai_mode=settings.desktop_ai_mode,
+        llm_configured=(
+            (settings.desktop_ai_mode == "local" and bool(settings.llm_model))
+            or (settings.desktop_ai_mode == "byok" and bool(settings.llm_api_key) and settings.llm_cloud_consent)
+        ),
     )

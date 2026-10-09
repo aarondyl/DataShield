@@ -86,7 +86,9 @@ def create_app() -> FastAPI:
     mode = get_settings().runtime_mode
     if mode == "local":
         from app.api import local_repositories
+        from app.api import ai_provider
         app.include_router(local_repositories.router, prefix="/api")
+        app.include_router(ai_provider.router, prefix="/api")
     from app.api import health
     app.include_router(health.router, prefix="/api")
     if mode == "cloud":

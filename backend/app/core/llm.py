@@ -63,13 +63,15 @@ class ApiLLMClient(BaseLLMClient):
 
     def __init__(self) -> None:
         settings = get_settings()
-        if not settings.llm_api_key:
+        api_key = settings.llm_api_key or ("ollama-local" if settings.desktop_ai_mode == "local" else "")
+        if not api_key:
             raise LLMError("未配置 LLM_API_KEY，无法使用 api provider")
         # 延迟导入，避免 mock 模式下也强依赖 openai 包可用
         from openai import OpenAI
 
-        self._client = OpenAI(api_key=settings.llm_api_key, base_url=settings.llm_base_url)
+        self._client = OpenAI(api_key=api_key, base_url=settings.llm_base_url)
         self._model = settings.llm_model
+        self.provider_name = settings.desktop_ai_mode if settings.runtime_mode == "local" else "api"
         self.model_name = settings.llm_model
 
     def chat_json(
@@ -563,13 +565,17 @@ def get_llm_client() -> BaseLLMClient:
     """
     settings = get_settings()
     if settings.llm_provider == "api":
+        if settings.runtime_mode == "local" and settings.desktop_ai_mode == "byok" and not settings.llm_cloud_consent:
+            raise LLMError("使用 BYOK 前请先确认本次分析所需上下文会发送给你选择的模型服务商")
         return ApiLLMClient()
     return MockLLMClient()
 
 
 def get_llm_client_safe() -> BaseLLMClient:
-    """获取可用的 LLM 客户端：api 不可用时回退 mock，保证节点永不因取客户端而崩溃。"""
+    """仅在显式 Mock 模式降级；真实 Provider 配置错误必须向用户报告。"""
     try:
         return get_llm_client()
     except LLMError:
-        return MockLLMClient()
+        if get_settings().desktop_ai_mode == "mock":
+            return MockLLMClient()
+        raise
