@@ -243,6 +243,8 @@ export default {
       organizationSwitched: 'Cloud organization switched. Your local workspace was not switched or uploaded.', invitationSent: 'Invitation email sent.',
       invitationCode: 'Invitation code from your email', acceptInvitation: 'Accept organization invitation', invitationAccepted: 'Organization joined. Select it above to switch the active Cloud organization.',
       roles: { owner: 'Owner', admin: 'Administrator', member: 'Member' },
+      memberRole: 'Member role', removeMember: 'Remove member', roleUpdated: 'Member role updated.',
+      confirmRemoveMember: 'Remove {{email}} from this organization?', memberRemoved: 'Member removed.',
       newPassword: 'New password (at least 12 characters)', requestReset: 'Send reset code', resetPassword: 'Reset password',
       passwordResetDone: 'Password reset. Sign in with your new password.', forgotPassword: 'Forgot password?',
       backToLogin: 'Back to sign in', resendVerification: 'Resend verification email', verificationResent: 'Verification email resent.',

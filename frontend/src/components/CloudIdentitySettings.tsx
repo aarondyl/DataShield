@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import client from '../api/client';
 import { identityErrorMessage } from '../features/auth/identityErrors';
 
-type IdentityView = { email: string; name?: string; organization?: { id: number; name: string; edition: string; role: string } };
+type IdentityView = { userId?: number; email: string; name?: string; organization?: { id: number; name: string; edition: string; role: string } };
 type Organization = { id: number; name: string; edition: string; role: string; active: boolean };
 type Member = { user_id: number; email: string; name: string; role: string };
 
@@ -65,6 +65,28 @@ export default function CloudIdentitySettings() {
     } catch (error) { setMessage(identityErrorMessage(error, t)); }
     finally { setBusy(false); }
   };
+
+  const changeRole = async (member: Member, role: 'admin' | 'member') => {
+    const organizationId = account?.organization?.id;
+    if (!organizationId) return;
+    setBusy(true); setMessage('');
+    try {
+      await invoke('cloud_identity_change_member_role', { input: { baseUrl, organizationId, userId: member.user_id, role } });
+      await load(); setMessage(t('appnew.desktopAccount.roleUpdated'));
+    } catch (error) { setMessage(identityErrorMessage(error, t)); }
+    finally { setBusy(false); }
+  };
+
+  const removeMember = async (member: Member) => {
+    const organizationId = account?.organization?.id;
+    if (!organizationId || !window.confirm(t('appnew.desktopAccount.confirmRemoveMember', { email: member.email }))) return;
+    setBusy(true); setMessage('');
+    try {
+      await invoke('cloud_identity_remove_member', { input: { baseUrl, organizationId, userId: member.user_id } });
+      await load(); setMessage(t('appnew.desktopAccount.memberRemoved'));
+    } catch (error) { setMessage(identityErrorMessage(error, t)); }
+    finally { setBusy(false); }
+  };
   useEffect(() => { void load(); }, []);
 
   const signOut = async () => {
@@ -78,7 +100,11 @@ export default function CloudIdentitySettings() {
     <p>{account ? t('appnew.desktopAccount.signedIn', { email: account.email, organization: account.organization?.name || '' }) : status === 'unavailable' ? t('appnew.desktopAccount.statusUnavailable') : status === 'checking' ? t('appnew.desktopAccount.checking') : t('appnew.desktopAccount.signedOutState')}</p>
     {account?.organization && <>
       {organizations.length > 1 && <label>{t('appnew.desktopAccount.activeOrganization')}<select value={account.organization.id} disabled={busy} onChange={event => void switchOrganization(Number(event.target.value))}>{organizations.map(org => <option key={org.id} value={org.id}>{org.name}</option>)}</select></label>}
-      <ul>{members.map(member => <li key={member.user_id}>{member.name} · {member.email} · {t(`appnew.desktopAccount.roles.${member.role}`, { defaultValue: member.role })}</li>)}</ul>
+      <ul>{members.map(member => <li key={member.user_id}>
+        {member.name} · {member.email} · {t(`appnew.desktopAccount.roles.${member.role}`, { defaultValue: member.role })}
+        {account.organization?.role === 'owner' && member.role !== 'owner' && <select aria-label={t('appnew.desktopAccount.memberRole')} value={member.role} disabled={busy} onChange={event => void changeRole(member, event.target.value as 'admin' | 'member')}><option value="member">{t('appnew.desktopAccount.roles.member')}</option><option value="admin">{t('appnew.desktopAccount.roles.admin')}</option></select>}
+        {['owner', 'admin'].includes(account.organization?.role || '') && member.role !== 'owner' && member.user_id !== account.userId && !(account.organization?.role === 'admin' && member.role === 'admin') && <button className="ds-button quiet" disabled={busy} onClick={() => void removeMember(member)}>{t('appnew.desktopAccount.removeMember')}</button>}
+      </li>)}</ul>
       {['owner', 'admin'].includes(account.organization.role) && <form onSubmit={invite}><label>{t('appnew.desktopAccount.inviteMember')}<input type="email" required maxLength={320} value={inviteEmail} onChange={event => setInviteEmail(event.target.value)} /></label><button className="ds-button quiet" disabled={busy}>{t('appnew.desktopAccount.sendInvitation')}</button></form>}
       <form onSubmit={acceptInvitation}><label>{t('appnew.desktopAccount.invitationCode')}<input required maxLength={256} value={inviteCode} onChange={event => setInviteCode(event.target.value)} /></label><button className="ds-button quiet" disabled={busy}>{t('appnew.desktopAccount.acceptInvitation')}</button></form>
     </>}

@@ -243,6 +243,8 @@ export default {
       organizationSwitched: '已切换云端组织。此操作不会切换或上传本地工作区。', invitationSent: '邀请邮件已发送。',
       invitationCode: '邀请邮件中的验证码', acceptInvitation: '接受组织邀请', invitationAccepted: '已加入组织；可在上方切换当前云端组织。',
       roles: { owner: '所有者', admin: '管理员', member: '成员' },
+      memberRole: '成员角色', removeMember: '移除成员', roleUpdated: '成员权限已更新。',
+      confirmRemoveMember: '确定从此组织移除 {{email}} 吗？', memberRemoved: '成员已移除。',
       newPassword: '新密码（至少 12 位）', requestReset: '发送重置验证码', resetPassword: '重置密码',
       passwordResetDone: '密码已重置，请使用新密码登录。', forgotPassword: '忘记密码？',
       backToLogin: '返回登录', resendVerification: '重新发送验证邮件', verificationResent: '验证邮件已重新发送。',

@@ -139,6 +139,23 @@ struct IdentityAcceptInvitationInput {
     code: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IdentityMemberActionInput {
+    base_url: String,
+    organization_id: i64,
+    user_id: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IdentityMemberRoleInput {
+    base_url: String,
+    organization_id: i64,
+    user_id: i64,
+    role: String,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct IdentityAuthView {
@@ -719,6 +736,42 @@ async fn cloud_identity_accept_invitation(
 }
 
 #[tauri::command]
+async fn cloud_identity_remove_member(
+    input: IdentityMemberActionInput,
+    state: State<'_, DesktopState>,
+) -> Result<serde_json::Value, String> {
+    identity_authenticated_request(
+        &input.base_url,
+        &format!(
+            "/v1/organizations/{}/members/{}",
+            input.organization_id, input.user_id
+        ),
+        Method::DELETE,
+        None,
+        &state,
+    )
+    .await
+}
+
+#[tauri::command]
+async fn cloud_identity_change_member_role(
+    input: IdentityMemberRoleInput,
+    state: State<'_, DesktopState>,
+) -> Result<serde_json::Value, String> {
+    identity_authenticated_request(
+        &input.base_url,
+        &format!(
+            "/v1/organizations/{}/members/{}",
+            input.organization_id, input.user_id
+        ),
+        Method::PATCH,
+        Some(serde_json::json!({"role": input.role})),
+        &state,
+    )
+    .await
+}
+
+#[tauri::command]
 async fn cloud_identity_me(
     input: IdentityEndpointInput,
     state: State<'_, DesktopState>,
@@ -1033,7 +1086,9 @@ fn main() {
             cloud_identity_switch_organization,
             cloud_identity_members,
             cloud_identity_invite,
-            cloud_identity_accept_invitation
+            cloud_identity_accept_invitation,
+            cloud_identity_remove_member,
+            cloud_identity_change_member_role
         ])
         .build(tauri::generate_context!())
         .expect("启动 DataShield Desktop 失败")
