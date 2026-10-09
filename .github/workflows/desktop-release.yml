@@ -1,15 +1,15 @@
-name: Desktop Release Candidate（不部署 Cloud/Web）
+name: DataShield Desktop Pre-release
 on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: '经审核的完整 40 位 Commit SHA；从此提交重新构建'
+        description: 固定的 main Commit SHA（完整 40 位）
         required: true
         type: string
-      publish_approved:
-        description: '仅在用户完成 Windows 实机验收并批准发布后勾选'
-        default: false
-        type: boolean
+      version:
+        description: 新 SemVer 预发布版本，例如 0.2.0-rc.1
+        required: true
+        type: string
 permissions:
   contents: read
 jobs:
@@ -19,12 +19,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.source_sha }}
-      - name: 校验指定提交并运行完整后端回归
+      - name: 校验 main 提交与新版本号
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
+          VERSION: ${{ inputs.version }}
         run: |
           [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ ]]
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          git fetch origin main
+          git merge-base --is-ancestor "$SOURCE_SHA" origin/main
+          ! git rev-parse "refs/tags/v$VERSION" >/dev/null 2>&1
+          test "$(python -c 'import json;print(json.load(open("apps/desktop/package.json"))["version"])')" = "$VERSION"
+          test "$(grep '^version = ' apps/desktop/src-tauri/Cargo.toml | head -1 | cut -d '\"' -f2)" = "$VERSION"
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -37,9 +44,7 @@ jobs:
     with:
       source_ref: ${{ inputs.source_sha }}
   publish:
-    if: ${{ inputs.publish_approved }}
     needs: windows
-    environment: desktop-release
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -51,11 +56,15 @@ jobs:
         with:
           name: DataShield-Windows-Installer
           path: release-assets
-      - name: 发布经批准的 Desktop Pre-release
+      - name: 核对来源并发布新的预发布版本
         env:
           GH_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ inputs.source_sha }}
+          VERSION: ${{ inputs.version }}
         run: |
           test "$(tr -d '\r\n\357\273\277' < release-assets/SOURCE_COMMIT.txt)" = "$SOURCE_SHA"
-          printf '\nSource Commit: `%s`\n' "$SOURCE_SHA" >> docs/DESKTOP_RELEASE_NOTES.md
-          gh release create desktop-v0.1.0 release-assets/* --prerelease --target "$SOURCE_SHA" --title 'DataShield Desktop v0.1.0' --notes-file docs/DESKTOP_RELEASE_NOTES.md
+          TAG="v$VERSION"
+          ! gh release view "$TAG" >/dev/null 2>&1
+          cp docs/DESKTOP_RELEASE_NOTES.md release-notes.md
+          printf '\n\nSource Commit: `%s`\n' "$SOURCE_SHA" >> release-notes.md
+          gh release create "$TAG" release-assets/* --prerelease --target "$SOURCE_SHA" --title "DataShield Desktop $TAG" --notes-file release-notes.md
