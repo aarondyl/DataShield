@@ -52,6 +52,32 @@ def test_http_source_retries_transient_server_errors(monkeypatch):
     assert raw.content == "<p>正文</p>"
 
 
+def test_source_snapshot_stores_original_bytes_and_separate_raw_hash(tmp_path, monkeypatch):
+    import hashlib
+    from app.regintel import pipeline
+
+    monkeypatch.setattr(pipeline, "BACKEND_ROOT", tmp_path)
+    raw = b"<article>raw &amp; official</article>"
+    uri, raw_hash = pipeline._write_snapshot(9, "normalized-hash", raw)
+    assert (tmp_path / uri).read_bytes() == raw
+    assert raw_hash == hashlib.sha256(raw).hexdigest()
+    assert raw.raw_bytes == "<p>正文</p>".encode("utf-8")
+
+
+def test_raw_snapshot_preserves_exact_response_bytes_and_hash(tmp_path, monkeypatch):
+    import hashlib
+    import app.regintel.pipeline as pipeline
+
+    monkeypatch.setattr(pipeline, "BACKEND_ROOT", tmp_path)
+    monkeypatch.setattr(pipeline, "SNAPSHOT_DIR", "snapshots")
+    raw_bytes = b"<html><p>Official response</p></html>\r\n"
+    uri, raw_hash = pipeline._write_snapshot(7, "a" * 64, raw_bytes)
+    snapshot_path = tmp_path / uri
+
+    assert snapshot_path.read_bytes() == raw_bytes
+    assert raw_hash == hashlib.sha256(raw_bytes).hexdigest()
+
+
 def test_scheduler_registers_warmup_and_daily_single_instance_jobs(monkeypatch):
     from app.core.config import get_settings
 

@@ -49,14 +49,17 @@ from app.regintel.retrieval import deactivate_legal_chunks, index_legal_chunks
 SNAPSHOT_DIR = "data/snapshots"
 
 
-def _write_snapshot(source_id: int, digest: str, text: str) -> str:
-    """把规范化文本写入快照文件（按内容哈希去重），返回相对路径。"""
+def _write_snapshot(source_id: int, digest: str, raw_bytes: bytes) -> tuple[str, str]:
+    """保存原始抓取响应字节，返回快照路径与原始 SHA256。"""
+    import hashlib
+
+    raw_digest = hashlib.sha256(raw_bytes).hexdigest()
     dirpath = BACKEND_ROOT / SNAPSHOT_DIR / str(source_id)
     dirpath.mkdir(parents=True, exist_ok=True)
-    path = dirpath / f"{digest[:12]}.txt"
+    path = dirpath / f"{digest[:12]}-{raw_digest[:12]}.bin"
     if not path.exists():
-        path.write_text(text, encoding="utf-8")
-    return path.relative_to(BACKEND_ROOT).as_posix()
+        path.write_bytes(raw_bytes)
+    return path.relative_to(BACKEND_ROOT).as_posix(), raw_digest
 
 
 def _embedding_model_name() -> str:
@@ -335,14 +338,16 @@ def _run_pipeline(
     if existing_snapshot is not None:
         snapshot_uri = existing_snapshot.snapshot_uri
     else:
-        snapshot_uri = _write_snapshot(source.id, digest, normalized)
+        raw_bytes = raw.raw_bytes if raw.raw_bytes is not None else raw.content.encode("utf-8")
+        snapshot_uri, raw_content_hash = _write_snapshot(source.id, digest, raw_bytes)
         db.add(
             SourceSnapshot(
                 source_id=source.id,
                 regulation_id=regulation.id,
                 snapshot_uri=snapshot_uri,
                 content_hash=digest,
-                content_length=len(normalized.encode("utf-8")),
+                raw_content_hash=raw_content_hash,
+                content_length=len(raw_bytes),
             )
         )
 

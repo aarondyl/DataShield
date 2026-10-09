@@ -32,6 +32,7 @@ class RawDocument:
     """一次抓取得到的原始文档。"""
 
     content: str = ""
+    raw_bytes: bytes | None = None
     origin_url: str = ""
     content_type: str = "text/plain"
     retrieved_at: datetime = field(default_factory=lambda: datetime.now(UTC).replace(tzinfo=None))
@@ -72,8 +73,9 @@ class LocalFileAdapter(SourceAdapter):
             file_path = BACKEND_ROOT / path
         if not file_path.exists():
             raise FileNotFoundError(f"来源快照不存在：{file_path}")
-        content = file_path.read_text(encoding="utf-8")
-        return RawDocument(content=content, origin_url=str(file_path), content_type="text/plain")
+        raw_bytes = file_path.read_bytes()
+        content = raw_bytes.decode("utf-8")
+        return RawDocument(content=content, raw_bytes=raw_bytes, origin_url=str(file_path), content_type="text/plain")
 
 
 class HttpTextAdapter(SourceAdapter):
@@ -114,8 +116,8 @@ class HttpTextAdapter(SourceAdapter):
             from pypdf import PdfReader
 
             text = "\n".join((p.extract_text() or "") for p in PdfReader(io.BytesIO(resp.content)).pages)
-            return RawDocument(content=text, origin_url=url, content_type="application/pdf")
-        return RawDocument(content=resp.text, origin_url=url, content_type="text/html")
+            return RawDocument(content=text, raw_bytes=resp.content, origin_url=url, content_type="application/pdf")
+        return RawDocument(content=resp.text, raw_bytes=resp.content, origin_url=url, content_type="text/html")
 
     def extract_content(self, raw: RawDocument) -> str:
         text = raw.content

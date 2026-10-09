@@ -74,6 +74,12 @@ def init_db() -> None:
             connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
 
     Base.metadata.create_all(bind=engine)
+    snapshot_columns = {column["name"] for column in inspect(engine).get_columns("source_snapshots")}
+    if "raw_content_hash" not in snapshot_columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE source_snapshots ADD COLUMN raw_content_hash VARCHAR(64) NOT NULL DEFAULT ''")
+            )
     # Account linkage was added after desktop SQLite files were already in use.
     # Keep the local runtime's additive startup migration safe for existing files.
     evaluation_columns = {column["name"] for column in inspect(engine).get_columns("evaluation_sessions")}
@@ -144,4 +150,10 @@ def init_regintel_db() -> None:
         with engine.begin() as connection:
             connection.execute(
                 text("ALTER TABLE regulation_versions ADD COLUMN review_status VARCHAR(32) NOT NULL DEFAULT 'UNREVIEWED'")
+            )
+    snapshot_columns = {column["name"] for column in inspect(engine).get_columns("source_snapshots")}
+    if "raw_content_hash" not in snapshot_columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE source_snapshots ADD COLUMN raw_content_hash VARCHAR(64) NOT NULL DEFAULT ''")
             )

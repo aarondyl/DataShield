@@ -39,7 +39,7 @@ class RegulatorySource(Base):
 
 
 class SourceSnapshot(Base):
-    """每次抓取保存的原始内容快照（供重放解析，避免重复访问官网）。"""
+    """抓取响应原始字节的持久快照；内容解析使用规范化文本。"""
 
     __tablename__ = "source_snapshots"
 
@@ -50,8 +50,12 @@ class SourceSnapshot(Base):
     regulation_id: Mapped[int | None] = mapped_column(
         ForeignKey("regulations.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    snapshot_uri: Mapped[str] = mapped_column(String(500), default="", comment="快照文件落盘路径")
+    snapshot_uri: Mapped[str] = mapped_column(String(500), default="", comment="原始响应快照文件路径")
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False, comment="规范化文本的 SHA256")
+    raw_content_hash: Mapped[str] = mapped_column(
+        String(64), default="", server_default="", nullable=False,
+        comment="抓取响应原始字节的 SHA256",
+    )
     content_length: Mapped[int] = mapped_column(Integer, default=0, comment="快照字节数")
     retrieved_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), comment="抓取时间")
 

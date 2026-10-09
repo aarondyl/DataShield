@@ -41,6 +41,8 @@ services:
       CLOUD_ADMIN_TOKEN_FILE: /run/secrets/cloud_admin_token
     ports:
       - "${CLOUD_BIND_ADDRESS:-127.0.0.1}:8000:8000"
+    volumes:
+      - cloud_regintel_snapshots:/app/data/snapshots
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,3 +73,4 @@ secrets:
 
 volumes:
   cloud_postgres_data:
+  cloud_regintel_snapshots:
