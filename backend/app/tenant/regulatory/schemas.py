@@ -14,6 +14,7 @@ class RegulationSourceContext(Contract):
     version: int | None = None
     source_url: str = ""
     effective_date: datetime | None = None
+    review_status: str = "UNREVIEWED"
 
 
 class RegulationTrigger(Contract):
@@ -60,6 +61,7 @@ class RequirementContext(Contract):
     jurisdiction: str = ""
     regulation_version: int | None = None
     source_url: str = ""
+    review_status: str = "UNREVIEWED"
 
 
 class LegalEvidence(Contract):
@@ -74,3 +76,4 @@ class LegalEvidence(Contract):
     source_url: str
     effective_date: datetime | None = None
     requirement_ids: list[int] = Field(default_factory=list)
+    review_status: str = "UNREVIEWED"

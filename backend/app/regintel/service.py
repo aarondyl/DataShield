@@ -82,7 +82,17 @@ def load_requirements(db: Session, requirement_ids: Iterable[int]) -> list[Requi
         return []
     rows = db.scalars(select(Requirement).where(Requirement.id.in_(ids))).all()
     by_id = {row.id: row for row in rows}
-    return [RequirementOut.model_validate(by_id[item]) for item in ids if item in by_id]
+    outputs = [RequirementOut.model_validate(by_id[item]) for item in ids if item in by_id]
+    versions = {
+        version.id: version
+        for version in db.scalars(
+            select(RegulationVersion).where(RegulationVersion.id.in_({item.version_id for item in outputs}))
+        ).all()
+    } if outputs else {}
+    for output in outputs:
+        if output.version_id in versions:
+            output.review_status = versions[output.version_id].review_status
+    return outputs
 
 
 def load_requirements_for_legal_units(
@@ -113,6 +123,7 @@ def load_legal_units(db: Session, legal_unit_ids: Iterable[int]) -> list[LegalUn
         out = LegalUnitOut.model_validate(unit)
         if version:
             out.version_number = version.version_number
+            out.review_status = version.review_status
         if regulation:
             out.regulation_id = regulation.id
             out.regulation_name = regulation.name

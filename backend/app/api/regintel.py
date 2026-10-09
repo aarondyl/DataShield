@@ -106,6 +106,7 @@ def legal_search(body: LegalSearchRequest, db: Session = Depends(get_db)) -> Leg
             ).all()
             requirement_ids = [r.id for r in reqs]
             summary = reqs[0].summary if reqs else ""
+        version = db.get(RegulationVersion, hit.get("version_id")) if hit.get("version_id") else None
         results.append(
             LegalSearchResultItem(
                 chunk_id=hit["chunk_id"],
@@ -119,6 +120,7 @@ def legal_search(body: LegalSearchRequest, db: Session = Depends(get_db)) -> Leg
                 summary=summary,
                 source_url=hit.get("source_url", ""),
                 similarity_score=hit.get("score"),
+                review_status=version.review_status if version else "UNREVIEWED",
             )
         )
     return LegalSearchResponse(results=results)
@@ -148,7 +150,15 @@ def list_requirements(
             stmt = stmt.where(Requirement.version_id == regulation.current_version_id)
     if status:
         stmt = stmt.where(Requirement.status == status)
-    return [RequirementOut.model_validate(r) for r in db.scalars(stmt.order_by(Requirement.id)).all()]
+    return [_requirement_out(db, r) for r in db.scalars(stmt.order_by(Requirement.id)).all()]
+
+
+def _requirement_out(db: Session, requirement: Requirement) -> RequirementOut:
+    out = RequirementOut.model_validate(requirement)
+    version = db.get(RegulationVersion, requirement.version_id)
+    if version:
+        out.review_status = version.review_status
+    return out
 
 
 @router.get("/requirements/{requirement_id}", response_model=RequirementOut)
@@ -157,7 +167,7 @@ def get_requirement(requirement_id: int, db: Session = Depends(get_db)) -> Requi
     requirement = db.get(Requirement, requirement_id)
     if requirement is None:
         raise HTTPException(status_code=404, detail="义务单元不存在")
-    return RequirementOut.model_validate(requirement)
+    return _requirement_out(db, requirement)
 
 
 @router.get("/legal-units/{unit_id}", response_model=LegalUnitOut)
@@ -171,6 +181,7 @@ def get_legal_unit(unit_id: int, db: Session = Depends(get_db)) -> LegalUnitOut:
     out = LegalUnitOut.model_validate(unit)
     if version:
         out.version_number = version.version_number
+        out.review_status = version.review_status
     if regulation:
         out.regulation_id = regulation.id
         out.regulation_name = regulation.name

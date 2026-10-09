@@ -35,10 +35,14 @@ services:
       DATABASE_URL_FILE: /run/secrets/cloud_database_url
       RUNTIME_MODE: cloud
       RUN_SEED: "false"
-      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-false}
+      # The Cloud runtime owns only public legal sources; the scheduler performs
+      # one low-concurrency warm-up poll after startup and then daily refreshes.
+      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
       CLOUD_ADMIN_TOKEN_FILE: /run/secrets/cloud_admin_token
     ports:
       - "${CLOUD_BIND_ADDRESS:-127.0.0.1}:8000:8000"
+    volumes:
+      - cloud_regintel_snapshots:/app/data/snapshots
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,3 +73,4 @@ secrets:
 
 volumes:
   cloud_postgres_data:
+  cloud_regintel_snapshots:

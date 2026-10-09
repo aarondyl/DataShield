@@ -52,6 +52,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     settings = get_settings()
     if settings.runtime_mode == "cloud":
         init_regintel_db()
+        from app.services.cloud_source_catalog import seed_cloud_official_sources
+
+        with SessionLocal() as db:
+            seed_cloud_official_sources(db)
     else:
         init_db()
     if is_sqlite() and settings.runtime_mode != "cloud":

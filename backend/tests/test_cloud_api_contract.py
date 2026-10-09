@@ -33,3 +33,20 @@ def test_cloud_does_not_mount_private_tenant_routes(monkeypatch):
     client = _client(monkeypatch)
     assert client.get("/api/companies").status_code == 404
     assert client.get("/api/v1/today?tenant_id=1&product_id=1").status_code == 404
+
+
+def test_cloud_startup_registers_official_sources_without_claiming_review(monkeypatch):
+    client = _client(monkeypatch)
+    # TestClient only invokes FastAPI's lifespan when used as a context manager.
+    # Cloud source registration deliberately happens at startup.
+    with client:
+        sources = client.get("/api/v1/sources").json()
+        assert {source["source_name"] for source in sources} >= {"PIPL", "DSL", "GDPR"}
+        # The public regulation bundle lists catalog entries only after a current
+        # version exists. Other tests may have populated this shared test database.
+        listed_ids = {item["id"] for item in client.get("/api/v1/regulations").json()}
+        for source in sources:
+            regulation_id = source["regulation_id"]
+            detail = client.get(f"/api/v1/regulations/{regulation_id}").json()
+            if detail["current_version_id"] is None:
+                assert regulation_id not in listed_ids

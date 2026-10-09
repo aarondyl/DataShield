@@ -162,6 +162,7 @@ def load_regulation_trigger(db: Session, event_id: str) -> RegulationTrigger:
             version=version.version_number,
             source_url=regulation.canonical_source_url or regulation.source_url,
             effective_date=version.effective_from,
+            review_status=version.review_status,
         ),
     )
 
@@ -170,11 +171,12 @@ def _requirement_context(db: Session, item: RequirementOut) -> RequirementContex
     regulation = get_regulation_info(db, item.regulation_id)
     version = get_regulation_version(db, item.version_id)
     return RequirementContext(
-        **item.model_dump(exclude={"created_at"}),
+        **item.model_dump(exclude={"created_at", "review_status"}),
         regulation_name=regulation.name if regulation else "",
         jurisdiction=regulation.jurisdiction if regulation else "",
         regulation_version=version.version_number if version else None,
         source_url=(regulation.canonical_source_url or regulation.source_url) if regulation else "",
+        review_status=version.review_status if version else "UNREVIEWED",
     )
 
 
@@ -282,5 +284,6 @@ def load_legal_evidence(
             source_url=unit.official_source_url,
             effective_date=version.effective_from,
             requirement_ids=requirement_ids_by_unit[unit.id],
+            review_status=version.review_status,
         ))
     return evidence

@@ -126,6 +126,7 @@ class EvidenceSnapshot(Contract):
     source_url: str
     effective_date: datetime | None = None
     requirement_ids: list[int] = Field(default_factory=list)
+    review_status: str = "UNREVIEWED"
 
 
 class FindingEvidenceRecord(Contract):

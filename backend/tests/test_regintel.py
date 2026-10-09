@@ -269,6 +269,7 @@ class TestChangeDetectionFlow:
             assert search and search[0]["article"] == "第六十六条之一"
             assert search[0]["version_id"] == versions[1]["id"]
             assert search[0]["requirement_ids"], "新条款应关联 requirement"
+            assert search[0]["review_status"] == "UNREVIEWED"
 
             # 修改后的第十三条可检索且为新版 chunk
             search13 = client.post(
@@ -290,6 +291,7 @@ class TestChangeDetectionFlow:
             payload = event["payload"]
             assert payload["regulation_id"] == pipl["id"]
             assert payload["version_id"] == versions[1]["id"]
+            assert payload["review_status"] == "UNREVIEWED"
             assert payload["materiality"] in ("LOW", "MEDIUM", "HIGH", "CRITICAL")
             assert payload["affected_legal_unit_ids"]
             assert payload["requirement_ids"]
