@@ -234,6 +234,7 @@ export default {
       signedOutState: '当前设备未登录云端账户。你仍可继续使用本地工作区。', signedOut: '已退出云端账户。',
       signOutError: '退出云端账户失败，请检查网络后重试。',
       statusUnavailable: '暂时无法连接身份服务，账户状态未知。', checking: '正在检查云端账户状态…',
+      profileLabel: '云端账户',
     },
     localMode: {
       eyebrow: '离线工作区',

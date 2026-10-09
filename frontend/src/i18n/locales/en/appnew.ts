@@ -234,6 +234,7 @@ export default {
       signedOutState: 'No Cloud account is signed in on this device. Your local workspace remains available.', signedOut: 'Signed out of the Cloud account.',
       signOutError: 'Cloud sign-out failed. Check your network and retry.',
       statusUnavailable: 'The identity service is unavailable; account status is unknown.', checking: 'Checking Cloud account status…',
+      profileLabel: 'Cloud account',
     },
     localMode: {
       eyebrow: 'Offline workspace',

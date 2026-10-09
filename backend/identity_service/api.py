@@ -14,6 +14,7 @@ import secrets
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.passwords import hash_password, verify_password
@@ -257,7 +258,11 @@ def register(payload: RegisterInput, request: Request, db: Session = Depends(get
     db.add_all([organization, user])
     db.flush()
     db.add(Membership(organization_id=organization.id, user_id=user.id, role="owner"))
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Email already registered") from None
     db.refresh(user)
     db.refresh(organization)
     _record_attempt(db, email, ip, True)
@@ -338,7 +343,9 @@ def login(payload: LoginInput, request: Request, db: Session = Depends(get_db)):
 @router.post("/auth/refresh")
 def refresh(payload: RefreshInput, db: Session = Depends(get_db)):
     settings = IdentitySettings.load()
-    session = db.scalar(select(IdentitySession).where(IdentitySession.refresh_token_hash == _hash(payload.refresh_token)))
+    session = db.scalar(select(IdentitySession)
+                         .where(IdentitySession.refresh_token_hash == _hash(payload.refresh_token))
+                         .with_for_update())
     now = _now()
     if session is None or session.revoked_at or session.refresh_expires_at <= now:
         raise HTTPException(401, "Refresh token expired or revoked")
