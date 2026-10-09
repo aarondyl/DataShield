@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranslation } from 'react-i18next';
 import client from '../api/client';
+import { identityErrorMessage } from '../features/auth/identityErrors';
 
 type IdentityView = { email: string; name?: string; organization?: { id: number; name: string; edition: string; role: string } };
 type Organization = { id: number; name: string; edition: string; role: string; active: boolean };
@@ -41,7 +42,7 @@ export default function CloudIdentitySettings() {
     try {
       const value = await invoke<IdentityView>('cloud_identity_switch_organization', { input: { baseUrl, organizationId } });
       setAccount(value); await load(); setMessage(t('appnew.desktopAccount.organizationSwitched'));
-    } catch (error) { setMessage(typeof error === 'string' ? error : t('appnew.desktopAccount.requestFailed')); }
+    } catch (error) { setMessage(identityErrorMessage(error, t)); }
     finally { setBusy(false); }
   };
 
@@ -52,7 +53,7 @@ export default function CloudIdentitySettings() {
       if (!organizationId) return;
       await invoke('cloud_identity_invite', { input: { baseUrl, organizationId, email: inviteEmail, role: 'member' } });
       setInviteEmail(''); setMessage(t('appnew.desktopAccount.invitationSent'));
-    } catch (error) { setMessage(typeof error === 'string' ? error : t('appnew.desktopAccount.requestFailed')); }
+    } catch (error) { setMessage(identityErrorMessage(error, t)); }
     finally { setBusy(false); }
   };
 
@@ -61,7 +62,7 @@ export default function CloudIdentitySettings() {
     try {
       await invoke('cloud_identity_accept_invitation', { input: { baseUrl, code: inviteCode } });
       setInviteCode(''); await load(); setMessage(t('appnew.desktopAccount.invitationAccepted'));
-    } catch (error) { setMessage(typeof error === 'string' ? error : t('appnew.desktopAccount.requestFailed')); }
+    } catch (error) { setMessage(identityErrorMessage(error, t)); }
     finally { setBusy(false); }
   };
   useEffect(() => { void load(); }, []);

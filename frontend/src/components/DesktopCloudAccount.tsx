@@ -5,6 +5,7 @@ import client from '../api/client';
 import { createCompany, listCompanies } from '../api';
 import { writeSession, type Edition } from '../features/auth/session';
 import { useNavigate } from 'react-router-dom';
+import { identityErrorMessage } from '../features/auth/identityErrors';
 
 type IdentityView = {
   userId?: number;
@@ -79,7 +80,7 @@ export default function DesktopCloudAccount({ mode, edition }: { mode: 'login' |
         await finishLogin(account);
       }
     } catch (err: any) {
-      setError(typeof err === 'string' ? err : err?.response?.data?.detail || err?.message || t('appnew.desktopAccount.requestFailed'));
+      setError(identityErrorMessage(err, t));
     } finally { setBusy(false); }
   };
 
@@ -103,7 +104,7 @@ export default function DesktopCloudAccount({ mode, edition }: { mode: 'login' |
     {needsVerification && <button className="ds-button quiet" type="button" disabled={busy} onClick={async () => {
       setBusy(true); setError('');
       try { await invoke('cloud_identity_resend_verification', { input: { baseUrl, email } }); setNotice(t('appnew.desktopAccount.verificationResent')); }
-      catch (err: any) { setError(typeof err === 'string' ? err : t('appnew.desktopAccount.requestFailed')); }
+      catch (err: any) { setError(identityErrorMessage(err, t)); }
       finally { setBusy(false); }
     }}>{t('appnew.desktopAccount.resendVerification')}</button>}
     {mode === 'login' && !needsVerification && <button className="ds-button quiet" type="button" onClick={() => { setResettingPassword(value => !value); setResetCodeSent(false); setCode(''); setError(''); }}>{resettingPassword ? t('appnew.desktopAccount.backToLogin') : t('appnew.desktopAccount.forgotPassword')}</button>}
