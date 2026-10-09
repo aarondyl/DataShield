@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useCompanies } from '../hooks';
 import { createCompany, updateCompany } from '../api';
 import type { Company } from '../types';
@@ -22,6 +23,7 @@ const inputCls =
   'w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500';
 
 export default function CompanyPage() {
+  const { t } = useTranslation();
   const { data, loading, error, reload } = useCompanies();
   const [editing, setEditing] = useState<Company | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -68,7 +70,7 @@ export default function CompanyPage() {
       resetForm();
       reload();
     } catch (err: any) {
-      setSubmitError(err?.response?.data?.detail ?? err?.message ?? '保存失败');
+      setSubmitError(err?.response?.data?.detail ?? err?.message ?? t('business.common.saveFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -76,7 +78,7 @@ export default function CompanyPage() {
 
   return (
     <div>
-      <PageHeader title="企业画像" desc="维护企业合规背景，分析代理将自动读取这些信息" />
+      <PageHeader title={t('business.company.title')} desc={t('business.company.desc')} />
       {loading ? (
         <Spinner />
       ) : error ? (
@@ -85,7 +87,7 @@ export default function CompanyPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
             {(data ?? []).length === 0 ? (
-              <EmptyState message="暂无企业,请在右侧创建" />
+              <EmptyState message={t('business.company.empty')} />
             ) : (
               (data ?? []).map((c) => (
                 <div key={c.id} className="bg-white border border-gray-200 rounded-lg p-5">
@@ -105,7 +107,7 @@ export default function CompanyPage() {
                       onClick={() => startEdit(c)}
                       className="text-sm text-indigo-600 hover:underline shrink-0"
                     >
-                      编辑
+                      {t('business.common.edit')}
                     </button>
                   </div>
                 </div>
@@ -115,11 +117,11 @@ export default function CompanyPage() {
 
           <form onSubmit={onSubmit} className="bg-white border border-gray-200 rounded-lg p-5 h-fit">
             <div className="text-sm font-semibold text-slate-900 mb-4">
-              {editing ? `编辑企业 #${editing.id}` : '创建企业'}
+              {editing ? t('business.company.editTitle', { id: editing.id }) : t('business.company.createTitle')}
             </div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">企业名称 *</label>
+                <label className="block text-xs text-gray-500 mb-1">{t('business.company.nameLabel')}</label>
                 <input
                   required
                   className={inputCls}
@@ -128,16 +130,16 @@ export default function CompanyPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">行业</label>
+                <label className="block text-xs text-gray-500 mb-1">{t('business.company.industryLabel')}</label>
                 <input
                   className={inputCls}
                   value={form.industry}
                   onChange={(e) => setForm({ ...form, industry: e.target.value })}
-                  placeholder="如软件服务 / 电子商务 / 金融科技"
+                  placeholder={t('business.company.industryPlaceholder')}
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">所在国家</label>
+                <label className="block text-xs text-gray-500 mb-1">{t('business.company.countryLabel')}</label>
                 <input
                   className={inputCls}
                   value={form.country}
@@ -145,7 +147,7 @@ export default function CompanyPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">目标市场(逗号分隔)</label>
+                <label className="block text-xs text-gray-500 mb-1">{t('business.company.marketsLabel')}</label>
                 <input
                   className={inputCls}
                   value={form.target_markets}
@@ -154,12 +156,12 @@ export default function CompanyPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">商业模式</label>
+                <label className="block text-xs text-gray-500 mb-1">{t('business.company.modelLabel')}</label>
                 <input
                   className={inputCls}
                   value={form.business_model}
                   onChange={(e) => setForm({ ...form, business_model: e.target.value })}
-                  placeholder="如 B2B 订阅制"
+                  placeholder={t('business.company.modelPlaceholder')}
                 />
               </div>
             </div>
@@ -170,7 +172,7 @@ export default function CompanyPage() {
                 disabled={submitting}
                 className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 disabled:opacity-50"
               >
-                {submitting ? '保存中…' : editing ? '保存修改' : '创建'}
+                {submitting ? t('business.common.saving') : editing ? t('business.common.saveChanges') : t('business.common.create')}
               </button>
               {editing && (
                 <button
@@ -178,7 +180,7 @@ export default function CompanyPage() {
                   onClick={resetForm}
                   className="px-4 py-2 border border-gray-300 text-sm rounded-md text-gray-600 hover:bg-gray-50"
                 >
-                  取消
+                  {t('business.common.cancel')}
                 </button>
               )}
             </div>

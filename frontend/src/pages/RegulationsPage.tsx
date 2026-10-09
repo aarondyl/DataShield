@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useRegulations } from '../hooks';
 import { getRegulation, uploadRegulation } from '../api';
 import type { Regulation, RegulationDetail } from '../types';
@@ -18,6 +19,7 @@ function fmtDate(s: string | null) {
 }
 
 export default function RegulationsPage() {
+  const { t } = useTranslation();
   const { data, loading, error, reload } = useRegulations();
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<RegulationDetail | null>(null);
@@ -49,7 +51,7 @@ export default function RegulationsPage() {
   const onUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) {
-      setUploadMsg('请选择文件(.txt / .md / .pdf)');
+      setUploadMsg(t('business.regulations.selectFile'));
       return;
     }
     setUploading(true);
@@ -62,12 +64,12 @@ export default function RegulationsPage() {
     fd.append('source_url', upForm.source_url.trim());
     try {
       const res = await uploadRegulation(fd);
-      setUploadMsg(`上传成功:${res.name},已导入 ${res.articles_ingested} 条条款`);
+      setUploadMsg(t('business.regulations.uploadSuccess', { name: res.name, count: res.articles_ingested }));
       setFile(null);
       setUpForm({ name: '', jurisdiction: '', description: '', source_url: '' });
       reload();
     } catch (err: any) {
-      setUploadMsg(`上传失败:${err?.response?.data?.detail ?? err?.message ?? '未知错误'}`);
+      setUploadMsg(t('business.regulations.uploadFailure', { message: err?.response?.data?.detail ?? err?.message ?? t('business.regulations.unknownError') }));
     } finally {
       setUploading(false);
     }
@@ -75,7 +77,7 @@ export default function RegulationsPage() {
 
   return (
     <div>
-      <PageHeader title="法规情报中心" desc="查看法规与条款明细,或上传新的法规文件" />
+      <PageHeader title={t('business.regulations.title')} desc={t('business.regulations.desc')} />
       {loading ? (
         <Spinner />
       ) : error ? (
@@ -84,7 +86,7 @@ export default function RegulationsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
             {(data ?? []).length === 0 ? (
-              <EmptyState message="法规库为空,请在右侧上传法规文件" />
+              <EmptyState message={t('business.regulations.empty')} />
             ) : (
               (data ?? []).map((r) => (
                 <div key={r.id} className="bg-white border border-gray-200 rounded-lg">
@@ -94,12 +96,12 @@ export default function RegulationsPage() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="text-base font-semibold text-slate-900">{r.name}</div>
-                      <span className="text-xs text-gray-400">{expandedId === r.id ? '收起 ▲' : '查看条款 ▼'}</span>
+                      <span className="text-xs text-gray-400">{expandedId === r.id ? t('business.regulations.collapse') : t('business.regulations.expand')}</span>
                     </div>
                     <div className="mt-1 text-sm text-gray-500">
                       <Tag>{r.jurisdiction}</Tag>
-                      <span className="ml-1">{r.article_count} 条条款</span>
-                      <span className="ml-3">生效:{fmtDate(r.effective_at)}</span>
+                      <span className="ml-1">{t('business.regulations.articleCount', { count: r.article_count })}</span>
+                      <span className="ml-3">{t('business.regulations.effective', { date: fmtDate(r.effective_at) })}</span>
                     </div>
                     {r.description && <p className="mt-2 text-sm text-gray-600">{r.description}</p>}
                     {r.source_url && (
@@ -109,9 +111,9 @@ export default function RegulationsPage() {
                   {expandedId === r.id && (
                     <div className="border-t border-gray-200 px-5 py-4">
                       {detailLoading ? (
-                        <Spinner text="加载条款中…" />
+                        <Spinner text={t('business.regulations.loadingArticles')} />
                       ) : !detail || detail.articles.length === 0 ? (
-                        <div className="text-sm text-gray-400 py-2">无条款数据</div>
+                        <div className="text-sm text-gray-400 py-2">{t('business.regulations.noArticles')}</div>
                       ) : (
                         <div className="space-y-3 max-h-96 overflow-auto pr-2">
                           {detail.articles.map((a) => (
@@ -133,10 +135,10 @@ export default function RegulationsPage() {
           </div>
 
           <form onSubmit={onUpload} className="bg-white border border-gray-200 rounded-lg p-5 h-fit">
-            <div className="text-sm font-semibold text-slate-900 mb-4">上传法规</div>
+            <div className="text-sm font-semibold text-slate-900 mb-4">{t('business.regulations.uploadTitle')}</div>
             <div className="space-y-3">
               <div>
-                <label className="block text-xs text-gray-500 mb-1">法规文件 * (.txt / .md / .pdf)</label>
+                <label className="block text-xs text-gray-500 mb-1">{t('business.regulations.fileLabel')}</label>
                 <input
                   type="file"
                   accept=".txt,.md,.pdf"
@@ -145,7 +147,7 @@ export default function RegulationsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">法规名称 *</label>
+                <label className="block text-xs text-gray-500 mb-1">{t('business.regulations.nameLabel')}</label>
                 <input
                   required
                   className={inputCls}
@@ -154,17 +156,17 @@ export default function RegulationsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">适用地区 *</label>
+                <label className="block text-xs text-gray-500 mb-1">{t('business.regulations.jurisdictionLabel')}</label>
                 <input
                   required
                   className={inputCls}
                   value={upForm.jurisdiction}
                   onChange={(e) => setUpForm({ ...upForm, jurisdiction: e.target.value })}
-                  placeholder="如 EU / US-CA / CN"
+                  placeholder={t('business.regulations.jurisdictionPlaceholder')}
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">简介</label>
+                <label className="block text-xs text-gray-500 mb-1">{t('business.regulations.descLabel')}</label>
                 <textarea
                   className={inputCls}
                   rows={2}
@@ -173,7 +175,7 @@ export default function RegulationsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-500 mb-1">来源网址</label>
+                <label className="block text-xs text-gray-500 mb-1">{t('business.regulations.sourceLabel')}</label>
                 <input
                   className={inputCls}
                   value={upForm.source_url}
@@ -183,7 +185,7 @@ export default function RegulationsPage() {
               </div>
             </div>
             {uploadMsg && (
-              <div className={`mt-3 text-xs ${uploadMsg.startsWith('上传成功') ? 'text-green-700' : 'text-red-600'}`}>
+              <div className={`mt-3 text-xs ${uploadMsg.startsWith(t('business.regulations.uploadSuccessPrefix')) ? 'text-green-700' : 'text-red-600'}`}>
                 {uploadMsg}
               </div>
             )}
@@ -192,7 +194,7 @@ export default function RegulationsPage() {
               disabled={uploading}
               className="mt-4 px-4 py-2 bg-indigo-600 text-white text-sm rounded-md hover:bg-indigo-700 disabled:opacity-50"
             >
-              {uploading ? '上传中…' : '上传'}
+              {uploading ? t('business.regulations.uploading') : t('business.regulations.upload')}
             </button>
           </form>
         </div>

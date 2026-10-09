@@ -1,6 +1,6 @@
 """Opaque, revocable evaluation sessions for browser previews."""
 from datetime import datetime
-from sqlalchemy import DateTime,ForeignKey,String,func
+from sqlalchemy import DateTime,ForeignKey,Integer,String,func
 from sqlalchemy.orm import Mapped,mapped_column
 from app.db.base import Base
 class EvaluationSession(Base):
@@ -13,3 +13,4 @@ class EvaluationSession(Base):
     created_at:Mapped[datetime]=mapped_column(DateTime,server_default=func.now(),nullable=False)
     expires_at:Mapped[datetime]=mapped_column(DateTime,nullable=False,index=True)
     revoked_at:Mapped[datetime|None]=mapped_column(DateTime)
+    user_id:Mapped[int|None]=mapped_column(ForeignKey("users.id",name="fk_evaluation_sessions_user_id"),nullable=True,index=True)

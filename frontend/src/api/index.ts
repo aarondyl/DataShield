@@ -25,10 +25,11 @@ export const getHealth = () => client.get<HealthStatus>('/health').then((r) => r
 // Companies
 export const listCompanies = () => client.get<Company[]>('/companies').then((r) => r.data);
 export const getCompany = (id: number) => client.get<Company>(`/companies/${id}`).then((r) => r.data);
+const notifyWorkspaceChange = (event: string) => { if (window.datashieldDesktop) window.dispatchEvent(new Event(event)); };
 export const createCompany = (data: CompanyPayload) =>
-  client.post<Company>('/companies', data).then((r) => r.data);
+  client.post<Company>('/companies', data).then((r) => { notifyWorkspaceChange('datashield:workspaces-changed'); return r.data; });
 export const updateCompany = (id: number, data: CompanyPayload) =>
-  client.put<Company>(`/companies/${id}`, data).then((r) => r.data);
+  client.put<Company>(`/companies/${id}`, data).then((r) => { notifyWorkspaceChange('datashield:workspaces-changed'); return r.data; });
 
 // Products
 export const listProducts = (companyId?: number) =>
@@ -37,9 +38,9 @@ export const listProducts = (companyId?: number) =>
     .then((r) => r.data);
 export const getProduct = (id: number) => client.get<Product>(`/products/${id}`).then((r) => r.data);
 export const createProduct = (data: ProductPayload) =>
-  client.post<Product>('/products', data).then((r) => r.data);
+  client.post<Product>('/products', data).then((r) => { notifyWorkspaceChange('datashield:products-changed'); return r.data; });
 export const updateProduct = (id: number, data: ProductPayload) =>
-  client.put<Product>(`/products/${id}`, data).then((r) => r.data);
+  client.put<Product>(`/products/${id}`, data).then((r) => { notifyWorkspaceChange('datashield:products-changed'); return r.data; });
 
 // Regulations
 export const listRegulations = () => client.get<Regulation[]>('/regulations').then((r) => r.data);

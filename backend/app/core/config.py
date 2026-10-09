@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     application_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     legacy_tenant_api_enabled: bool = False
     evaluation_auth_bypass: bool = False
+    desktop_mode: bool = False
+    mailer_provider: str = "console"
+    auth_require_email_verify: bool = False
     runtime_token: str = ""
     # Only public regulation events are fetched from this HTTPS endpoint. Local
     # Product Twin, evidence and tenant data are never sent to it.

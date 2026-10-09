@@ -222,7 +222,11 @@ async fn local_api_request(
         .await
         .unwrap_or_else(|_| serde_json::json!({ "detail": "本地智能体返回了无效响应" }));
     if !status.is_success() {
-        return Err(format!("本地智能体请求失败（{}）", status.as_u16()));
+        let detail = body
+            .get("detail")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("本地智能体请求失败");
+        return Err(format!("{}（HTTP {}）", detail, status.as_u16()));
     }
     Ok(body)
 }
