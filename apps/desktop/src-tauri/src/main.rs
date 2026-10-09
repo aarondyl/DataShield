@@ -96,8 +96,47 @@ struct IdentityVerificationInput {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct IdentityResetRequestInput {
+    base_url: String,
+    email: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IdentityResetConfirmInput {
+    base_url: String,
+    email: String,
+    code: String,
+    new_password: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct IdentityEndpointInput {
     base_url: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IdentityOrganizationInput {
+    base_url: String,
+    organization_id: i64,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IdentityInvitationInput {
+    base_url: String,
+    organization_id: i64,
+    email: String,
+    role: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IdentityAcceptInvitationInput {
+    base_url: String,
+    code: String,
 }
 
 #[derive(Serialize)]
@@ -471,6 +510,61 @@ async fn cloud_identity_verify_email(
 }
 
 #[tauri::command]
+async fn cloud_identity_resend_verification(
+    input: IdentityResetRequestInput,
+    state: State<'_, DesktopState>,
+) -> Result<(), String> {
+    let url = identity_url(&input.base_url, "/v1/auth/verification/resend")?;
+    let response = state
+        .client
+        .post(url)
+        .json(&serde_json::json!({"email": input.email}))
+        .timeout(Duration::from_secs(20))
+        .send()
+        .await
+        .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
+    identity_response(response).await.map(|_| ())
+}
+
+#[tauri::command]
+async fn cloud_identity_password_reset_request(
+    input: IdentityResetRequestInput,
+    state: State<'_, DesktopState>,
+) -> Result<(), String> {
+    let url = identity_url(&input.base_url, "/v1/auth/password-reset/request")?;
+    let response = state
+        .client
+        .post(url)
+        .json(&serde_json::json!({"email": input.email}))
+        .timeout(Duration::from_secs(20))
+        .send()
+        .await
+        .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
+    identity_response(response).await.map(|_| ())
+}
+
+#[tauri::command]
+async fn cloud_identity_password_reset_confirm(
+    input: IdentityResetConfirmInput,
+    state: State<'_, DesktopState>,
+) -> Result<(), String> {
+    let url = identity_url(&input.base_url, "/v1/auth/password-reset/confirm")?;
+    let response = state
+        .client
+        .post(url)
+        .json(&serde_json::json!({
+            "email": input.email,
+            "code": input.code,
+            "new_password": input.new_password,
+        }))
+        .timeout(Duration::from_secs(20))
+        .send()
+        .await
+        .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
+    identity_response(response).await.map(|_| ())
+}
+
+#[tauri::command]
 async fn cloud_identity_login(
     input: IdentityAuthInput,
     state: State<'_, DesktopState>,
@@ -506,6 +600,121 @@ async fn identity_refresh(base_url: &str, state: &DesktopState) -> Result<(), St
         .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
     let value = identity_response(response).await?;
     store_identity_tokens(&value)
+}
+
+async fn identity_authenticated_request(
+    base_url: &str,
+    path: &str,
+    method: Method,
+    body: Option<serde_json::Value>,
+    state: &DesktopState,
+) -> Result<serde_json::Value, String> {
+    let url = identity_url(base_url, path)?;
+    let access = read_identity_secret("access-token")?;
+    let mut request = state
+        .client
+        .request(method.clone(), &url)
+        .bearer_auth(access);
+    if let Some(json) = body.clone() {
+        request = request.json(&json);
+    }
+    let response = request
+        .timeout(Duration::from_secs(20))
+        .send()
+        .await
+        .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
+    if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+        identity_refresh(base_url, state).await?;
+        let access = read_identity_secret("access-token")?;
+        let mut request = state.client.request(method, &url).bearer_auth(access);
+        if let Some(json) = body {
+            request = request.json(&json);
+        }
+        let response = request
+            .timeout(Duration::from_secs(20))
+            .send()
+            .await
+            .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
+        return identity_response(response).await;
+    }
+    identity_response(response).await
+}
+
+#[tauri::command]
+async fn cloud_identity_organizations(
+    input: IdentityEndpointInput,
+    state: State<'_, DesktopState>,
+) -> Result<serde_json::Value, String> {
+    identity_authenticated_request(
+        &input.base_url,
+        "/v1/organizations",
+        Method::GET,
+        None,
+        &state,
+    )
+    .await
+}
+
+#[tauri::command]
+async fn cloud_identity_switch_organization(
+    input: IdentityOrganizationInput,
+    state: State<'_, DesktopState>,
+) -> Result<IdentityAuthView, String> {
+    let value = identity_authenticated_request(
+        &input.base_url,
+        &format!("/v1/organizations/{}/switch", input.organization_id),
+        Method::POST,
+        Some(serde_json::json!({})),
+        &state,
+    )
+    .await?;
+    store_identity_tokens(&value)?;
+    identity_view(&value, false)
+}
+
+#[tauri::command]
+async fn cloud_identity_members(
+    input: IdentityOrganizationInput,
+    state: State<'_, DesktopState>,
+) -> Result<serde_json::Value, String> {
+    identity_authenticated_request(
+        &input.base_url,
+        &format!("/v1/organizations/{}/members", input.organization_id),
+        Method::GET,
+        None,
+        &state,
+    )
+    .await
+}
+
+#[tauri::command]
+async fn cloud_identity_invite(
+    input: IdentityInvitationInput,
+    state: State<'_, DesktopState>,
+) -> Result<serde_json::Value, String> {
+    identity_authenticated_request(
+        &input.base_url,
+        &format!("/v1/organizations/{}/invitations", input.organization_id),
+        Method::POST,
+        Some(serde_json::json!({"email": input.email, "role": input.role})),
+        &state,
+    )
+    .await
+}
+
+#[tauri::command]
+async fn cloud_identity_accept_invitation(
+    input: IdentityAcceptInvitationInput,
+    state: State<'_, DesktopState>,
+) -> Result<serde_json::Value, String> {
+    identity_authenticated_request(
+        &input.base_url,
+        "/v1/invitations/accept",
+        Method::POST,
+        Some(serde_json::json!({"code": input.code})),
+        &state,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -811,9 +1020,17 @@ fn main() {
             delete_ai_provider_key,
             cloud_identity_register,
             cloud_identity_verify_email,
+            cloud_identity_resend_verification,
+            cloud_identity_password_reset_request,
+            cloud_identity_password_reset_confirm,
             cloud_identity_login,
             cloud_identity_me,
-            cloud_identity_logout
+            cloud_identity_logout,
+            cloud_identity_organizations,
+            cloud_identity_switch_organization,
+            cloud_identity_members,
+            cloud_identity_invite,
+            cloud_identity_accept_invitation
         ])
         .build(tauri::generate_context!())
         .expect("启动 DataShield Desktop 失败")

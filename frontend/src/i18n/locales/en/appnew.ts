@@ -235,6 +235,12 @@ export default {
       signOutError: 'Cloud sign-out failed. Check your network and retry.',
       statusUnavailable: 'The identity service is unavailable; account status is unknown.', checking: 'Checking Cloud account status…',
       profileLabel: 'Cloud account',
+      activeOrganization: 'Active Cloud organization', inviteMember: 'Member email', sendInvitation: 'Send invitation',
+      organizationSwitched: 'Cloud organization switched. Your local workspace was not switched or uploaded.', invitationSent: 'Invitation email sent.',
+      invitationCode: 'Invitation code from your email', acceptInvitation: 'Accept organization invitation', invitationAccepted: 'Organization joined. Select it above to switch the active Cloud organization.',
+      newPassword: 'New password (at least 12 characters)', requestReset: 'Send reset code', resetPassword: 'Reset password',
+      passwordResetDone: 'Password reset. Sign in with your new password.', forgotPassword: 'Forgot password?',
+      backToLogin: 'Back to sign in', resendVerification: 'Resend verification email', verificationResent: 'Verification email resent.',
     },
     localMode: {
       eyebrow: 'Offline workspace',

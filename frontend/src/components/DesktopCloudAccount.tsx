@@ -25,8 +25,11 @@ export default function DesktopCloudAccount({ mode, edition }: { mode: 'login' |
   const [organization, setOrganization] = useState('');
   const [code, setCode] = useState('');
   const [needsVerification, setNeedsVerification] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
+  const [resetCodeSent, setResetCodeSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
 
   useEffect(() => {
     client.get<{ base_url: string }>('/v1/local-regulations/configuration')
@@ -45,13 +48,24 @@ export default function DesktopCloudAccount({ mode, edition }: { mode: 'login' |
   };
 
   const submit = async (event: FormEvent) => {
-    event.preventDefault(); setBusy(true); setError('');
+    event.preventDefault(); setBusy(true); setError(''); setNotice('');
     try {
       if (!baseUrl) throw new Error(t('appnew.desktopAccount.endpointMissing'));
       if (needsVerification) {
         await invoke<boolean>('cloud_identity_verify_email', { input: { baseUrl, email, code } });
         setNeedsVerification(false); setCode('');
         navigate('/login');
+        return;
+      }
+      if (resettingPassword && !resetCodeSent) {
+        await invoke('cloud_identity_password_reset_request', { input: { baseUrl, email } });
+        setResetCodeSent(true);
+        return;
+      }
+      if (resettingPassword) {
+        await invoke('cloud_identity_password_reset_confirm', { input: { baseUrl, email, code, newPassword: password } });
+        setResettingPassword(false); setResetCodeSent(false); setCode(''); setPassword('');
+        setNotice(t('appnew.desktopAccount.passwordResetDone'));
         return;
       }
       if (mode === 'signup') {
@@ -73,16 +87,25 @@ export default function DesktopCloudAccount({ mode, edition }: { mode: 'login' |
     <h2 id="cloud-account-title">{mode === 'signup' ? t('appnew.desktopAccount.registerTitle') : t('appnew.desktopAccount.loginTitle')}</h2>
     <p>{t('appnew.desktopAccount.privacy')}</p>
     <form onSubmit={submit}>
-      {!needsVerification && <>
+      {!needsVerification && !resettingPassword && <>
         {mode === 'signup' && <label>{t('appnew.auth.name')}<input required maxLength={200} value={name} onChange={e => setName(e.target.value)} autoComplete="name" /></label>}
         <label>{t('appnew.auth.email')}<input required type="email" maxLength={320} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></label>
         <label>{t('appnew.auth.password')}<input required type="password" minLength={12} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} /></label>
         {mode === 'signup' && <label>{t('appnew.auth.workspaceName')}<input required maxLength={200} value={organization} onChange={e => setOrganization(e.target.value)} /></label>}
       </>}
-      {needsVerification && <label>{t('appnew.desktopAccount.verificationCode')}<input required inputMode="numeric" pattern="[0-9]{6}" minLength={6} maxLength={6} value={code} onChange={e => setCode(e.target.value)} autoComplete="one-time-code" /></label>}
+      {(needsVerification || (resettingPassword && resetCodeSent)) && <label>{t('appnew.desktopAccount.verificationCode')}<input required inputMode="numeric" pattern="[0-9]{6}" minLength={6} maxLength={6} value={code} onChange={e => setCode(e.target.value)} autoComplete="one-time-code" /></label>}
+      {resettingPassword && <label>{t('appnew.desktopAccount.newPassword')}<input required type="password" minLength={12} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" /></label>}
       {!baseUrl && <p role="status" className="ds-inline-error">{t('appnew.desktopAccount.endpointMissing')}</p>}
       {error && <p role="alert" className="ds-inline-error">{error}</p>}
-      <button className="ds-button primary" disabled={busy || !baseUrl}>{busy ? t('appnew.desktopAccount.working') : needsVerification ? t('appnew.desktopAccount.verify') : mode === 'signup' ? t('appnew.desktopAccount.register') : t('appnew.desktopAccount.login')}</button>
+      {notice && <p role="status" className="ds-cloud-notice">{notice}</p>}
+      <button className="ds-button primary" disabled={busy || !baseUrl}>{busy ? t('appnew.desktopAccount.working') : needsVerification ? t('appnew.desktopAccount.verify') : resettingPassword ? resetCodeSent ? t('appnew.desktopAccount.resetPassword') : t('appnew.desktopAccount.requestReset') : mode === 'signup' ? t('appnew.desktopAccount.register') : t('appnew.desktopAccount.login')}</button>
     </form>
+    {needsVerification && <button className="ds-button quiet" type="button" disabled={busy} onClick={async () => {
+      setBusy(true); setError('');
+      try { await invoke('cloud_identity_resend_verification', { input: { baseUrl, email } }); setNotice(t('appnew.desktopAccount.verificationResent')); }
+      catch (err: any) { setError(typeof err === 'string' ? err : t('appnew.desktopAccount.requestFailed')); }
+      finally { setBusy(false); }
+    }}>{t('appnew.desktopAccount.resendVerification')}</button>}
+    {mode === 'login' && !needsVerification && <button className="ds-button quiet" type="button" onClick={() => { setResettingPassword(value => !value); setResetCodeSent(false); setCode(''); setError(''); }}>{resettingPassword ? t('appnew.desktopAccount.backToLogin') : t('appnew.desktopAccount.forgotPassword')}</button>}
   </section>;
 }

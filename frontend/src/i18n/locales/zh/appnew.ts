@@ -235,6 +235,12 @@ export default {
       signOutError: '退出云端账户失败，请检查网络后重试。',
       statusUnavailable: '暂时无法连接身份服务，账户状态未知。', checking: '正在检查云端账户状态…',
       profileLabel: '云端账户',
+      activeOrganization: '当前云端组织', inviteMember: '邀请成员邮箱', sendInvitation: '发送邀请',
+      organizationSwitched: '已切换云端组织。此操作不会切换或上传本地工作区。', invitationSent: '邀请邮件已发送。',
+      invitationCode: '邀请邮件中的验证码', acceptInvitation: '接受组织邀请', invitationAccepted: '已加入组织；可在上方切换当前云端组织。',
+      newPassword: '新密码（至少 12 位）', requestReset: '发送重置验证码', resetPassword: '重置密码',
+      passwordResetDone: '密码已重置，请使用新密码登录。', forgotPassword: '忘记密码？',
+      backToLogin: '返回登录', resendVerification: '重新发送验证邮件', verificationResent: '验证邮件已重新发送。',
     },
     localMode: {
       eyebrow: '离线工作区',
