@@ -233,6 +233,7 @@ export default {
       accountSettings: 'Cloud account', signedIn: 'Signed in as {{email}} ({{organization}})',
       signedOutState: 'No Cloud account is signed in on this device. Your local workspace remains available.', signedOut: 'Signed out of the Cloud account.',
       signOutError: 'Cloud sign-out failed. Check your network and retry.',
+      localSignedOutRemoteMayExpire: 'Cloud credentials were removed from this device. The server session could not be revoked and will expire later.',
       statusUnavailable: 'The identity service is unavailable; account status is unknown.', checking: 'Checking Cloud account status…',
       profileLabel: 'Cloud account',
       activeOrganization: 'Active Cloud organization', inviteMember: 'Member email', sendInvitation: 'Send invitation',

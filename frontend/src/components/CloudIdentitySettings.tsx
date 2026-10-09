@@ -69,7 +69,7 @@ export default function CloudIdentitySettings() {
   const signOut = async () => {
     setBusy(true); setMessage('');
     try { await invoke('cloud_identity_logout', { input: { baseUrl } }); setAccount(null); setStatus('signed-out'); setMessage(t('appnew.desktopAccount.signedOut')); }
-    catch (error) { setMessage(typeof error === 'string' ? error : t('appnew.desktopAccount.signOutError')); }
+    catch { setAccount(null); setStatus('signed-out'); setMessage(t('appnew.desktopAccount.localSignedOutRemoteMayExpire')); }
     finally { setBusy(false); }
   };
 

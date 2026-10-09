@@ -233,6 +233,7 @@ export default {
       accountSettings: '云端账户', signedIn: '已登录 {{email}}（{{organization}}）',
       signedOutState: '当前设备未登录云端账户。你仍可继续使用本地工作区。', signedOut: '已退出云端账户。',
       signOutError: '退出云端账户失败，请检查网络后重试。',
+      localSignedOutRemoteMayExpire: '此设备的云端凭据已删除；服务器会话无法联网撤销，将在过期后失效。',
       statusUnavailable: '暂时无法连接身份服务，账户状态未知。', checking: '正在检查云端账户状态…',
       profileLabel: '云端账户',
       activeOrganization: '当前云端组织', inviteMember: '邀请成员邮箱', sendInvitation: '发送邀请',

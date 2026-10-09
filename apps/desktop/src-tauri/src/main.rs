@@ -255,8 +255,9 @@ fn store_identity_tokens(value: &serde_json::Value) -> Result<(), String> {
 }
 
 fn clear_identity_tokens() -> Result<(), String> {
-    delete_identity_secret("access-token")?;
-    delete_identity_secret("refresh-token")
+    let access_result = delete_identity_secret("access-token");
+    let refresh_result = delete_identity_secret("refresh-token");
+    access_result.and(refresh_result)
 }
 
 #[cfg(not(windows))]
@@ -754,18 +755,20 @@ async fn cloud_identity_logout(
     state: State<'_, DesktopState>,
 ) -> Result<(), String> {
     let result = match read_identity_secret("access-token") {
-        Ok(access) => {
-            let url = identity_url(&input.base_url, "/v1/auth/logout")?;
-            let response = state
+        Ok(access) => match identity_url(&input.base_url, "/v1/auth/logout") {
+            Ok(url) => match state
                 .client
                 .post(url)
                 .bearer_auth(access)
                 .timeout(Duration::from_secs(20))
                 .send()
                 .await
-                .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
-            identity_response(response).await.map(|_| ())
-        }
+            {
+                Ok(response) => identity_response(response).await.map(|_| ()),
+                Err(_) => Err("IDENTITY_SERVICE_UNAVAILABLE".to_string()),
+            },
+            Err(error) => Err(error),
+        },
         Err(_) => Ok(()),
     };
     clear_identity_tokens()?;
