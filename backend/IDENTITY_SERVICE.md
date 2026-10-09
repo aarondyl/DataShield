@@ -8,6 +8,8 @@ Set `IDENTITY_DATABASE_URL_FILE` to a root/deploy-user-only file containing a Po
 
 Set `IDENTITY_SMTP_HOST`, `IDENTITY_SMTP_PORT`, `IDENTITY_SMTP_USER`, `IDENTITY_EMAIL_FROM`, and `IDENTITY_SMTP_PASSWORD_FILE`. Use a verified sender and a deploy-only password file. Account registration and invitations remain unavailable when email delivery is not configured; email verification is required by default.
 
+Identity is an opt-in Compose profile so an existing RegIntel-only deployment does not start an unprovisioned account service. After creating the separate database and SMTP secrets, validate the full Compose config, then start it with `docker compose --profile identity up -d identity`.
+
 For an existing PostgreSQL volume, create the identity database and role through an administrator session without touching the RegIntel database. Generate a unique password in the server's secret manager, then grant the dedicated role access only to the new database. Do not put credentials in shell history, source control, or chat. Before deployment, take and verify a PostgreSQL backup, inspect current memory and disk headroom, and validate Compose configuration. The service container runs the identity-only Alembic chain on startup.
 
 The first platform administrator must be provisioned out of band after registration has been email-verified. Use a restricted DBA session to set `identity_users.is_platform_admin = TRUE` for the verified operator account, record the operation, and close the DBA session. There is no shared admin key or public admin bootstrap endpoint. Platform account disable immediately revokes active sessions.

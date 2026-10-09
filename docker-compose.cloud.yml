@@ -58,17 +58,18 @@ services:
     logging: *json_logging
 
   identity:
+    profiles: [identity]
     build:
       context: .
       dockerfile: backend/Dockerfile.identity
     environment:
       IDENTITY_DATABASE_URL_FILE: /run/secrets/identity_database_url
       IDENTITY_EMAIL_VERIFY_REQUIRED: "true"
-      IDENTITY_SMTP_HOST: ${IDENTITY_SMTP_HOST:?Set the account email SMTP host}
+      IDENTITY_SMTP_HOST: ${IDENTITY_SMTP_HOST:-}
       IDENTITY_SMTP_PORT: ${IDENTITY_SMTP_PORT:-587}
-      IDENTITY_SMTP_USER: ${IDENTITY_SMTP_USER:?Set the account email SMTP username}
+      IDENTITY_SMTP_USER: ${IDENTITY_SMTP_USER:-}
       IDENTITY_SMTP_PASSWORD_FILE: /run/secrets/identity_smtp_password
-      IDENTITY_EMAIL_FROM: ${IDENTITY_EMAIL_FROM:?Set the verified DataShield sender address}
+      IDENTITY_EMAIL_FROM: ${IDENTITY_EMAIL_FROM:-}
       IDENTITY_SMTP_STARTTLS: "true"
     ports:
       - "${IDENTITY_BIND_ADDRESS:-127.0.0.1}:8001:8001"

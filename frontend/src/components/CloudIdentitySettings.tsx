@@ -77,7 +77,7 @@ export default function CloudIdentitySettings() {
     <p>{account ? t('appnew.desktopAccount.signedIn', { email: account.email, organization: account.organization?.name || '' }) : status === 'unavailable' ? t('appnew.desktopAccount.statusUnavailable') : status === 'checking' ? t('appnew.desktopAccount.checking') : t('appnew.desktopAccount.signedOutState')}</p>
     {account?.organization && <>
       {organizations.length > 1 && <label>{t('appnew.desktopAccount.activeOrganization')}<select value={account.organization.id} disabled={busy} onChange={event => void switchOrganization(Number(event.target.value))}>{organizations.map(org => <option key={org.id} value={org.id}>{org.name}</option>)}</select></label>}
-      <ul>{members.map(member => <li key={member.user_id}>{member.name} · {member.email} · {member.role}</li>)}</ul>
+      <ul>{members.map(member => <li key={member.user_id}>{member.name} · {member.email} · {t(`appnew.desktopAccount.roles.${member.role}`, { defaultValue: member.role })}</li>)}</ul>
       {['owner', 'admin'].includes(account.organization.role) && <form onSubmit={invite}><label>{t('appnew.desktopAccount.inviteMember')}<input type="email" required maxLength={320} value={inviteEmail} onChange={event => setInviteEmail(event.target.value)} /></label><button className="ds-button quiet" disabled={busy}>{t('appnew.desktopAccount.sendInvitation')}</button></form>}
       <form onSubmit={acceptInvitation}><label>{t('appnew.desktopAccount.invitationCode')}<input required maxLength={256} value={inviteCode} onChange={event => setInviteCode(event.target.value)} /></label><button className="ds-button quiet" disabled={busy}>{t('appnew.desktopAccount.acceptInvitation')}</button></form>
     </>}
