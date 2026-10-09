@@ -50,6 +50,7 @@ def test_http_source_retries_transient_server_errors(monkeypatch):
     monkeypatch.setattr(adapters.time, "sleep", lambda _: None)
     raw = HttpTextAdapter(type("Source", (), {"fetch_url": "https://example.org/law"})()).fetch()
     assert raw.content == "<p>正文</p>"
+    assert raw.raw_bytes == "<p>正文</p>".encode("utf-8")
 
 
 def test_source_snapshot_stores_original_bytes_and_separate_raw_hash(tmp_path, monkeypatch):
@@ -61,7 +62,6 @@ def test_source_snapshot_stores_original_bytes_and_separate_raw_hash(tmp_path, m
     uri, raw_hash = pipeline._write_snapshot(9, "normalized-hash", raw)
     assert (tmp_path / uri).read_bytes() == raw
     assert raw_hash == hashlib.sha256(raw).hexdigest()
-    assert raw.raw_bytes == "<p>正文</p>".encode("utf-8")
 
 
 def test_raw_snapshot_preserves_exact_response_bytes_and_hash(tmp_path, monkeypatch):
