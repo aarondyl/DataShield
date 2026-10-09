@@ -1,105 +1,41 @@
-# DataShield Agent Execution State
+# DataShield 交付断点状态
 
-Last updated: 2026-10-09 (Asia/Shanghai)
+更新时间：2026-10-09（Asia/Shanghai）
 
-## Objective
+## 当前代码
 
-Continue the in-progress DataShield delivery from the existing repository state. Preserve prior work and finish the Windows desktop, Cloud RegIntel, identity, real AI providers, deploy, and pre-release path with verifiable evidence.
+- 仓库：`aarondyl/DataShield`。
+- 远端 main：`6ec30c09219024f2aa733512d9f1952be7fa34d4`（PR #28 文档状态合入）。
+- 本工作树分支：`release/0.2.0-rc.3`，从上述 main 创建。
+- 当前未提交改动：三个 Desktop 版本号文件升至 `0.2.0-rc.3`；中英文 Release Notes 改为反映已实现的 Cloud Identity、Cloud AI、BYOK、Ollama，并注明 Cloud 服务可用性取决于服务端部署配置。
+- 发布工作流：`.github/workflows/desktop-release.yml` 固定完整 main SHA 构建并校验 SemVer，复用 Windows NSIS 工作流，自动上传安装包和校验文件至 GitHub Pre-release。不可覆盖现有 `v0.2.0-rc.2`。
 
-## Repository and current work
+## 已完成并验证
 
-- Repository: `aarondyl/DataShield`
-- Main at recovery: `a7f0e166b1e74c772b8d1b24afa9e296cf0d91f5` (`v0.2.0-rc.2`). Current main is `d543c1437314b2b1cfd728ada430328eded9fcb0`, containing PR #23 and PR #24.
-- Current active worktree: `/home/aaron/Projects/DataShield/DataShield-regintel`
-- Branch: `fix/ecs-readonly-inspection`, merged to main in PR #26.
-- Current main merge commit: `a0cf9467b676493f5011903ac6c9cf3da553d3fc`.
-- PR #24, official Cloud source catalog and review provenance, was merged at `d543c14` after all three checks passed.
-- PR #26 adds read-only ECS inspection with direct Docker and passwordless sudo fallbacks; backend/frontend CI passed before merge.
-- PR #23 was merged after Cloud, Product Twin, and Windows installer CI all passed; merge commit is `480c52c`.
-- Open PR #19 remains a draft on `release/integration-v0.1.0` at `75a0a8cd596e9cbb9bce50d77845d299ca526e46`. It is based on older main and does not contain current main. Review its 44-file delta before selectively reusing; do not merge it wholesale.
-- Original worktree `/home/aaron/Projects/DataShield/DataShield` is on `feat/ai-native-frontend` with pre-existing staged modifications in `backend/app/core/config.py`, `docker-compose.yml`, `frontend/vite.config.ts`, and deletion of `启动DataShield.bat`. These changes were preserved and not reset or cleaned.
+- PR #25 已合入：隔离的 Cloud Identity（邮箱验证注册、登录/刷新/退出、密码重置、组织/成员/RBAC、邀请及停用）与 DeepSeek JSON Gateway；AI 用量落库但不记录提示词，按账户限流。Identity 使用独立迁移和数据库配置，与 RegIntel/本地租户数据隔离。
+- Desktop 经 Rust Bridge 与本地 Agent 调用 Cloud AI；Windows Credential Manager 保存凭据；明确征得远程上下文同意。默认 Cloud API 地址为 `https://api.datashield.ltd`，初始 AI 仍为离线/mock。
+- Cloud 法规来源目录已包含官方 PIPL 与 DSL，原始响应归档及哈希，2 个法规版本、284 个法律单元、137 个自动提取 Requirement；内容核验状态明确为 UNREVIEWED；有启动及每日轮询。
+- PR #25 GitHub CI 全绿（Backend/PostgreSQL/Identity 隔离迁移，Cloud migration/API/image，Windows sidecar/Rust Bridge/NSIS/安装及升级验证）。本地完整后端：349 passed；前端 TypeScript/Vite 构建通过。
+- 旧版中文优先产品体验、Product Twin、Tenant Agent、Finding/Evidence、Remediation、Feedback/Reanalysis 已在 main；之前 Windows CI 做了安装与升级、sidecar 验收。尚无人工 Windows GUI 验收。
 
-## Completed before this continuation
+## 外部服务实际状态与未完成
 
-- Original Chinese-first product experience is restored on main (PR #20).
-- Windows installer lock fix and version validation are on main (PRs #21/#22).
-- Product Twin, Local Tenant Agent, Finding/Evidence, Remediation, Feedback, and reanalysis flows exist in prior branches and integration evidence.
-- Main has the v0.2.0-rc.2 GitHub Pre-release.
-- PR #23 secure BYOK and Ollama settings work is now on main.
-- PR #24 official PIPL/DSL source catalog, source review status, original-source snapshot hashes, Cloud-only migration, and scheduled polling work is on main.
-- The branch includes low-concurrency scheduled polling and an initial warm-up poll.
+- ECS：`123.57.252.25`，Alibaba Cloud Linux 4.0.3，RAM 1674 MiB，磁盘 40 GiB（已知剩余约 31 GiB）。GitHub Actions 现有 SSH 只允许 `deploy`。ECS 本机旧 RegIntel API 健康检查曾返回 200；无法读取 Docker/容器/Postgres，因为 `deploy` 对 Docker socket 和 `sudo -n docker` 均无权限。`/opt/datashield-cloud/secrets` 为 admin 所有且权限 700，内容未读取。
+- `https://api.datashield.ltd/api/health` 此执行环境无法成功访问，因此不能声称公网 TLS/API 可用；Identity/Nginx 新路径尚未部署验证。
+- 可访问 GitHub Actions secret 名称中没有 DeepSeek 或邮件配置项；没有验证线上 DeepSeek API Key、邮件发送或真实模型推理。不要把 Secret 值输出或写入此文件。
+- 没有 Aliyun 管理 CLI/授权接口或可用云平台 MCP。用户给出的 ECS 密码无法用于 SSH（主机只接受公钥）；不得绕过权限限制。
+- 目前 Release 仍为 `v0.2.0-rc.2`；无 rc.3 安装包和发布。不得以 Workflow/Artifact 代替 Release。
+- 未完成真实 Windows→公网 Cloud→SQLite→Finding→Remediation→Feedback E2E；BYOK/Ollama 仍需真实模型配置和推理验证。
 
-## This continuation's changes
+## 恢复后具体操作
 
-- Fixed the Cloud startup source-catalog test to enter FastAPI's lifespan context; source seeding happens at startup (commit `15beaba`).
-- Made full-application Alembic migration `0012` for `regulation_versions.review_status` idempotent. The Cloud-only Alembic chain remains separate (commit `15beaba`).
-- Carried legal-version review status through change events, Tenant Agent source/requirement context, Finding legal evidence, and persisted evidence snapshots. Fixed a duplicate-field DTO error and added regression assertions.
-- Preserved exact official HTTP response bytes in source snapshots, stored a separate raw SHA256 and byte length, added additive migration revisions `0013` and Cloud-only `c0003`, and mounted a persistent Cloud snapshot volume.
-- Expanded the existing manual, read-only ECS SSH workflow to report host/container/resource state, Cloud PostgreSQL aggregate counts, secrets-directory permissions (without reading files), local API health, and external HTTPS health.
-- Merged PR #24 after Cloud, Product Twin, and Windows installer CI passed.
-- Merged PR #26 after backend/frontend CI passed; ECS read-only SSH workflow completed from main.
+1. `git status --short` 检查 `release/0.2.0-rc.3` 上的四项改动；`git diff --check` 与版本三方一致性检查（`package.json`、`Cargo.toml`、`tauri.conf.json`）。
+2. 提交并推送版本及发布说明，开 PR；等待 Cloud/Product Twin、Windows NSIS、Backend/Frontend 检查通过后合并 main。
+3. 在 main 取得最终 40 位 SHA；核对所有 required external Cloud config（管理员以安全方式配置独立 Identity Postgres DB/角色、DeepSeek 服务端密钥及邮件 SMTP；绝不向聊天或仓库写凭据）。
+4. 需由 ECS 管理员通过 Aliyun Console 安装受限、root-owned 的固定部署入口，授权 `deploy` 仅操作 `/opt/datashield-cloud` 下 Compose、执行健康检查/迁移及读取不含 Secret 的状态摘要；或配置等效正式 CI/CD 管理权限。之后检查现有卷/DB备份和 Compose 状态，确认数据保护，再部署 Identity/Gateway/Nginx，不覆盖既有 RegIntel 数据。
+5. 验证公网 HTTPS、真实注册邮件、DeepSeek Gateway 推理、RegIntel 实际法规查询/增量同步、Desktop 同步缓存，以及真实 AI 业务分析和用户反馈闭环。
+6. 在最终 main SHA 上运行 `desktop-release.yml`，发布新 `v0.2.0-rc.3` Pre-release，确认 EXE、`.sha256`、中英文说明和源 SHA；验证下载及哈希。只有真实服务和产品链路具备证据后才发布。
 
-## Validation
+## 已知外部授权请求（只提出一次）
 
-- Recovery audit commands completed: Git status/branches/remotes/log, worktrees, GitHub PRs, Releases, Actions.
-- PR #24 failure 1: catalog assertion ran without TestClient lifespan, so startup registration had not run.
-- PR #24 failure 2: full application migration chain lacked the review-status column used by the ORM smoke test.
-- Targeted Cloud API, official source catalog, migration-isolation, and Local sync tests: 16 passed.
-- Tenant regulatory gateway, applicability/gap, remediation planner, Tenant Agent, Cloud API, and official catalog tests: 70 passed after review-status propagation fixes.
-- Official source snapshot, tenant regulatory, Cloud startup, and Local sync tests: 19 passed after raw-byte archival changes.
-- Latest GitHub Product Twin run passed all 342 backend tests, PostgreSQL smoke migrations, SQLite migration, and frontend build.
-- Latest GitHub Windows run passed the Rust Bridge security checks, built the current-user NSIS installer, verified installed sidecar dependencies, and produced its checksum/source artifact.
-- Full application Alembic chain upgraded a fresh temporary SQLite database through revision `0013`.
-- Cloud-only Alembic chain upgraded a separate temporary SQLite database through revision `c0003`; both chains reach `0013` / `c0003` with the source snapshot hash column.
-- Live official-source ingestion against the CAC PIPL and DSL URLs completed with LLM disabled and local embeddings: 2 versions, 284 legal units, and 137 extracted requirements in an isolated temporary SQLite database. All content remains marked unreviewed pending legal review.
-- Latest live snapshot verification: PIPL response 60,221 bytes and DSL response 32,994 bytes; raw hashes matched persisted bytes and both versions remained `UNREVIEWED`.
-- Official CAC source URLs returned HTTP 200 with HTML content from this environment. ECS workflow YAML parsed and its Bash script passed `bash -n`.
-
-## ECS deployment and health
-
-- ECS public IP visible in the supplied console screenshot: `123.57.252.25`.
-- Read-only GitHub Actions SSH reached the host as `deploy`: Alibaba Cloud Linux 4.0.3, 1,674 MiB RAM, 40 GiB root disk with 6.6 GiB used, uptime about one day. This inspection did not modify the host.
-- Read-only SSH confirmed local API HTTP 200, but `deploy` cannot access Docker and `sudo -n docker` is also denied. Containers and PostgreSQL could not be inspected. External HTTPS health from the ECS host was unavailable.
-- Direct HTTPS request to `api.datashield.ltd` did not complete TLS from this environment; local DNS resolved to `198.18.0.4`, so this is not sufficient evidence of public service health.
-- SSH to `root@123.57.252.25` was rejected with public-key-only authentication. The provided password was not accepted as an SSH method. Deployed image and PostgreSQL contents remain unverified; local API responds HTTP 200 and secret-directory permissions are known without reading contents.
-- No credentials or private business data are stored in this file.
-
-## Release
-
-- Latest existing release: `v0.2.0-rc.2`, Pre-release.
-- No new release has been created by this continuation.
-
-## Remaining work
-
-1. Obtain a least-privilege Docker inspection path for `deploy` (or an authorized admin SSH key); Docker access is required to inspect containers, PostgreSQL, deployed images, and perform safe deployment.
-2. Re-run read-only inspection and verify Cloud health externally before any deployment change.
-3. Implement or explicitly scope the missing Cloud identity service and default Cloud LLM Gateway.
-4. Verify change-event generation and scheduled polling against live source updates.
-5. Verify the actual Cloud public endpoint and deployed image before planning any deployment change.
-6. Verify domain/TLS access from an external network, connect Desktop Cloud sync, and validate Cloud-to-local Finding flow.
-7. Build a fixed-commit Windows installer, calculate SHA256, complete available GUI acceptance, and publish a new GitHub Pre-release with bilingual notes.
-
-## Next executable steps
-
-From `/home/aaron/Projects/DataShield/DataShield-regintel/backend`:
-
-```bash
-/tmp/datashield-uv/uv run --no-project --with-requirements requirements-dev.txt python -m pytest tests/test_cloud_api_contract.py tests/test_official_source_catalog.py tests/test_cloud_migration_isolation.py tests/test_local_regulation_cache.py tests/test_local_sync_http_e2e.py -q
-DATABASE_URL=sqlite:////tmp/datashield-main-migration-check.db /tmp/datashield-uv/uv run --no-project --with-requirements requirements-dev.txt python -m alembic upgrade head
-RUNTIME_MODE=cloud DATABASE_URL=sqlite:////tmp/datashield-cloud-migration-check.db /tmp/datashield-uv/uv run --no-project --with-requirements requirements-dev.txt python -m alembic -c alembic-cloud.ini upgrade head
-git diff --check
-```
-
-These validations completed using `/tmp/datashield-uv/uv` because the host has no system pytest installation. The most recent ECS SSH inspection reached the host but could not read Docker state; direct and passwordless-sudo Docker checks both returned unavailable.
-
-## Current continuation checkpoint (2026-10-09)
-
-- Current main: `960d3e31902549e30e7832ce0721415f32f74d77` (PR #25 merged).
-- PR #25 merges isolated Cloud Identity (verified-email registration, login, refresh/revoke, password reset, organizations, memberships/RBAC, invitations and account disable) and an authenticated DeepSeek JSON gateway. Gateway usage is persisted without prompt contents and limited to 12 calls per minute per account.
-- Desktop Cloud AI is wired to local Agent workflows. Windows Credential Manager tokens pass through the Rust-protected loopback bridge; analysis paths preflight/refresh the session. Explicit consent is required before sending private analysis context. Desktop Cloud URL defaults to `https://api.datashield.ltd`; offline/mock remains the initial mode.
-- Verification for PR #25 head `871de6b`: GitHub backend/frontend (including PostgreSQL migrations, isolated Identity PostgreSQL DB, all backend tests, and frontend build) passed; Cloud-only migration/API contract and image build passed; Windows NSIS sidecar/security/install-directory checks and installer build passed (run 37925540115). Local full backend suite: 349 passed. Local frontend production build passed.
-- Windows artifact is a CI artifact only; no new GitHub Release has been published. No human Windows GUI installation/upgrade acceptance has been performed.
-- Gateway inference test used a mocked vendor response. No DeepSeek platform key is present among accessible GitHub Actions secrets; no real DeepSeek response has been verified. Production SMTP and Identity database configuration remain unverified.
-- ECS SSH works through GitHub Actions as `deploy`; local API returned HTTP 200. Docker and passwordless sudo are denied to `deploy`; the Secrets directory is mode 700 owned by `admin` and its contents were not read. External HTTPS `api.datashield.ltd` is unavailable from this environment/host. No Aliyun management connector is available here.
-- Next: use a formal administrator-provisioned deploy channel to inspect/operate Cloud Compose and the separate Identity database without exposing secrets; then verify SMTP and DeepSeek secrets, deploy Identity/Gateway, validate public HTTPS and real inference, sync Cloud regulations into Desktop, and run Cloud-to-Finding-to-Feedback validation before a fixed-SHA Windows Pre-release.
-- No credentials or private business data are stored here.
+待本地/CI/版本候选工作完成后，若 ECS 管理通道仍不存在，仅需请求用户通过阿里云控制台配置第 4 步所述最小受限授权；无需提供服务器密码、密钥或将 Secret 发到聊天。未获得该授权时，继续保留可恢复代码状态，不宣称服务或版本已经交付。
