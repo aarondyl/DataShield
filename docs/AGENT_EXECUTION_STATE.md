@@ -5,10 +5,11 @@
 ## 当前代码
 
 - 仓库：`aarondyl/DataShield`。
-- 远端 main：`6ec30c09219024f2aa733512d9f1952be7fa34d4`（PR #28 文档状态合入）。
-- 本工作树分支：`release/0.2.0-rc.3`，从上述 main 创建。
-- 当前未提交改动：三个 Desktop 版本号文件升至 `0.2.0-rc.3`；中英文 Release Notes 改为反映已实现的 Cloud Identity、Cloud AI、BYOK、Ollama，并注明 Cloud 服务可用性取决于服务端部署配置。
-- 发布工作流：`.github/workflows/desktop-release.yml` 固定完整 main SHA 构建并校验 SemVer，复用 Windows NSIS 工作流，自动上传安装包和校验文件至 GitHub Pre-release。不可覆盖现有 `v0.2.0-rc.2`。
+- 远端 main：`eeec5a5582ff79f11b38a85a17524b9443b40293`（PR #29 合入，rc.3 固定源 Commit）。
+- 本文档更新分支：`docs/rc3-release-checkpoint`。
+- Desktop 版本：`0.2.0-rc.3`；中英文 Release Notes 反映已实现的 Cloud Identity、Cloud AI、BYOK、Ollama，并注明 Cloud 服务仍依赖服务端配置。
+- GitHub Pre-release：<https://github.com/aarondyl/DataShield/releases/tag/v0.2.0-rc.3>。正式 Windows NSIS 构建及安装升级验证由 Release workflow `37928809124` 执行。资产包含 EXE、SHA256、源 Commit；从 GitHub 下载 EXE 后 `sha256sum -c` 校验通过，EXE 大小 36,482,778 bytes，固定源 SHA 与 main 一致。
+- 发布工作流：`.github/workflows/desktop-release.yml`，固定完整 main SHA 并校验 SemVer，复用 Windows NSIS 工作流，在 Windows 实际静默安装/启动 sidecar/原位升级后创建 Pre-release。
 
 ## 已完成并验证
 
@@ -29,13 +30,12 @@
 
 ## 恢复后具体操作
 
-1. `git status --short` 检查 `release/0.2.0-rc.3` 上的四项改动；`git diff --check` 与版本三方一致性检查（`package.json`、`Cargo.toml`、`tauri.conf.json`）。
-2. 提交并推送版本及发布说明，开 PR；等待 Cloud/Product Twin、Windows NSIS、Backend/Frontend 检查通过后合并 main。
-3. 在 main 取得最终 40 位 SHA；核对所有 required external Cloud config（管理员以安全方式配置独立 Identity Postgres DB/角色、DeepSeek 服务端密钥及邮件 SMTP；绝不向聊天或仓库写凭据）。
-4. 需由 ECS 管理员通过 Aliyun Console 安装受限、root-owned 的固定部署入口，授权 `deploy` 仅操作 `/opt/datashield-cloud` 下 Compose、执行健康检查/迁移及读取不含 Secret 的状态摘要；或配置等效正式 CI/CD 管理权限。之后检查现有卷/DB备份和 Compose 状态，确认数据保护，再部署 Identity/Gateway/Nginx，不覆盖既有 RegIntel 数据。
-5. 验证公网 HTTPS、真实注册邮件、DeepSeek Gateway 推理、RegIntel 实际法规查询/增量同步、Desktop 同步缓存，以及真实 AI 业务分析和用户反馈闭环。
-6. 在最终 main SHA 上运行 `desktop-release.yml`，发布新 `v0.2.0-rc.3` Pre-release，确认 EXE、`.sha256`、中英文说明和源 SHA；验证下载及哈希。只有真实服务和产品链路具备证据后才发布。
+1. `v0.2.0-rc.3` 已合入 main，Release 已由 `desktop-release.yml` 发布并实际下载验证；发布 SHA 为 `eeec5a5582ff79f11b38a85a17524b9443b40293`。
+2. 等待用户提供已请求的受限 ECS 管理部署通道。不得绕过 deploy 权限或尝试读取 Secret 文件。
+3. 管理员通过安全服务器配置 Identity 独立 Postgres DB/角色、DeepSeek 服务端密钥及邮件 SMTP；绝不向聊天或仓库写凭据。检查现有卷/DB备份及 Compose 状态，确认数据保护，再部署 Identity/Gateway/Nginx，不覆盖既有 RegIntel 数据。
+4. 验证公网 HTTPS、真实注册邮件、DeepSeek Gateway 推理、RegIntel 实际法规查询/增量同步、Desktop 同步缓存，以及真实 AI 业务分析和用户反馈闭环。
+5. 未经公有服务及 AI 端到端验证，不得把现有 rc.3 宣称为完整交付或 Stable。完整链路验证后应递增版本并以新的固定 main SHA 发布下一 Pre-release。
 
-## 已知外部授权请求（只提出一次）
+## 已知外部授权请求（已向用户提出一次，等待回复）
 
 待本地/CI/版本候选工作完成后，若 ECS 管理通道仍不存在，仅需请求用户通过阿里云控制台配置第 4 步所述最小受限授权；无需提供服务器密码、密钥或将 Secret 发到聊天。未获得该授权时，继续保留可恢复代码状态，不宣称服务或版本已经交付。
