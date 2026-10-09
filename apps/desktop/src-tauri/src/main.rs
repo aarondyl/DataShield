@@ -350,6 +350,10 @@ fn valid_ai_endpoint(provider: &str, base_url: &str) -> bool {
             })
             .unwrap_or(false),
         "ollama" => base_url == "http://127.0.0.1:11434/v1",
+        "cloud" => reqwest::Url::parse(base_url).map(|url| {
+            url.scheme() == "https" && url.host().is_some() && url.username().is_empty()
+                && url.password().is_none() && url.query().is_none() && url.fragment().is_none()
+        }).unwrap_or(false),
         "mock" => true,
         _ => false,
     }
@@ -366,8 +370,11 @@ fn set_ai_provider_config(update: AiProviderUpdate) -> Result<AiProviderView, St
     if provider != "mock" && model.is_empty() {
         return Err("AI_MODEL_REQUIRED".into());
     }
-    if provider == "byok" && !update.cloud_consent {
+    if matches!(provider, "byok" | "cloud") && !update.cloud_consent {
         return Err("AI_CONSENT_REQUIRED".into());
+    }
+    if provider == "cloud" && read_identity_secret("access-token").is_err() {
+        return Err("IDENTITY_SESSION_MISSING".into());
     }
 
     let provided_key = update.api_key.unwrap_or_default();
@@ -1009,10 +1016,30 @@ async fn local_api_request(
     let method = Method::from_bytes(request.method.as_bytes())
         .map_err(|_| "不支持的请求方法".to_string())?;
     let descriptor = descriptor_from_state(&state).await?;
+    let cloud_ai = read_ai_config().provider == "cloud";
+    let ai_request = request.path.starts_with("/api/v1/tenant-agent/analyze")
+        || request.path.starts_with("/api/v1/ui/understanding/")
+        || request.path.starts_with("/api/v1/feedback/")
+        || request.path.starts_with("/api/v1/remediations/")
+        || request.path.starts_with("/api/ai/provider/test");
+    if cloud_ai && ai_request {
+        identity_authenticated_request(
+            &read_ai_config().base_url,
+            "/v1/auth/me",
+            Method::GET,
+            None,
+            &state,
+        ).await?;
+    }
     let mut builder = state
         .client
         .request(method, format!("{}{}", descriptor.base_url, request.path))
         .header("X-Runtime-Token", descriptor.runtime_token);
+    if read_ai_config().provider == "cloud" {
+        if let Ok(token) = read_identity_secret("access-token") {
+            builder = builder.header("X-Cloud-Identity-Token", token);
+        }
+    }
     if let Some(body) = request.body {
         builder = builder.json(&body);
     }
@@ -1042,6 +1069,7 @@ fn start_sidecar(app: &tauri::AppHandle, state: &DesktopState) -> Result<(), Str
         .sidecar("datashield-local")
         .map_err(|_| "未找到已打包的本地智能体 sidecar".to_string())?
         .env("RUNTIME_MODE", "local")
+        .env("DESKTOP_MODE", "true")
         .env("RUN_SEED", "false")
         .env("LLM_API_KEY", "")
         .env("LLM_CLOUD_CONSENT", "false");
@@ -1066,6 +1094,14 @@ fn start_sidecar(app: &tauri::AppHandle, state: &DesktopState) -> Result<(), Str
                 .env("LLM_PROVIDER", "api")
                 .env("LLM_BASE_URL", &ai.base_url)
                 .env("LLM_MODEL", &ai.model);
+        }
+        "cloud" => {
+            command = command
+                .env("DESKTOP_AI_MODE", "cloud")
+                .env("LLM_PROVIDER", "cloud")
+                .env("LLM_BASE_URL", &ai.base_url)
+                .env("LLM_MODEL", &ai.model)
+                .env("LLM_CLOUD_CONSENT", ai.cloud_consent.to_string());
         }
         _ => command = command.env("DESKTOP_AI_MODE", "mock"),
     }

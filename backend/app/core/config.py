@@ -82,6 +82,8 @@ class Settings(BaseSettings):
                         self.cloud_regintel_base_url = value
                 except (OSError, ValueError):
                     pass
+            if self.desktop_mode and not self.cloud_regintel_base_url:
+                self.cloud_regintel_base_url = "https://api.datashield.ltd"
             if "DATABASE_URL" not in os.environ:
                 self.database_url = f"sqlite:///{(Path(self.local_data_dir) / 'datashield.db').as_posix()}"
             # A Desktop launched from a developer shell may inherit Cloud
@@ -95,6 +97,12 @@ class Settings(BaseSettings):
                 # BYOK and Ollama share the OpenAI-compatible Chat Completions
                 # adapter; Ollama is constrained to a loopback endpoint by Desktop.
                 self.llm_provider = "api"
+                self.embedding_provider = "local"
+            elif self.desktop_ai_mode == "cloud":
+                self.llm_provider = "cloud"
+                self.embedding_provider = "local"
+            elif self.desktop_ai_mode == "cloud":
+                self.llm_provider = "cloud"
                 self.embedding_provider = "local"
             # Desktop 通过主进程持有的短期 runtime token 调用这些业务路由。
             # 这不是 Web 共享预览的匿名开放：所有 /api/*（健康检查除外）仍由

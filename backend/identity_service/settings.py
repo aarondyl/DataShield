@@ -42,7 +42,7 @@ class IdentitySettings:
             login_max_attempts=max(3, min(20, int(os.getenv("IDENTITY_LOGIN_MAX_ATTEMPTS", "8")))),
             email_verify_required=os.getenv("IDENTITY_EMAIL_VERIFY_REQUIRED", "true").lower() == "true",
             llm_api_key_file=os.getenv("IDENTITY_LLM_API_KEY_FILE", ""),
-            llm_model=os.getenv("IDENTITY_LLM_MODEL", "deepseek-chat"),
+            llm_model=os.getenv("IDENTITY_LLM_MODEL", "deepseek-flash"),
         )
 
     @property

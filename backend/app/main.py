@@ -139,6 +139,12 @@ async def enforce_local_runtime_token(request, call_next):
     if settings.runtime_mode == "local" and request.url.path.startswith("/api/") and request.url.path != "/api/health":
         if not settings.runtime_token or request.headers.get("X-Runtime-Token") != settings.runtime_token:
             return JSONResponse({"detail": "Invalid runtime token"}, status_code=401)
+        from app.core.cloud_ai import current_cloud_identity_token
+        context = current_cloud_identity_token.set(request.headers.get("X-Cloud-Identity-Token", ""))
+        try:
+            return await call_next(request)
+        finally:
+            current_cloud_identity_token.reset(context)
     return await call_next(request)
 
 

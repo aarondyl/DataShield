@@ -14,9 +14,8 @@ import pytest
 
 from identity_service import api as identity_api
 from identity_service.base import IdentityBase
-from identity_service.database import engine
-from identity_service.database import SessionLocal
-from identity_service.models import IdentityUser
+from identity_service.database import engine, SessionLocal
+from identity_service.models import IdentityAIUsage, IdentityUser
 from identity_service.main import app
 
 
@@ -24,7 +23,6 @@ from identity_service.main import app
 def client(monkeypatch):
     IdentityBase.metadata.drop_all(engine)
     IdentityBase.metadata.create_all(engine)
-    identity_api._ai_calls.clear()
     sent_codes = []
     monkeypatch.setattr(identity_api, "send_security_code",
                         lambda settings, email, purpose, code: sent_codes.append((email, purpose, code)))
@@ -177,10 +175,16 @@ def test_cloud_ai_gateway_requires_account_and_validates_json(monkeypatch, clien
     assert http.post("/v1/ai/chat-json", json=payload).status_code == 401
     result = http.post("/v1/ai/chat-json", headers=headers, json=payload)
     assert result.status_code == 200 and result.json()["result"] == {"ok": True}
+    assert result.json()["usage"] == {"input_tokens": 0, "output_tokens": 0}
     assert requests[0][0] == "https://api.deepseek.com/chat/completions"
     assert requests[0][1]["headers"]["Authorization"] == "Bearer test-only-deepseek-key"
-    assert requests[0][1]["json"]["model"] == "deepseek-chat"
+    assert requests[0][1]["json"]["model"] == "deepseek-flash"
+    with SessionLocal() as db:
+        usage = db.query(IdentityAIUsage).one()
+        assert usage.user_id > 0 and usage.status == "SUCCEEDED"
+        assert not hasattr(usage, "prompt") and not hasattr(usage, "user_prompt")
     for _ in range(11):
         assert http.post("/v1/ai/chat-json", headers=headers, json=payload).status_code == 200
     limited = http.post("/v1/ai/chat-json", headers=headers, json=payload)
     assert limited.status_code == 429 and limited.headers["Retry-After"] == "60"
+    assert len(requests) == 12

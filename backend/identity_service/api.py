@@ -11,8 +11,6 @@ import hmac
 import json
 import re
 import secrets
-import threading
-from collections import defaultdict, deque
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 import httpx
@@ -25,7 +23,7 @@ from app.core.passwords import hash_password, verify_password
 from identity_service.database import get_db
 from identity_service.mailer import send_security_code
 from identity_service.models import (
-    IdentityAuditEvent, IdentitySession, IdentityUser, LoginAttempt, Membership,
+    IdentityAIUsage, IdentityAuditEvent, IdentitySession, IdentityUser, LoginAttempt, Membership,
     Organization, OrganizationInvitation, PasswordResetToken, VerificationToken,
 )
 from identity_service.settings import IdentitySettings
@@ -34,8 +32,6 @@ from identity_service.settings import IdentitySettings
 router = APIRouter(prefix="/v1", tags=["Identity"])
 _EMAIL_CODE = re.compile(r"^\d{6}$")
 _EMAIL_PATTERN = r"^[^\s@]+@[^\s@]+\.[^\s@]+$"
-_ai_lock = threading.Lock()
-_ai_calls: dict[int, deque[datetime]] = defaultdict(deque)
 
 
 class AIChatRequest(BaseModel):
@@ -43,18 +39,25 @@ class AIChatRequest(BaseModel):
     user_prompt: str = Field(min_length=1, max_length=48_000)
 
 
-def _limit_ai_calls(user_id: int) -> None:
-    now = datetime.now(UTC)
-    with _ai_lock:
-        calls = _ai_calls[user_id]
-        while calls and (now - calls[0]).total_seconds() > 60:
-            calls.popleft()
-        if len(calls) >= 12:
-            raise HTTPException(429, "AI request limit reached. Try again shortly.",
-                                headers={"Retry-After": "60"})
-        calls.append(now)
-
-
+def _reserve_ai_call(db: Session, user_id: int, model: str) -> IdentityAIUsage:
+    # Serialize quota checks per account. PostgreSQL enforces this across
+    # processes; SQLite's single-process local tests exercise the same path.
+    user = db.scalar(select(IdentityUser).where(IdentityUser.id == user_id).with_for_update())
+    if user is None or user.disabled:
+        raise HTTPException(403, "Account disabled")
+    since = _now() - timedelta(seconds=60)
+    count = db.scalar(select(func.count()).select_from(IdentityAIUsage).where(
+        IdentityAIUsage.user_id == user_id, IdentityAIUsage.created_at >= since,
+    )) or 0
+    if count >= 12:
+        db.rollback()
+        raise HTTPException(429, "AI request limit reached. Try again shortly.",
+                            headers={"Retry-After": "60"})
+    usage = IdentityAIUsage(user_id=user_id, model=model, status="PENDING")
+    db.add(usage)
+    db.commit()
+    db.refresh(usage)
+    return usage
 def _now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
 
@@ -172,12 +175,13 @@ def require_platform_admin(principal: Principal = Depends(require_principal)) ->
 
 @router.post("/ai/chat-json")
 async def cloud_ai_chat_json(payload: AIChatRequest,
-                             principal: Principal = Depends(require_principal)):
+                             principal: Principal = Depends(require_principal),
+                             db: Session = Depends(get_db)):
     """Authenticated, rate-limited DataShield inference; prompts are never logged."""
     settings = IdentitySettings.load()
     if not settings.llm_api_key:
         raise HTTPException(503, "DataShield Cloud AI is not configured")
-    _limit_ai_calls(principal.user.id)
+    usage = _reserve_ai_call(db, principal.user.id, settings.llm_model)
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(45.0, connect=8.0), follow_redirects=False) as client:
             response = await client.post(
@@ -195,15 +199,26 @@ async def cloud_ai_chat_json(payload: AIChatRequest,
                 },
             )
             response.raise_for_status()
-            content = response.json()["choices"][0]["message"]["content"]
+            completion = response.json()
+            content = completion["choices"][0]["message"]["content"]
         value = json.loads(content)
         if not isinstance(value, dict):
             raise ValueError("model response must be a JSON object")
+        accounting = completion.get("usage") if isinstance(completion.get("usage"), dict) else {}
+        usage.input_tokens = max(0, int(accounting.get("prompt_tokens") or 0))
+        usage.output_tokens = max(0, int(accounting.get("completion_tokens") or 0))
+        usage.status = "SUCCEEDED"
+        db.commit()
     except HTTPException:
+        usage.status = "FAILED"
+        db.commit()
         raise
     except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
+        usage.status = "FAILED"
+        db.commit()
         raise HTTPException(502, "Cloud AI inference failed or returned invalid structured output") from None
-    return {"provider": "deepseek", "model": settings.llm_model, "result": value}
+    return {"provider": "deepseek", "model": settings.llm_model, "result": value,
+            "usage": {"input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens}}
 
 
 
