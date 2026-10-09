@@ -2,6 +2,7 @@ type Translate = (key: string) => string;
 
 export function identityErrorMessage(error: unknown, t: Translate): string {
   const message = typeof error === 'string' ? error : error instanceof Error ? error.message : '';
+  if (message === 'PASSWORD_MISMATCH') return t('appnew.auth.passwordMismatch');
   if (message.includes('Email already registered')) return t('appnew.auth.emailTaken');
   if (message.includes('Invalid email or password')) return t('appnew.auth.invalidCredentials');
   if (message.includes('Invalid or expired')) return t('appnew.desktopAccount.invalidCode');

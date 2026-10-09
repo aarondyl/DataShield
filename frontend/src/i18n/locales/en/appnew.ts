@@ -247,6 +247,7 @@ export default {
       confirmRemoveMember: 'Remove {{email}} from this organization?', memberRemoved: 'Member removed.',
       deviceSessions: 'Signed-in devices', currentSession: 'This device', revokeSession: 'Revoke device session', sessionRevoked: 'Device session revoked.',
       newPassword: 'New password (at least 12 characters)', requestReset: 'Send reset code', resetPassword: 'Reset password',
+      passwordRequirement: 'Use at least 12 characters.',
       passwordResetDone: 'Password reset. Sign in with your new password.', forgotPassword: 'Forgot password?',
       backToLogin: 'Back to sign in', resendVerification: 'Resend verification email', verificationResent: 'Verification email resent.',
     },

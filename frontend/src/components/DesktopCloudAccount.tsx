@@ -23,6 +23,7 @@ export default function DesktopCloudAccount({ mode, edition }: { mode: 'login' |
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [organization, setOrganization] = useState('');
   const [code, setCode] = useState('');
   const [needsVerification, setNeedsVerification] = useState(false);
@@ -64,12 +65,14 @@ export default function DesktopCloudAccount({ mode, edition }: { mode: 'login' |
         return;
       }
       if (resettingPassword) {
+        if (password !== confirmPassword) throw new Error('PASSWORD_MISMATCH');
         await invoke('cloud_identity_password_reset_confirm', { input: { baseUrl, email, code, newPassword: password } });
-        setResettingPassword(false); setResetCodeSent(false); setCode(''); setPassword('');
+        setResettingPassword(false); setResetCodeSent(false); setCode(''); setPassword(''); setConfirmPassword('');
         setNotice(t('appnew.desktopAccount.passwordResetDone'));
         return;
       }
       if (mode === 'signup') {
+        if (password !== confirmPassword) throw new Error('PASSWORD_MISMATCH');
         const account = await invoke<IdentityView>('cloud_identity_register', { input: {
           baseUrl, email, password, name, organizationName: organization, edition,
         } });
@@ -91,11 +94,12 @@ export default function DesktopCloudAccount({ mode, edition }: { mode: 'login' |
       {!needsVerification && !resettingPassword && <>
         {mode === 'signup' && <label>{t('appnew.auth.name')}<input required maxLength={200} value={name} onChange={e => setName(e.target.value)} autoComplete="name" /></label>}
         <label>{t('appnew.auth.email')}<input required type="email" maxLength={320} value={email} onChange={e => setEmail(e.target.value)} autoComplete="email" /></label>
-        <label>{t('appnew.auth.password')}<input required type="password" minLength={12} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} /></label>
+        <label>{t('appnew.auth.password')}<input required type="password" minLength={mode === 'signup' ? 12 : 1} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} autoComplete={mode === 'signup' ? 'new-password' : 'current-password'} />{mode === 'signup' && <small>{t('appnew.desktopAccount.passwordRequirement')}</small>}</label>
+        {mode === 'signup' && <label>{t('appnew.auth.confirmPassword')}<input required type="password" minLength={12} maxLength={128} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} autoComplete="new-password" /></label>}
         {mode === 'signup' && <label>{t('appnew.auth.workspaceName')}<input required maxLength={200} value={organization} onChange={e => setOrganization(e.target.value)} /></label>}
       </>}
       {(needsVerification || (resettingPassword && resetCodeSent)) && <label>{t('appnew.desktopAccount.verificationCode')}<input required inputMode="numeric" pattern="[0-9]{6}" minLength={6} maxLength={6} value={code} onChange={e => setCode(e.target.value)} autoComplete="one-time-code" /></label>}
-      {resettingPassword && <label>{t('appnew.desktopAccount.newPassword')}<input required type="password" minLength={12} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" /></label>}
+      {resettingPassword && <><label>{t('appnew.desktopAccount.newPassword')}<input required type="password" minLength={12} maxLength={128} value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" /></label><label>{t('appnew.auth.confirmPassword')}<input required type="password" minLength={12} maxLength={128} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} autoComplete="new-password" /></label></>}
       {!baseUrl && <p role="status" className="ds-inline-error">{t('appnew.desktopAccount.endpointMissing')}</p>}
       {error && <p role="alert" className="ds-inline-error">{error}</p>}
       {notice && <p role="status" className="ds-cloud-notice">{notice}</p>}
