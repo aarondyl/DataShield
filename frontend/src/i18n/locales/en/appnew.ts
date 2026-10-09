@@ -809,6 +809,7 @@ export default {
       testOk: 'Real inference succeeded: {{provider}} / {{model}}', loadError: 'Could not read local AI configuration.',
       deleteKey: 'Delete saved API key', keyDeleted: 'The key was deleted from Windows Credential Manager. Restart DataShield to apply.', notReady: 'Not configured',
       modeLabels: { mock: 'Demo rules (not AI)', byok: 'My cloud model', local: 'Local Ollama model', cloud: 'DataShield Cloud AI' },
+      errors: { KEYSTORE_UNAVAILABLE: 'Windows Credential Manager is unavailable for this Windows user.', KEYSTORE_WINDOWS_ONLY: 'Secure API key storage is available only in the Windows desktop app.', KEY_NOT_SAVED: 'No API key has been saved.', KEY_SAVE_FAILED: 'Could not save the key to Windows Credential Manager.', KEY_DELETE_FAILED: 'Could not delete the key from Windows Credential Manager.', AI_ENDPOINT_INVALID: 'Invalid service URL. BYOK requires HTTPS; Ollama must use the local device.', AI_MODEL_REQUIRED: 'Enter a model name.', AI_CONSENT_REQUIRED: 'Confirm that the minimum context needed for analysis may be sent to your selected model provider.', AI_KEY_REQUIRED: 'Enter a model API key.', AI_CONFIG_PATH_INVALID: 'Could not locate the local configuration file.', AI_CONFIG_DIRECTORY_FAILED: 'Could not create the DataShield configuration directory.', AI_CONFIG_ENCODE_FAILED: 'Could not encode the AI configuration.', AI_CONFIG_SAVE_FAILED: 'Could not save the AI configuration.' },
       service: 'Local service',
       llm: 'Language model provider',
       embeddings: 'Embedding provider',

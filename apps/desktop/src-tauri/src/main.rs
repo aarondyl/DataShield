@@ -115,43 +115,43 @@ fn read_ai_config() -> AiProviderConfig {
 #[cfg(windows)]
 fn credential_entry() -> Result<Entry, String> {
     Entry::new(AI_CREDENTIAL_SERVICE, AI_CREDENTIAL_USER)
-        .map_err(|_| "无法访问 Windows 凭据管理器，请检查当前 Windows 用户配置".to_string())
+        .map_err(|_| "KEYSTORE_UNAVAILABLE".to_string())
 }
 
 #[cfg(not(windows))]
 fn get_stored_key() -> Result<String, String> {
-    Err("AI API Key 安全存储仅在 Windows 桌面版可用".into())
+    Err("KEYSTORE_WINDOWS_ONLY".into())
 }
 
 #[cfg(windows)]
 fn get_stored_key() -> Result<String, String> {
     credential_entry()?
         .get_password()
-        .map_err(|_| "Windows 凭据管理器中没有已保存的 AI Key".into())
+        .map_err(|_| "KEY_NOT_SAVED".into())
 }
 
 #[cfg(not(windows))]
 fn save_stored_key(_key: &str) -> Result<(), String> {
-    Err("AI API Key 安全存储仅在 Windows 桌面版可用".into())
+    Err("KEYSTORE_WINDOWS_ONLY".into())
 }
 
 #[cfg(windows)]
 fn save_stored_key(key: &str) -> Result<(), String> {
     credential_entry()?
         .set_password(key)
-        .map_err(|_| "无法将密钥保存到 Windows 凭据管理器".into())
+        .map_err(|_| "KEY_SAVE_FAILED".into())
 }
 
 #[cfg(not(windows))]
 fn remove_stored_key() -> Result<(), String> {
-    Err("AI API Key 安全存储仅在 Windows 桌面版可用".into())
+    Err("KEYSTORE_WINDOWS_ONLY".into())
 }
 
 #[cfg(windows)]
 fn remove_stored_key() -> Result<(), String> {
     match credential_entry()?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(_) => Err("无法从 Windows 凭据管理器删除模型密钥".into()),
+        Err(_) => Err("KEY_DELETE_FAILED".into()),
     }
 }
 
@@ -195,13 +195,13 @@ fn set_ai_provider_config(update: AiProviderUpdate) -> Result<AiProviderView, St
     let base_url = update.base_url.trim().trim_end_matches('/');
     let model = update.model.trim();
     if !valid_ai_endpoint(provider, base_url) {
-        return Err("模型服务地址无效；BYOK 必须使用 HTTPS，Ollama 仅允许本机地址".into());
+        return Err("AI_ENDPOINT_INVALID".into());
     }
     if provider != "mock" && model.is_empty() {
-        return Err("请填写模型名称".into());
+        return Err("AI_MODEL_REQUIRED".into());
     }
     if provider == "byok" && !update.cloud_consent {
-        return Err("请先确认本次分析所需上下文会发送给你选择的模型服务商".into());
+        return Err("AI_CONSENT_REQUIRED".into());
     }
 
     let provided_key = update.api_key.unwrap_or_default();
@@ -209,7 +209,7 @@ fn set_ai_provider_config(update: AiProviderUpdate) -> Result<AiProviderView, St
         save_stored_key(provided_key.trim())?;
     }
     if provider == "byok" && get_stored_key().is_err() {
-        return Err("请输入模型 API Key；密钥只会保存到 Windows 凭据管理器".into());
+        return Err("AI_KEY_REQUIRED".into());
     }
     if provider == "mock" {
         remove_stored_key()?;
@@ -222,13 +222,13 @@ fn set_ai_provider_config(update: AiProviderUpdate) -> Result<AiProviderView, St
         cloud_consent: update.cloud_consent,
     };
     let path = ai_config_path()?;
-    fs::create_dir_all(path.parent().ok_or("无法定位配置目录")?)
-        .map_err(|_| "无法创建 DataShield 配置目录".to_string())?;
+    fs::create_dir_all(path.parent().ok_or("AI_CONFIG_PATH_INVALID")?)
+        .map_err(|_| "AI_CONFIG_DIRECTORY_FAILED".to_string())?;
     fs::write(
         &path,
-        serde_json::to_vec(&config).map_err(|_| "无法编码 AI 配置")?,
+        serde_json::to_vec(&config).map_err(|_| "AI_CONFIG_ENCODE_FAILED")?,
     )
-    .map_err(|_| "无法保存 AI 配置".to_string())?;
+    .map_err(|_| "AI_CONFIG_SAVE_FAILED".to_string())?;
     Ok(ai_provider_view(config))
 }
 

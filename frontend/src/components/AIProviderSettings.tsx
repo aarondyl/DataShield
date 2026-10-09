@@ -23,12 +23,16 @@ export default function AIProviderSettings() {
   }, [t]);
 
   const update = (patch: Partial<Config>) => setConfig(current => ({ ...current, ...patch }));
+  const nativeError = (err: unknown) => {
+    const code = String(err).replace(/^Error:\s*/, '').trim();
+    return t(`appnew.settings.aiProvider.errors.${code}`, { defaultValue: code });
+  };
   const save = async () => {
     setBusy(true); setError(''); setMessage('');
     try {
       const next = await invoke<Config>('set_ai_provider_config', { update: { ...config, apiKey: apiKey || null } });
       setConfig(next); setApiKey(''); setRestartRequired(true); setMessage(t('appnew.settings.aiProvider.saved'));
-    } catch (err: any) { setError(String(err)); }
+    } catch (err: any) { setError(nativeError(err)); }
     finally { setBusy(false); }
   };
   const loadOllamaModels = async () => {
@@ -55,7 +59,7 @@ export default function AIProviderSettings() {
       await invoke('delete_ai_provider_key');
       setConfig(current => ({ ...current, keyConfigured: false }));
       setRestartRequired(true); setMessage(t('appnew.settings.aiProvider.keyDeleted'));
-    } catch (err: any) { setError(String(err)); }
+    } catch (err: any) { setError(nativeError(err)); }
     finally { setBusy(false); }
   };
 

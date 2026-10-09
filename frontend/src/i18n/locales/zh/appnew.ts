@@ -809,6 +809,7 @@ export default {
       testOk: '真实推理连接成功：{{provider}} / {{model}}', loadError: '无法读取本机 AI 配置。',
       deleteKey: '删除已保存的 API Key', keyDeleted: '密钥已从 Windows 凭据管理器删除；重启 DataShield 后生效。', notReady: '未配置',
       modeLabels: { mock: '演示规则（非 AI）', byok: '用户自带云端模型', local: 'Ollama 本机模型', cloud: 'DataShield Cloud AI' },
+      errors: { KEYSTORE_UNAVAILABLE: '无法访问 Windows 凭据管理器，请检查当前 Windows 用户配置。', KEYSTORE_WINDOWS_ONLY: 'API Key 安全存储仅支持 Windows 桌面版。', KEY_NOT_SAVED: '尚未保存 API Key。', KEY_SAVE_FAILED: '无法将 Key 保存到 Windows 凭据管理器。', KEY_DELETE_FAILED: '无法从 Windows 凭据管理器删除 Key。', AI_ENDPOINT_INVALID: '服务地址无效。BYOK 必须使用 HTTPS，Ollama 只能连接本机地址。', AI_MODEL_REQUIRED: '请填写模型名称。', AI_CONSENT_REQUIRED: '请先确认本次分析所需上下文会发送给你选择的模型服务商。', AI_KEY_REQUIRED: '请输入模型 API Key。', AI_CONFIG_PATH_INVALID: '无法定位本机配置文件。', AI_CONFIG_DIRECTORY_FAILED: '无法创建 DataShield 配置目录。', AI_CONFIG_ENCODE_FAILED: '无法编码 AI 配置。', AI_CONFIG_SAVE_FAILED: '无法保存 AI 配置。' },
       service: '本地服务',
       llm: '语言模型服务商',
       embeddings: '向量模型服务商',
