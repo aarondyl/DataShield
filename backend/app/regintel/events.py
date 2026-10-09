@@ -63,6 +63,7 @@ def build_change_ready_payload(
         "change_ids": [c.id for c in changes],
         "version_id": version.id,
         "version_number": version.version_number,
+        "review_status": version.review_status,
         "jurisdiction": regulation.jurisdiction,
         "topics": _topics_of(combined_text),
         "materiality": materiality,

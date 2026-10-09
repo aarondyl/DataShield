@@ -35,7 +35,7 @@ def regulatory_db(tmp_path):
         db.flush()
         version = RegulationVersion(id=1, regulation_id=1, version_number=2,
                                     normalized_text="Article 1 transparency", content_hash="a" * 64,
-                                    is_current=True)
+                                    is_current=True, review_status="UNREVIEWED")
         db.add(version)
         db.flush()
         regulation.current_version_id = version.id
@@ -80,7 +80,9 @@ def test_event_requirement_and_legal_evidence_are_stable_dtos(regulatory_db):
     assert trigger.change_id == 1
     assert trigger.requirement_ids == [1]
     assert trigger.source.version == 2
+    assert trigger.source.review_status == "UNREVIEWED"
     assert requirements[0].status == "NEEDS_REVIEW"
+    assert requirements[0].review_status == "UNREVIEWED"
     assert requirements[0].conditions == [{"market": "EU"}]
     assert requirements[0].regulation_name == "EU Test Act"
     assert evidence[0].legal_unit_id == 1
@@ -88,6 +90,7 @@ def test_event_requirement_and_legal_evidence_are_stable_dtos(regulatory_db):
     assert evidence[0].article == "Article 1"
     assert evidence[0].version == 2
     assert evidence[0].source_url == "https://example.eu/official"
+    assert evidence[0].review_status == "UNREVIEWED"
 
 
 def test_event_with_requirement_ids_does_not_search(regulatory_db, monkeypatch):

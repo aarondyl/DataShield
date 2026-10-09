@@ -29,6 +29,7 @@ class LegalSearchResultItem(BaseModel):
     summary: str = ""
     source_url: str = ""
     similarity_score: float | None = None
+    review_status: str = "UNREVIEWED"
 
 
 class LegalSearchResponse(BaseModel):
@@ -57,6 +58,7 @@ class RequirementOut(BaseModel):
     status: str
     effective_from: datetime | None = None
     effective_to: datetime | None = None
+    review_status: str = "UNREVIEWED"
     created_at: datetime
 
 
@@ -77,6 +79,7 @@ class LegalUnitOut(BaseModel):
     version_number: int = 0
     is_current_version: bool = False
     official_source_url: str = ""
+    review_status: str = "UNREVIEWED"
 
 
 class VersionOut(BaseModel):
