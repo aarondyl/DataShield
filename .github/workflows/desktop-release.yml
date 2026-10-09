@@ -31,7 +31,7 @@ jobs:
           git merge-base --is-ancestor "$SOURCE_SHA" origin/main
           ! git rev-parse "refs/tags/v$VERSION" >/dev/null 2>&1
           test "$(python -c 'import json;print(json.load(open("apps/desktop/package.json"))["version"])')" = "$VERSION"
-          test "$(grep '^version = ' apps/desktop/src-tauri/Cargo.toml | head -1 | cut -d '\"' -f2)" = "$VERSION"
+          test "$(python -c 'import tomllib;print(tomllib.load(open("apps/desktop/src-tauri/Cargo.toml","rb"))["package"]["version"])')" = "$VERSION"
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
