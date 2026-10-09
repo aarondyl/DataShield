@@ -14,7 +14,7 @@ Continue the in-progress DataShield delivery from the existing repository state.
 - Branch: `feat/global-regintel-agent`
 - Last pushed commit before this continuation began: `6197fd7b95737ecaa7d56bdaa08dfed6d88cd3fe`
 - The branch subsequently advanced to `2e3cf43` while recovery was underway, adding bounded retries for transient official-source fetch failures. This is the pushed base for the current fixes.
-- Current PR branch includes origin/main through merge commit `aca24ca`; checks are rerunning after each code push.
+- Current PR branch includes origin/main through merge commit `aca24ca`; pushed commits through `ec1f56c` contain the latest tested legal-review propagation fixes.
 - Open PR #24: official Cloud source catalog and review provenance. Earlier CI at `6197fd7` failed; startup-lifespan seeding and full-app migration fixes are in `15beaba`.
 - PR #23 was merged after Cloud, Product Twin, and Windows installer CI all passed; merge commit is `480c52c`.
 - Open PR #19 remains a draft on `release/integration-v0.1.0` at `75a0a8cd596e9cbb9bce50d77845d299ca526e46`. It is based on older main and does not contain current main. Review its 44-file delta before selectively reusing; do not merge it wholesale.
@@ -35,6 +35,8 @@ Continue the in-progress DataShield delivery from the existing repository state.
 - Fixed the Cloud startup source-catalog test to enter FastAPI's lifespan context; source seeding happens at startup (commit `15beaba`).
 - Made full-application Alembic migration `0012` for `regulation_versions.review_status` idempotent. The Cloud-only Alembic chain remains separate (commit `15beaba`).
 - Carried legal-version review status through change events, Tenant Agent source/requirement context, Finding legal evidence, and persisted evidence snapshots. Fixed a duplicate-field DTO error and added regression assertions.
+- Preserved exact official HTTP response bytes in source snapshots, stored a separate raw SHA256 and byte length, added additive migration revisions `0013` and Cloud-only `c0003`, and mounted a persistent Cloud snapshot volume.
+- Expanded the existing manual, read-only ECS SSH workflow to report host/container/resource state, Cloud PostgreSQL aggregate counts, secrets-directory permissions (without reading files), local API health, and external HTTPS health.
 
 ## Validation
 
@@ -43,10 +45,12 @@ Continue the in-progress DataShield delivery from the existing repository state.
 - PR #24 failure 2: full application migration chain lacked the review-status column used by the ORM smoke test.
 - Targeted Cloud API, official source catalog, migration-isolation, and Local sync tests: 16 passed.
 - Tenant regulatory gateway, applicability/gap, remediation planner, Tenant Agent, Cloud API, and official catalog tests: 70 passed after review-status propagation fixes.
+- Official source snapshot, tenant regulatory, Cloud startup, and Local sync tests: 19 passed after raw-byte archival changes.
 - Full application Alembic chain upgraded a fresh temporary SQLite database through revision `0012`.
-- Cloud-only Alembic chain upgraded a separate temporary SQLite database through revision `c0002`.
+- Cloud-only Alembic chain upgraded a separate temporary SQLite database through revision `c0003`; both chains reach `0013` / `c0003` with the source snapshot hash column.
 - Live official-source ingestion against the CAC PIPL and DSL URLs completed with LLM disabled and local embeddings: 2 versions, 284 legal units, and 137 extracted requirements in an isolated temporary SQLite database. All content remains marked unreviewed pending legal review.
-- Official CAC source URLs returned HTTP 200 with HTML content from this environment.
+- Latest live snapshot verification: PIPL response 60,221 bytes and DSL response 32,994 bytes; raw hashes matched persisted bytes and both versions remained `UNREVIEWED`.
+- Official CAC source URLs returned HTTP 200 with HTML content from this environment. ECS workflow YAML parsed and its Bash script passed `bash -n`.
 
 ## ECS deployment and health
 
@@ -62,8 +66,8 @@ Continue the in-progress DataShield delivery from the existing repository state.
 
 ## Remaining work
 
-1. Verify the GitHub checks for the latest PR #24 commit, including Windows packaging; merge only after green checks.
-2. Resolve PR #23 Windows packaging and complete actual AI provider checks.
+1. Push the raw-source archive, migrations, Docker volume, legal-review propagation, and ECS audit workflow; verify all PR #24 checks and merge only after green checks.
+2. Run the read-only ECS inspection workflow from main and use its evidence before any deployment change.
 3. Implement or explicitly scope the missing Cloud identity service and default Cloud LLM Gateway.
 4. Verify change-event generation and scheduled polling against live source updates.
 5. Obtain a working authorized ECS SSH key or equivalent deployment access, then inspect current deployment before changing it.
@@ -81,4 +85,4 @@ RUNTIME_MODE=cloud DATABASE_URL=sqlite:////tmp/datashield-cloud-migration-check.
 git diff --check
 ```
 
-These validations completed using `/tmp/datashield-uv/uv` because the host has no system pytest installation. After the legal review-status propagation commit is pushed, inspect the latest GitHub Actions results.
+These validations completed using `/tmp/datashield-uv/uv` because the host has no system pytest installation. After the source-snapshot and audit-workflow changes are pushed, inspect the latest GitHub Actions results.
