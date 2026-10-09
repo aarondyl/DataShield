@@ -5,6 +5,7 @@ from app.db.base import Base
 from app.models import Regulation, RegulatorySource
 from app.regintel.adapters import HttpTextAdapter, RawDocument
 from app.services.cloud_source_catalog import seed_cloud_official_sources
+from app.services import scheduler as scheduler_service
 
 
 def test_official_source_catalog_is_idempotent_and_only_records_source_metadata():
@@ -33,3 +34,21 @@ def test_html_extraction_skips_navigation_and_decodes_entities():
     assert "第一条 处理个人信息。" in text
     assert "导航" not in text
     assert "伪造内容" not in text
+
+
+def test_scheduler_registers_warmup_and_daily_single_instance_jobs(monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("RUNTIME_MODE", "cloud")
+    monkeypatch.setenv("SCHEDULER_ENABLED", "true")
+    monkeypatch.setenv("SCHEDULER_INTERVAL_HOURS", "24")
+    get_settings.cache_clear()
+    scheduler = scheduler_service.start_scheduler()
+    assert scheduler is not None
+    try:
+        jobs = {job.id: job for job in scheduler.get_jobs()}
+        assert {"regintel_polling", "regintel_initial_poll"} <= jobs.keys()
+        assert jobs["regintel_polling"].max_instances == 1
+    finally:
+        scheduler.shutdown(wait=False)
+        get_settings.cache_clear()

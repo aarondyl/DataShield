@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from sqlalchemy import select
 
 from app.core.config import get_settings
@@ -43,6 +45,20 @@ def start_scheduler():
         hours=settings.scheduler_interval_hours,
         id="regintel_polling",
         name="法规来源定时轮询",
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=3600,
+    )
+    # Populate an empty Cloud catalog promptly after deployment. The recurring
+    # job remains the source of ongoing updates; this one-time run is serialized
+    # through the same sequential low-concurrency polling function.
+    scheduler.add_job(
+        poll_active_sources,
+        trigger="date",
+        run_date=datetime.now(UTC) + timedelta(seconds=15),
+        id="regintel_initial_poll",
+        name="法规来源首次同步",
+        misfire_grace_time=3600,
     )
     scheduler.start()
     return scheduler
