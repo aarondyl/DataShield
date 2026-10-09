@@ -122,7 +122,7 @@ class HttpTextAdapter(SourceAdapter):
 
                 def handle_data(self, data: str) -> None:
                     if self.ignored_depth == 0:
-                        self.parts.append(data)
+                        self.parts.append(data.replace("\u00a0", " ").replace("\u202f", " "))
 
             parser = _TextExtractor()
             parser.feed(text)
