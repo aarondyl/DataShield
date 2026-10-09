@@ -10,3 +10,5 @@ class HealthOut(BaseModel):
     db: str = Field(..., description="postgresql / sqlite")
     llm_provider: str
     embedding_provider: str
+    ai_mode: str = "mock"
+    llm_configured: bool = False

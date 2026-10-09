@@ -98,3 +98,4 @@
 .ds-guide-safe{margin:0;padding-top:14px;border-top:1px solid var(--ds-line);color:var(--ds-muted);font-size:12px;line-height:1.6}
 .ds-guide-safe b{color:var(--ds-ink)}
 @media(max-width:760px){.ds-guide{padding:24px}.ds-guide-steps{grid-template-columns:1fr}}
+.ds-ai-provider-settings{display:grid;gap:14px;max-width:680px}.ds-ai-provider-settings label{display:grid;gap:6px;color:var(--ds-ink);font-size:13px;font-weight:600}.ds-ai-provider-settings input:not([type=checkbox]),.ds-ai-provider-settings select{width:100%;min-height:40px;padding:9px 11px;border:1px solid var(--ds-line);border-radius:8px;background:#fff;color:var(--ds-ink);font:inherit}.ds-ai-provider-settings .ds-ai-consent{display:flex;grid-template-columns:auto 1fr;align-items:start;font-weight:400;line-height:1.5}.ds-ai-provider-settings .ds-ai-consent input{margin-top:4px}.ds-ai-provider-settings p{margin:0}.ds-ai-provider-settings code{font-size:12px}
