@@ -72,7 +72,7 @@ services:
       IDENTITY_EMAIL_FROM: ${IDENTITY_EMAIL_FROM:-}
       IDENTITY_SMTP_STARTTLS: "true"
       IDENTITY_LLM_API_KEY_FILE: /run/secrets/identity_llm_api_key
-      IDENTITY_LLM_MODEL: ${IDENTITY_LLM_MODEL:-deepseek-chat}
+      IDENTITY_LLM_MODEL: ${IDENTITY_LLM_MODEL:-deepseek-flash}
     ports:
       - "${IDENTITY_BIND_ADDRESS:-127.0.0.1}:8001:8001"
     depends_on:
