@@ -9,14 +9,14 @@ Continue the in-progress DataShield delivery from the existing repository state.
 ## Repository and current work
 
 - Repository: `aarondyl/DataShield`
-- Main branch at recovery: `origin/main` = `a7f0e166b1e74c772b8d1b24afa9e296cf0d91f5` (`v0.2.0-rc.2`).
+- Main branch at recovery: `a7f0e166b1e74c772b8d1b24afa9e296cf0d91f5` (`v0.2.0-rc.2`). Current main includes PR #23 merge `480c52c317f514d8d93b0be135060d76ce53ad15`.
 - Current active worktree: `/home/aaron/Projects/DataShield/DataShield-regintel`
 - Branch: `feat/global-regintel-agent`
 - Last pushed commit before this continuation began: `6197fd7b95737ecaa7d56bdaa08dfed6d88cd3fe`
 - The branch subsequently advanced to `2e3cf43` while recovery was underway, adding bounded retries for transient official-source fetch failures. This is the pushed base for the current fixes.
-- Current pushed branch commit: `15beaba4b441a153ec1fe17ae9379c291a7a3047`.
-- Open PR #24: official Cloud source catalog and review provenance. Earlier CI at `6197fd7` failed; fixes for startup-lifespan seeding and full-app migration were pushed in `15beaba`. CI for that head was running at the last check.
-- Open PR #23: secure local BYOK/Ollama provider settings. Backend/frontend and Cloud migration checks passed; Windows installer job was still running.
+- Current PR branch includes origin/main through merge commit `aca24ca`; its checks are rerunning.
+- Open PR #24: official Cloud source catalog and review provenance. Earlier CI at `6197fd7` failed; startup-lifespan seeding and full-app migration fixes are in `15beaba`.
+- PR #23 was merged after Cloud, Product Twin, and Windows installer CI all passed; merge commit is `480c52c`.
 - Open PR #19 remains a draft on `release/integration-v0.1.0` at `75a0a8cd596e9cbb9bce50d77845d299ca526e46`. It is based on older main and does not contain current main. Review its 44-file delta before selectively reusing; do not merge it wholesale.
 - Original worktree `/home/aaron/Projects/DataShield/DataShield` is on `feat/ai-native-frontend` with pre-existing staged modifications in `backend/app/core/config.py`, `docker-compose.yml`, `frontend/vite.config.ts`, and deletion of `启动DataShield.bat`. These changes were preserved and not reset or cleaned.
 
@@ -26,7 +26,7 @@ Continue the in-progress DataShield delivery from the existing repository state.
 - Windows installer lock fix and version validation are on main (PRs #21/#22).
 - Product Twin, Local Tenant Agent, Finding/Evidence, Remediation, Feedback, and reanalysis flows exist in prior branches and integration evidence.
 - Main has the v0.2.0-rc.2 GitHub Pre-release.
-- PR #23 contains secure BYOK and Ollama settings work.
+- PR #23 secure BYOK and Ollama settings work is now on main.
 - PR #24 contains official source catalog metadata, source review status, and Cloud-only migration work.
 - The branch includes low-concurrency scheduled polling and an initial warm-up poll.
 
