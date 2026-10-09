@@ -59,9 +59,6 @@ jobs:
           printf 'os=%s\n' "$PRETTY_NAME"
           printf 'memory_mb='; awk '/MemTotal/ {printf "%.0f\n", $2 / 1024}' /proc/meminfo
           printf 'root_disk='; df -h / | tail -n 1
-          printf 'docker='; docker version --format '{{.Server.Version}}' 2>/dev/null || echo unavailable
-          printf 'containers:\n'
-          docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
           if [ -d /opt/datashield-cloud/secrets ]; then
             stat -c 'secrets_dir_mode=%a owner=%U:%G' /opt/datashield-cloud/secrets
           else
@@ -72,20 +69,44 @@ jobs:
           else
             echo 'local_api_http=unavailable'
           fi
-          pg_container=$(docker ps --quiet --filter label=com.docker.compose.service=postgres | head -n 1)
-          if [ -n "$pg_container" ]; then
-            echo 'postgres_summary:'
-            docker exec -i "$pg_container" sh -c 'psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-postgres}" -At' <<'SQL'
+          DOCKER_USE_SUDO=0
+          if docker_version=$(docker version --format '{{.Server.Version}}' 2>/dev/null); then
+            :
+          elif docker_version=$(sudo -n docker version --format '{{.Server.Version}}' 2>/dev/null); then
+            DOCKER_USE_SUDO=1
+          else
+            docker_version=unavailable
+            DOCKER_USE_SUDO=-1
+          fi
+          run_docker() {
+            if [ "$DOCKER_USE_SUDO" = 1 ]; then sudo -n docker "$@"; else docker "$@"; fi
+          }
+          printf 'docker=%s\n' "$docker_version"
+          if [ "$DOCKER_USE_SUDO" = -1 ]; then
+            echo 'docker_access=denied'
+            echo 'containers=unavailable'
+            echo 'postgres_summary=unavailable'
+          else
+            printf 'docker_sudo=%s\n' "$DOCKER_USE_SUDO"
+            printf 'compose='; run_docker compose version --short 2>/dev/null || echo unavailable
+            printf 'containers:\n'
+            run_docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
+            pg_container=$(run_docker ps --quiet --filter label=com.docker.compose.service=postgres | head -n 1)
+            if [ -n "$pg_container" ]; then
+              echo 'postgres_summary:'
+              run_docker exec -i "$pg_container" sh -c 'psql -U "${POSTGRES_USER:-postgres}" -d "${POSTGRES_DB:-postgres}" -At' <<'SQL'
           SELECT 'database=' || current_database();
           SELECT 'schema_revision=' || COALESCE((SELECT version_num FROM alembic_version LIMIT 1), 'missing');
+          SELECT 'pgvector=' || COALESCE((SELECT extversion FROM pg_extension WHERE extname = 'vector'), 'missing');
           SELECT 'regulations=' || count(*) FROM regulations;
           SELECT 'versions=' || count(*) FROM regulation_versions;
           SELECT 'legal_units=' || count(*) FROM legal_units;
           SELECT 'requirements=' || count(*) FROM requirements;
           SELECT 'change_events=' || count(*) FROM regulation_events;
           SQL
-          else
-            echo 'postgres_container=not_found'
+            else
+              echo 'postgres_container=not_found'
+            fi
           fi
           REMOTE
 
