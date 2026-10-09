@@ -171,7 +171,7 @@ def _requirement_context(db: Session, item: RequirementOut) -> RequirementContex
     regulation = get_regulation_info(db, item.regulation_id)
     version = get_regulation_version(db, item.version_id)
     return RequirementContext(
-        **item.model_dump(exclude={"created_at"}),
+        **item.model_dump(exclude={"created_at", "review_status"}),
         regulation_name=regulation.name if regulation else "",
         jurisdiction=regulation.jurisdiction if regulation else "",
         regulation_version=version.version_number if version else None,
