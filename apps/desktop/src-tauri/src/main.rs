@@ -432,6 +432,7 @@ async fn cloud_identity_register(
             "organization_name": input.organization_name.unwrap_or_default(),
             "edition": input.edition.unwrap_or_else(|| "developer".into()),
         }))
+        .timeout(Duration::from_secs(20))
         .send()
         .await
         .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
@@ -458,6 +459,7 @@ async fn cloud_identity_verify_email(
         .client
         .post(url)
         .json(&serde_json::json!({"email": input.email, "code": input.code}))
+        .timeout(Duration::from_secs(20))
         .send()
         .await
         .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
@@ -482,6 +484,7 @@ async fn cloud_identity_login(
             "password": input.password,
             "device_name": input.device_name.unwrap_or_else(|| "DataShield Desktop".into()),
         }))
+        .timeout(Duration::from_secs(20))
         .send()
         .await
         .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
@@ -497,6 +500,7 @@ async fn identity_refresh(base_url: &str, state: &DesktopState) -> Result<(), St
         .client
         .post(url)
         .json(&serde_json::json!({"refresh_token": refresh}))
+        .timeout(Duration::from_secs(20))
         .send()
         .await
         .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
@@ -515,6 +519,7 @@ async fn cloud_identity_me(
         .client
         .get(&url)
         .bearer_auth(&access)
+        .timeout(Duration::from_secs(20))
         .send()
         .await
         .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
@@ -525,6 +530,7 @@ async fn cloud_identity_me(
             .client
             .get(&url)
             .bearer_auth(access)
+            .timeout(Duration::from_secs(20))
             .send()
             .await
             .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
@@ -545,6 +551,7 @@ async fn cloud_identity_logout(
                 .client
                 .post(url)
                 .bearer_auth(access)
+                .timeout(Duration::from_secs(20))
                 .send()
                 .await
                 .map_err(|_| "IDENTITY_SERVICE_UNAVAILABLE".to_string())?;
