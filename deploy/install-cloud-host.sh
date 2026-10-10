@@ -13,6 +13,9 @@ libexec=/usr/local/libexec/datashield-cloud
 wrapper=/usr/local/sbin/datashield-cloud-deploy
 sudoers=/etc/sudoers.d/datashield-cloud-deploy
 project_dir=/opt/datashield-cloud/source
+root=/opt/datashield
+config_dir="$root/secrets"
+legacy_secrets=/opt/datashield-cloud/secrets
 
 # Finish every host-state preflight before creating files or changing policy.
 id deploy >/dev/null 2>&1 || { echo 'Dedicated deploy account is missing; no host changes were made.' >&2; exit 1; }
@@ -21,6 +24,37 @@ if [[ -e "$sudoers" ]]; then
   [[ -f "$sudoers" && ! -L "$sudoers" ]] || { echo 'Existing deployment sudoers path is not a regular file; no host changes were made.' >&2; exit 1; }
   [[ "$(stat -c '%U:%G:%a' "$sudoers")" == root:root:440 ]] || { echo 'Existing deployment sudoers file has unsafe ownership or mode; no host changes were made.' >&2; exit 1; }
   [[ "$(cat "$sudoers")" == "deploy ALL=(root) NOPASSWD: $wrapper *" ]] || { echo 'Existing sudoers policy differs from the restricted wrapper rule; no host changes were made.' >&2; exit 1; }
+fi
+
+[[ -x "$repo_root/deploy/datashield-cloud-deploy" && -x "$repo_root/deploy/prepare-cloud-secrets.sh" && -x "$repo_root/deploy/check-cloud-config.sh" && -f "$repo_root/deploy/cloud.env.example" ]] \
+  || { echo 'Deployment helper files are incomplete; no host changes were made.' >&2; exit 1; }
+[[ -d "$legacy_secrets" && ! -L "$legacy_secrets" && "$(stat -c '%a' "$legacy_secrets")" == 700 ]] \
+  || { echo 'Existing legacy Cloud Secret directory is missing or not mode 0700; no host changes were made.' >&2; exit 1; }
+if [[ -e "$root" ]]; then
+  [[ -d "$root" && ! -L "$root" ]] || { echo 'Deployment root is not a real directory; no host changes were made.' >&2; exit 1; }
+fi
+if [[ -e "$config_dir" ]]; then
+  [[ -d "$config_dir" && ! -L "$config_dir" ]] || { echo 'Deployment Secret path is not a real directory; no host changes were made.' >&2; exit 1; }
+fi
+if [[ -e "$config_dir/cloud.env" ]]; then
+  [[ -f "$config_dir/cloud.env" && ! -L "$config_dir/cloud.env" && "$(stat -c '%U:%G:%a' "$config_dir/cloud.env")" == root:root:600 ]] \
+    || { echo 'Existing cloud.env is not a root-owned mode 0600 regular file; no host changes were made.' >&2; exit 1; }
+  grep -Fxq "CLOUD_SECRETS_DIR=$legacy_secrets" "$config_dir/cloud.env" \
+    || { echo 'Existing cloud.env does not preserve the legacy Cloud Secret directory; no host changes were made.' >&2; exit 1; }
+fi
+for secret_name in postgres_password cloud_database_url cloud_admin_token identity_database_url identity_smtp_password identity_llm_api_key; do
+  secret_file="$legacy_secrets/$secret_name"
+  if [[ -e "$secret_file" ]]; then
+    [[ -f "$secret_file" && ! -L "$secret_file" && "$(stat -c '%a' "$secret_file")" == 600 ]] \
+      || { printf 'Existing Secret %s has unsafe type or mode; no host changes were made.\n' "$secret_name" >&2; exit 1; }
+    secret_owner="$(stat -c '%U' "$secret_file")"
+    [[ "$secret_owner" == root || "$secret_owner" == admin ]] \
+      || { printf 'Existing Secret %s has unexpected ownership; no host changes were made.\n' "$secret_name" >&2; exit 1; }
+  fi
+done
+if [[ -e "$config_dir/ghcr_pull_token" ]]; then
+  [[ -f "$config_dir/ghcr_pull_token" && ! -L "$config_dir/ghcr_pull_token" && "$(stat -c '%U:%G:%a' "$config_dir/ghcr_pull_token")" == root:root:600 ]] \
+    || { echo 'Existing GHCR token file has unsafe type, ownership or mode; no host changes were made.' >&2; exit 1; }
 fi
 
 if [[ ! -f "$project_dir/docker-compose.cloud.yml" || ! -f "$project_dir/docker-compose.ecs.yml" ]]; then
