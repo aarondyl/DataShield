@@ -74,9 +74,10 @@ jobs:
       - name: Validate startup Secret handling and migration rollback contract
         run: |
           python -m pytest backend/tests/test_cloud_startup_env_validation.py backend/tests/test_identity_startup_env_validation.py -q
-          python -m pytest backend/tests/test_alembic_config_url.py deploy/tests/test_cloud_deploy_workflow.py deploy/tests/test_cloud_deploy_state.py deploy/tests/test_cloud_readonly_diagnostics.py deploy/tests/test_cloud_release_artifact.py deploy/tests/test_ci_compose_transfer.py deploy/tests/test_migration_rehearsal.py -q
+          python -m pytest backend/tests/test_alembic_config_url.py deploy/tests/test_cloud_deploy_workflow.py deploy/tests/test_cloud_deploy_state.py deploy/tests/test_cloud_readonly_diagnostics.py deploy/tests/test_cloud_release_artifact.py deploy/tests/test_cloud_storage_compose.py deploy/tests/test_ci_compose_transfer.py deploy/tests/test_migration_rehearsal.py -q
           python deploy/check-additive-migrations.py
           python -m py_compile deploy/verify-cloud-migrations.py
+          python -m py_compile deploy/check-cloud-storage-compose.py
           bash -n deploy/prepare-cloud-secrets.sh deploy/check-cloud-config.sh deploy/install-cloud-host.sh deploy/datashield-cloud-deploy deploy/cloud-deploy-state.sh deploy/cloud-release-artifact.sh deploy/ci-transfer-cloud-compose.sh
           bash deploy/tests/test-container-id-normalization.sh
       - name: Build isolated Cloud Backend image

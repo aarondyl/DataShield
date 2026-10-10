@@ -15,7 +15,7 @@ def job_block(name: str) -> str:
     return match.group(0)
 
 
-def test_publish_only_runs_after_successful_main_cloud_validation_or_manual_main_deploy():
+def test_publish_only_runs_after_successful_main_cloud_validation():
     publish = job_block("build-and-publish")
     assert "workflows: [Cloud RegIntel validation]" in WORKFLOW
     assert "branches: [main]" in WORKFLOW
@@ -24,12 +24,11 @@ def test_publish_only_runs_after_successful_main_cloud_validation_or_manual_main
     assert "github.event.workflow_run.conclusion == 'success'" in publish
     assert "github.event.workflow_run.event == 'push'" in publish
     assert "github.event.workflow_run.head_branch == 'main'" in publish
-    assert "inputs.action == 'deploy'" in publish
-    assert "github.ref == 'refs/heads/main'" in publish
     assert "github.event.workflow_run.head_sha || github.sha" in publish
     assert "repos/${GITHUB_REPOSITORY}/commits/main" in publish
     assert '"$SOURCE_SHA" = "$current_main"' in publish
-    assert "gh run list --workflow cloud-validation.yml --branch main --commit \"$SOURCE_SHA\" --status success" in publish
+    manual = job_block("validate-approved-candidate")
+    assert "gh run list --workflow cloud-validation.yml --branch main --commit \"$SOURCE_SHA\" --status success" in manual
 
 
 def test_only_publish_job_has_package_write_and_it_has_no_production_secrets():
@@ -48,11 +47,12 @@ def test_all_images_are_published_by_digest_and_production_uses_those_digests():
     deploy = job_block("deploy-production")
     for image in ("datashield-cloud", "datashield-identity", "datashield-cloud-proxy"):
         assert f"ghcr.io/aarondyl/{image}:" in publish
+        assert "provenance: false" in publish
     for output in ("cloud_digest", "identity_digest", "proxy_digest"):
         assert output in publish
-        assert f"needs.build-and-publish.outputs.{output}" in deploy
+        assert f"inputs.{output.replace('_digest', '_digest')}" in deploy or f"inputs.{output}" in job_block("validate-approved-candidate")
     assert ":latest" not in publish + deploy
-    assert "needs: build-and-publish" in deploy
+    assert "needs: [build-and-publish, validate-approved-candidate]" in deploy
     assert "environment: Production" in deploy
     assert "vars.CLOUD_DEPLOY_ENABLED == 'true'" in deploy
     assert "sha256:[0-9a-f]{64}" in publish
@@ -93,7 +93,24 @@ def test_deployment_checks_out_same_validated_commit_and_passes_compose_hash():
     assert "compose_sha: ${{ steps.compose.outputs.sha256 }}" in publish
     assert "ref: ${{ env.SOURCE_SHA }}" in deploy
     assert 'test "$(git rev-parse HEAD)" = "$SOURCE_SHA"' in deploy
-    assert "COMPOSE_SHA256: ${{ needs.build-and-publish.outputs.compose_sha }}" in deploy
+    assert "inputs.compose_sha256 || needs.build-and-publish.outputs.compose_sha" in deploy
+
+
+def test_manual_deploy_checks_out_before_gh_cli_and_requires_fixed_candidate_inputs():
+    workflow = WORKFLOW
+    validator = job_block("validate-approved-candidate")
+    checkout = validator.index("uses: actions/checkout@v4")
+    gh_list = validator.index("gh run list --workflow cloud-validation.yml")
+    assert checkout < gh_list
+    for name in ("source_sha", "compose_sha256", "cloud_digest", "identity_digest", "proxy_digest"):
+        assert f"      {name}:" in workflow
+        assert f"inputs.{name}" in validator or f"inputs.{name}" in job_block("deploy-production")
+    assert 'docker image inspect --format' in validator
+    assert 'org.opencontainers.image.revision' in validator
+    assert "packages: read" in validator
+    assert "CLOUD_DEPLOY_ENABLED" in job_block("deploy-production")
+    assert "ECS_SSH_KEY" not in validator and "ECS_HOST" not in validator
+    assert "environment: Production" in job_block("deploy-production")
 
 
 def test_deployment_job_keeps_production_and_first_cutover_gates():
