@@ -1,4 +1,4 @@
-name: Deploy Cloud to Simple Application Server
+name: Publish and deploy Cloud
 
 on:
   workflow_run:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: Read-only audit or deploy latest validated main
+        description: Read-only audit or publish and deploy validated main
         type: choice
         options: [audit, deploy]
         default: audit
@@ -48,41 +48,53 @@ jobs:
           printf '%s\n' "$ECS_KNOWN_HOSTS" > "$hosts"
           ssh -F /dev/null -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$hosts" -i "$key" -p "$ECS_PORT" "$ECS_USER@$ECS_HOST" 'if [ -x /usr/local/sbin/datashield-cloud-deploy ]; then sudo -n /usr/local/sbin/datashield-cloud-deploy audit; else echo deploy_wrapper=not_installed; fi'
 
-  build-and-deploy:
+  build-and-publish:
+    name: Build and publish immutable Cloud images
     if: >-
-      (vars.CLOUD_DEPLOY_ENABLED == 'true' && github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
        && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main')
-      || (vars.CLOUD_DEPLOY_ENABLED == 'true' && github.event_name == 'workflow_dispatch' && inputs.action == 'deploy' && github.ref == 'refs/heads/main')
+      || (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
-    environment: test-ssh
     timeout-minutes: 30
     permissions:
       contents: read
       packages: write
       actions: read
+    outputs:
+      source_sha: ${{ steps.source.outputs.sha }}
+      cloud_digest: ${{ steps.cloud.outputs.digest }}
+      identity_digest: ${{ steps.identity.outputs.digest }}
+      proxy_digest: ${{ steps.proxy.outputs.digest }}
     env:
       GHCR_OWNER: aarondyl
       SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
-      ECS_HOST: ${{ vars.ECS_HOST }}
-      ECS_PORT: ${{ vars.ECS_PORT }}
-      ECS_USER: ${{ vars.ECS_USER }}
-      ECS_KNOWN_HOSTS: ${{ vars.ECS_KNOWN_HOSTS }}
-      ECS_SSH_KEY: ${{ secrets.ECS_SSH_KEY }}
     steps:
       - name: Confirm validated commit is current main
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$ECS_USER" = deploy && test "$ECS_PORT" = 22
-          current_main="$(gh api repos/${GITHUB_REPOSITORY}/commits/main --jq .sha)"
-          test "$SOURCE_SHA" = "$current_main" || { echo 'Deployment skipped: validated commit is no longer main HEAD.'; exit 1; }
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'Expected a full 40-character source commit SHA.'; exit 1; }
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          test "$SOURCE_SHA" = "$current_main" || { echo 'Publishing skipped: validated commit is no longer main HEAD.'; exit 1; }
           if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
             gh run list --workflow cloud-validation.yml --branch main --commit "$SOURCE_SHA" --status success --json databaseId --jq 'length' | grep -q '^1$'
+          else
+            test "$(jq -r '.workflow_run.head_sha' "$GITHUB_EVENT_PATH")" = "$SOURCE_SHA"
+            test "$(jq -r '.workflow_run.head_branch' "$GITHUB_EVENT_PATH")" = main
+            test "$(jq -r '.workflow_run.event' "$GITHUB_EVENT_PATH")" = push
+            test "$(jq -r '.workflow_run.conclusion' "$GITHUB_EVENT_PATH")" = success
           fi
+      - name: Record full validated source SHA
+        id: source
+        run: |
+          set -euo pipefail
+          printf 'sha=%s\n' "$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+          printf '## Published DataShield Cloud images\n\nSource commit: `%s`\n\n' "$SOURCE_SHA" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/checkout@v4
         with:
           ref: ${{ env.SOURCE_SHA }}
+          persist-credentials: false
       - uses: docker/setup-buildx-action@v3
       - name: Authenticate to GHCR for image publishing
         uses: docker/login-action@v3
@@ -90,7 +102,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push pinned Cloud image
+      - name: Build and publish datashield-cloud
         id: cloud
         uses: docker/build-push-action@v6
         with:
@@ -99,7 +111,7 @@ jobs:
           push: true
           tags: ghcr.io/aarondyl/datashield-cloud:${{ env.SOURCE_SHA }}
           labels: org.opencontainers.image.revision=${{ env.SOURCE_SHA }}
-      - name: Build and push pinned Identity image
+      - name: Build and publish datashield-identity
         id: identity
         uses: docker/build-push-action@v6
         with:
@@ -108,7 +120,7 @@ jobs:
           push: true
           tags: ghcr.io/aarondyl/datashield-identity:${{ env.SOURCE_SHA }}
           labels: org.opencontainers.image.revision=${{ env.SOURCE_SHA }}
-      - name: Build and push pinned HTTPS gateway image
+      - name: Build and publish datashield-cloud-proxy
         id: proxy
         uses: docker/build-push-action@v6
         with:
@@ -117,16 +129,66 @@ jobs:
           push: true
           tags: ghcr.io/aarondyl/datashield-cloud-proxy:${{ env.SOURCE_SHA }}
           labels: org.opencontainers.image.revision=${{ env.SOURCE_SHA }}
-      - name: Deploy image digests through restricted root wrapper
-        id: remote
+      - name: Verify and record image digests
         env:
           CLOUD_DIGEST: ${{ steps.cloud.outputs.digest }}
           IDENTITY_DIGEST: ${{ steps.identity.outputs.digest }}
           PROXY_DIGEST: ${{ steps.proxy.outputs.digest }}
         run: |
           set -euo pipefail
-          umask 077
+          for digest in "$CLOUD_DIGEST" "$IDENTITY_DIGEST" "$PROXY_DIGEST"; do
+            [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'Image publisher returned an invalid digest.'; exit 1; }
+          done
+          {
+            printf '| Image | Immutable reference | Digest |\n|---|---|---|\n'
+            printf '| datashield-cloud | `ghcr.io/%s/datashield-cloud@%s` | `%s` |\n' "$GHCR_OWNER" "$CLOUD_DIGEST" "$CLOUD_DIGEST"
+            printf '| datashield-identity | `ghcr.io/%s/datashield-identity@%s` | `%s` |\n' "$GHCR_OWNER" "$IDENTITY_DIGEST" "$IDENTITY_DIGEST"
+            printf '| datashield-cloud-proxy | `ghcr.io/%s/datashield-cloud-proxy@%s` | `%s` |\n' "$GHCR_OWNER" "$PROXY_DIGEST" "$PROXY_DIGEST"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-production:
+    name: Deploy published digests to production
+    needs: build-and-publish
+    if: >-
+      needs.build-and-publish.result == 'success'
+      && vars.CLOUD_DEPLOY_ENABLED == 'true'
+      && ((github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+           && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main')
+          || (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy' && github.ref == 'refs/heads/main'))
+    runs-on: ubuntu-latest
+    environment: Production
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      SOURCE_SHA: ${{ needs.build-and-publish.outputs.source_sha }}
+      CLOUD_DIGEST: ${{ needs.build-and-publish.outputs.cloud_digest }}
+      IDENTITY_DIGEST: ${{ needs.build-and-publish.outputs.identity_digest }}
+      PROXY_DIGEST: ${{ needs.build-and-publish.outputs.proxy_digest }}
+      ECS_HOST: ${{ vars.ECS_HOST }}
+      ECS_PORT: ${{ vars.ECS_PORT }}
+      ECS_USER: ${{ vars.ECS_USER }}
+      ECS_KNOWN_HOSTS: ${{ vars.ECS_KNOWN_HOSTS }}
+      ECS_SSH_KEY: ${{ secrets.ECS_SSH_KEY }}
+    steps:
+      - name: Confirm published source is still current main and digests are immutable
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$ECS_USER" = deploy && test "$ECS_PORT" = 22
           test -n "$ECS_HOST" && test -n "$ECS_KNOWN_HOSTS" && test -n "$ECS_SSH_KEY"
+          current_main="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
+          test "$SOURCE_SHA" = "$current_main" || { echo 'Deployment skipped: published source is no longer main HEAD.'; exit 1; }
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$CLOUD_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$IDENTITY_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          [[ "$PROXY_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+      - name: Deploy digest-pinned images through restricted root wrapper
+        id: remote
+        run: |
+          set -euo pipefail
+          umask 077
           mkdir -p "$HOME/.ssh"
           key="$(mktemp "$HOME/.ssh/key.XXXXXXXX")"
           hosts="$(mktemp "$HOME/.ssh/hosts.XXXXXXXX")"
