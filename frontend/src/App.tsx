@@ -16,8 +16,9 @@ import SettingsPage from './pages/new/SettingsPage';
 import WorkspaceHubPage from './pages/new/WorkspaceHubPage';
 import AdminPage from './pages/new/AdminPage';
 import {readSession} from './features/auth/session';
+import {desktopEntryPath} from './runtime';
 
-function EntryRoute(){return window.datashieldDesktop?<Navigate to={readSession()?"/app/today":"/choose"} replace/>:<LandingPage/>}
+function EntryRoute(){const target=desktopEntryPath(Boolean(window.datashieldDesktop),Boolean(readSession()));return target?<Navigate to={target} replace/>:<LandingPage/>}
 
 export default function App(){const {t,i18n}=useTranslation();useEffect(()=>{document.title=t('misc.appTitle')},[t,i18n.language]);const Router=window.datashieldDesktop?HashRouter:BrowserRouter;return <Router future={{v7_startTransition:true,v7_relativeSplatPath:true}}><ErrorBoundary><Routes>
   <Route path="/" element={<EntryRoute/>}/><Route path="/choose" element={<ChooseEditionPage/>}/><Route path="/login" element={<AuthPage mode="login"/>}/><Route path="/signup" element={<AuthPage mode="signup"/>}/><Route path="/features" element={<FeaturesPage/>}/><Route path="/plans" element={<PlansPage/>}/><Route path="/admin" element={<AdminPage/>}/>
