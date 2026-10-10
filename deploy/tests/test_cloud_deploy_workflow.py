@@ -65,7 +65,8 @@ def test_manual_audit_is_retained_and_server_first_cutover_guard_remains_require
     wrapper = (ROOT / "deploy/datashield-cloud-deploy").read_text()
     assert "inputs.action == 'audit'" in audit
     assert "datashield-cloud-deploy audit" in audit
-    assert "datashield-cloud-deploy deploy $SOURCE_SHA $CLOUD_DIGEST $IDENTITY_DIGEST $PROXY_DIGEST" in deploy
+    assert "ci-transfer-cloud-compose.sh" in deploy
+    assert "datashield-cloud-deploy deploy $source_sha $compose_sha $cloud_digest $identity_digest $proxy_digest" in (ROOT / "deploy/ci-transfer-cloud-compose.sh").read_text()
     assert "production-cutover.approved" in wrapper
     assert "first production cutover requires root-created production-cutover.approved" in wrapper
 
@@ -84,3 +85,24 @@ def test_ssh_jobs_read_environment_secrets_from_production_and_use_admin_port_22
     assert "ECS_HOST: ${{ secrets.ECS_HOST }}" in deploy
     assert "ECS_KNOWN_HOSTS: ${{ secrets.ECS_KNOWN_HOSTS }}" in deploy
     assert "ECS_SSH_KEY: ${{ secrets.ECS_SSH_KEY }}" in deploy
+
+
+def test_deployment_checks_out_same_validated_commit_and_passes_compose_hash():
+    publish = job_block("build-and-publish")
+    deploy = job_block("deploy-production")
+    assert "compose_sha: ${{ steps.compose.outputs.sha256 }}" in publish
+    assert "ref: ${{ env.SOURCE_SHA }}" in deploy
+    assert 'test "$(git rev-parse HEAD)" = "$SOURCE_SHA"' in deploy
+    assert "COMPOSE_SHA256: ${{ needs.build-and-publish.outputs.compose_sha }}" in deploy
+
+
+def test_deployment_job_keeps_production_and_first_cutover_gates():
+    deploy = job_block("deploy-production")
+    wrapper = (ROOT / "deploy/datashield-cloud-deploy").read_text()
+    assert "vars.CLOUD_DEPLOY_ENABLED == 'true'" in deploy
+    assert "environment: Production" in deploy
+    assert "production-cutover.approved" in wrapper
+    transfer = (ROOT / "deploy/ci-transfer-cloud-compose.sh").read_text()
+    assert "StrictHostKeyChecking=yes" in transfer
+    assert "KnownHostsFile=$known_hosts" in transfer
+    assert "ECS_SSH_KEY" in transfer and "ECS_KNOWN_HOSTS" in transfer
