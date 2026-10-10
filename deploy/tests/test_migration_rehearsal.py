@@ -1,7 +1,9 @@
 import gzip
 import importlib.util
+import io
 from pathlib import Path
 import stat
+from types import SimpleNamespace
 
 import pytest
 
@@ -73,3 +75,40 @@ def test_rehearsal_rejects_group_readable_production_backup(tmp_path):
 
     with pytest.raises(rehearsal.RehearsalError, match="group or others"):
         rehearsal.rehearse(backup, cloud_url, identity_url)
+
+
+def test_rehearsal_passes_process_environment_to_both_migrations(tmp_path, monkeypatch):
+    backup = protected_file(tmp_path / "backup.sql.gz", gzip.compress(b"SELECT 1;\n"))
+    cloud_url = protected_file(tmp_path / "cloud-url", "postgresql://cloud:secret@db.example:5432/cloud")
+    identity_url = protected_file(tmp_path / "identity-url", "postgresql://identity:secret@db.example:5432/identity")
+    docker_calls = []
+
+    def fake_docker(*args, **kwargs):
+        docker_calls.append(args)
+        if args[:2] == ("context", "inspect"):
+            return SimpleNamespace(returncode=0, stdout=b"unix:///var/run/docker.sock")
+        if args[:1] == ("port",):
+            return SimpleNamespace(returncode=0, stdout=b"127.0.0.1:49152\n")
+        return SimpleNamespace(returncode=0, stdout=b"")
+
+    class FakePsql:
+        def __init__(self, *args, **kwargs):
+            self.stdin = io.BytesIO()
+
+        def wait(self):
+            return 0
+
+    migrations = []
+    monkeypatch.setattr(rehearsal, "_docker", fake_docker)
+    monkeypatch.setattr(rehearsal.subprocess, "Popen", FakePsql)
+    monkeypatch.setattr(
+        rehearsal,
+        "_run_migration",
+        lambda config, url_file, env: migrations.append((config, env["DATASHIELD_TEST_ENV"]))
+    )
+    monkeypatch.setenv("DATASHIELD_TEST_ENV", "passed-through")
+
+    rehearsal.rehearse(backup, cloud_url, identity_url)
+
+    assert migrations == [("cloud", "passed-through"), ("identity", "passed-through")]
+    assert any(call[:2] == ("network", "rm") for call in docker_calls)
