@@ -25,20 +25,20 @@ jobs:
   audit:
     if: github.event_name == 'workflow_dispatch' && inputs.action == 'audit'
     runs-on: ubuntu-latest
-    environment: test-ssh
+    environment: Production
     timeout-minutes: 5
     steps:
       - name: Run restricted host audit
         env:
-          ECS_HOST: ${{ vars.ECS_HOST }}
-          ECS_PORT: ${{ vars.ECS_PORT }}
-          ECS_USER: ${{ vars.ECS_USER }}
-          ECS_KNOWN_HOSTS: ${{ vars.ECS_KNOWN_HOSTS }}
+          ECS_HOST: ${{ secrets.ECS_HOST }}
+          ECS_PORT: ${{ secrets.ECS_PORT }}
+          ECS_USER: ${{ secrets.ECS_USER }}
+          ECS_KNOWN_HOSTS: ${{ secrets.ECS_KNOWN_HOSTS }}
           ECS_SSH_KEY: ${{ secrets.ECS_SSH_KEY }}
         run: |
           set -euo pipefail
           umask 077
-          test -n "$ECS_HOST" && test "$ECS_USER" = deploy && test "$ECS_PORT" = 22
+          test -n "$ECS_HOST" && test "$ECS_USER" = admin && test "$ECS_PORT" = 22
           test -n "$ECS_KNOWN_HOSTS" && test -n "$ECS_SSH_KEY"
           mkdir -p "$HOME/.ssh"
           key="$(mktemp "$HOME/.ssh/key.XXXXXXXX")"
@@ -165,10 +165,10 @@ jobs:
       CLOUD_DIGEST: ${{ needs.build-and-publish.outputs.cloud_digest }}
       IDENTITY_DIGEST: ${{ needs.build-and-publish.outputs.identity_digest }}
       PROXY_DIGEST: ${{ needs.build-and-publish.outputs.proxy_digest }}
-      ECS_HOST: ${{ vars.ECS_HOST }}
-      ECS_PORT: ${{ vars.ECS_PORT }}
-      ECS_USER: ${{ vars.ECS_USER }}
-      ECS_KNOWN_HOSTS: ${{ vars.ECS_KNOWN_HOSTS }}
+      ECS_HOST: ${{ secrets.ECS_HOST }}
+      ECS_PORT: ${{ secrets.ECS_PORT }}
+      ECS_USER: ${{ secrets.ECS_USER }}
+      ECS_KNOWN_HOSTS: ${{ secrets.ECS_KNOWN_HOSTS }}
       ECS_SSH_KEY: ${{ secrets.ECS_SSH_KEY }}
     steps:
       - name: Confirm published source is still current main and digests are immutable
@@ -176,7 +176,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test "$ECS_USER" = deploy && test "$ECS_PORT" = 22
+          test "$ECS_USER" = admin && test "$ECS_PORT" = 22
           test -n "$ECS_HOST" && test -n "$ECS_KNOWN_HOSTS" && test -n "$ECS_SSH_KEY"
           current_main="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq .sha)"
           test "$SOURCE_SHA" = "$current_main" || { echo 'Deployment skipped: published source is no longer main HEAD.'; exit 1; }
@@ -207,10 +207,10 @@ jobs:
       - name: Restore last good application images if public smoke fails
         if: failure() && steps.remote.outcome == 'success' && steps.smoke.outcome == 'failure'
         env:
-          ECS_HOST: ${{ vars.ECS_HOST }}
-          ECS_PORT: ${{ vars.ECS_PORT }}
-          ECS_USER: ${{ vars.ECS_USER }}
-          ECS_KNOWN_HOSTS: ${{ vars.ECS_KNOWN_HOSTS }}
+          ECS_HOST: ${{ secrets.ECS_HOST }}
+          ECS_PORT: ${{ secrets.ECS_PORT }}
+          ECS_USER: ${{ secrets.ECS_USER }}
+          ECS_KNOWN_HOSTS: ${{ secrets.ECS_KNOWN_HOSTS }}
           ECS_SSH_KEY: ${{ secrets.ECS_SSH_KEY }}
         run: |
           set -euo pipefail
