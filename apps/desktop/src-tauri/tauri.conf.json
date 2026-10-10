@@ -4,10 +4,10 @@
   "version": "0.2.0-rc.3",
   "identifier": "com.datashield.desktop",
   "build": {
-    "frontendDist": "../../../frontend/dist",
-    "devUrl": "http://localhost:5173",
-    "beforeDevCommand": "npm --prefix ../../frontend run dev -- --host 127.0.0.1",
-    "beforeBuildCommand": "npm --prefix ../../frontend ci && npm --prefix ../../frontend run build"
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev -- --host 127.0.0.1",
+    "beforeBuildCommand": "npm run build"
   },
   "app": {
     "windows": [
