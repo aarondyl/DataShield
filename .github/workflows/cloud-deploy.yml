@@ -46,13 +46,13 @@ jobs:
           trap 'rm -f "$key" "$hosts"' EXIT
           printf '%s\n' "$ECS_SSH_KEY" > "$key"
           printf '%s\n' "$ECS_KNOWN_HOSTS" > "$hosts"
-          ssh -F /dev/null -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$hosts" -i "$key" -p "$ECS_PORT" "$ECS_USER@$ECS_HOST" 'sudo -n /usr/local/sbin/datashield-cloud-deploy audit'
+          ssh -F /dev/null -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$hosts" -i "$key" -p "$ECS_PORT" "$ECS_USER@$ECS_HOST" 'if [ -x /usr/local/sbin/datashield-cloud-deploy ]; then sudo -n /usr/local/sbin/datashield-cloud-deploy audit; else echo deploy_wrapper=not_installed; fi'
 
   build-and-deploy:
     if: >-
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+      (vars.CLOUD_DEPLOY_ENABLED == 'true' && github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
        && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main')
-      || (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy' && github.ref == 'refs/heads/main')
+      || (vars.CLOUD_DEPLOY_ENABLED == 'true' && github.event_name == 'workflow_dispatch' && inputs.action == 'deploy' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     environment: test-ssh
     timeout-minutes: 30
