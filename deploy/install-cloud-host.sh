@@ -17,17 +17,19 @@ project_dir=/opt/datashield-cloud/source
 root=/opt/datashield
 config_dir="$root/secrets"
 legacy_secrets=/opt/datashield-cloud/secrets
+updating_install=0
 
 # Finish every host-state preflight before creating files or changing policy.
 id deploy >/dev/null 2>&1 || { echo 'Dedicated deploy account is missing; no host changes were made.' >&2; exit 1; }
 command -v visudo >/dev/null 2>&1 || { echo 'visudo is unavailable; no host changes were made.' >&2; exit 1; }
 if [[ -e "$sudoers" ]]; then
+  updating_install=1
   [[ -f "$sudoers" && ! -L "$sudoers" ]] || { echo 'Existing deployment sudoers path is not a regular file; no host changes were made.' >&2; exit 1; }
   [[ "$(stat -c '%U:%G:%a' "$sudoers")" == root:root:440 ]] || { echo 'Existing deployment sudoers file has unsafe ownership or mode; no host changes were made.' >&2; exit 1; }
   [[ "$(cat "$sudoers")" == "deploy ALL=(root) NOPASSWD: $wrapper *" ]] || { echo 'Existing sudoers policy differs from the restricted wrapper rule; no host changes were made.' >&2; exit 1; }
 fi
 
-[[ -x "$repo_root/deploy/datashield-cloud-deploy" && -f "$repo_root/deploy/cloud-deploy-state.sh" && -f "$repo_root/deploy/container-id.sh" && -x "$repo_root/deploy/prepare-cloud-secrets.sh" && -x "$repo_root/deploy/check-cloud-config.sh" && -f "$repo_root/deploy/cloud.env.example" ]] \
+[[ -x "$repo_root/deploy/datashield-cloud-deploy" && -f "$repo_root/deploy/cloud-deploy-state.sh" && -f "$repo_root/deploy/cloud-release-artifact.sh" && -f "$repo_root/deploy/container-id.sh" && -x "$repo_root/deploy/prepare-cloud-secrets.sh" && -x "$repo_root/deploy/check-cloud-config.sh" && -f "$repo_root/deploy/cloud.env.example" ]] \
   || { echo 'Deployment helper files are incomplete; no host changes were made.' >&2; exit 1; }
 [[ -d "$legacy_secrets" && ! -L "$legacy_secrets" && "$(stat -c '%a' "$legacy_secrets")" == 700 ]] \
   || { echo 'Existing legacy Cloud Secret directory is missing or not mode 0700; no host changes were made.' >&2; exit 1; }
@@ -87,7 +89,18 @@ cloud_port="$(docker inspect --format '{{range $port, $bindings := .NetworkSetti
 [[ "$cloud_port" == 127.0.0.1:8000 ]] || { echo 'Existing Cloud port mapping differs from 127.0.0.1:8000; no host changes were made.' >&2; exit 1; }
 for port in 80 443 8001; do
   listener_count="$(ss -lnt "( sport = :$port )" 2>/dev/null | tail -n +2 | wc -l)"
-  published_count="$(docker ps -q --filter "publish=$port" | wc -l)"
+  published_ids="$(docker ps -q --filter "publish=$port")"
+  published_count="$(printf '%s\n' "$published_ids" | sed '/^$/d' | wc -l)"
+  if [[ "$updating_install" -eq 1 && "$published_count" -eq 1 ]]; then
+    case "$port" in
+      80|443) expected_service=gateway ;;
+      8001) expected_service=identity ;;
+    esac
+    expected_ids="$(docker ps -q --filter "publish=$port" --filter label=com.docker.compose.project=source --filter "label=com.docker.compose.service=$expected_service")"
+    if [[ "$(printf '%s\n' "$expected_ids" | sed '/^$/d' | wc -l)" -eq 1 && "$published_ids" == "$expected_ids" ]]; then
+      continue
+    fi
+  fi
   if [[ "$listener_count" -gt 0 || "$published_count" -gt 0 ]]; then
     printf 'TCP port %s is already in use; no host changes were made.\n' "$port" >&2
     exit 1
@@ -97,6 +110,7 @@ done
 install -d -o root -g root -m 0755 "$libexec"
 install -o root -g root -m 0644 "$repo_root/deploy/container-id.sh" "$libexec/container-id.sh"
 install -o root -g root -m 0644 "$repo_root/deploy/cloud-deploy-state.sh" "$libexec/cloud-deploy-state.sh"
+install -o root -g root -m 0644 "$repo_root/deploy/cloud-release-artifact.sh" "$libexec/cloud-release-artifact.sh"
 install -o root -g root -m 0755 "$repo_root/deploy/datashield-cloud-deploy" "$wrapper"
 install -o root -g root -m 0755 "$repo_root/deploy/prepare-cloud-secrets.sh" "$libexec/prepare-cloud-secrets.sh"
 install -o root -g root -m 0755 "$repo_root/deploy/check-cloud-config.sh" "$libexec/check-cloud-config.sh"

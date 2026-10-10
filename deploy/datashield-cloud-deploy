@@ -27,6 +27,9 @@ valid_digest() { [[ "$1" =~ ^sha256:[0-9a-f]{64}$ ]]; }
 id_helper=/usr/local/libexec/datashield-cloud/container-id.sh
 [[ -r "$id_helper" ]] || die 'container ID normalization helper is not installed'
 source "$id_helper"
+release_helper=/usr/local/libexec/datashield-cloud/cloud-release-artifact.sh
+[[ -r "$release_helper" ]] || die 'Cloud release artifact helper is not installed'
+source "$release_helper"
 compose() {
   local args=(--project-name "$PROJECT" --project-directory "$PROJECT_DIR")
   [[ ! -f "$PROJECT_DIR/.env" ]] || args+=(--env-file "$PROJECT_DIR/.env")
@@ -73,14 +76,14 @@ assert_candidate_images() {
   expected_identity="ghcr.io/aarondyl/datashield-identity@$2"
   expected_proxy="ghcr.io/aarondyl/datashield-cloud-proxy@$3"
   config="$(compose --profile identity --profile production config --format json 2>/dev/null)" || die 'candidate Compose configuration is invalid'
-  printf '%s' "$config" | python3 -c 'import json,sys; d=json.load(sys.stdin); s=d["services"]; assert s["cloud"]["image"]==sys.argv[1]; assert s["identity"]["image"]==sys.argv[2]; assert s["gateway"]["image"]==sys.argv[3]; assert int(s["cloud"]["mem_limit"])<=400*1024**2; assert int(s["identity"]["mem_limit"])<=192*1024**2; assert int(s["gateway"]["mem_limit"])<=80*1024**2' "$expected_cloud" "$expected_identity" "$expected_proxy" >/dev/null \
+  printf '%s' "$config" | python3 -c 'import json,sys; d=json.load(sys.stdin); s=d["services"]; assert set(s)=={"postgres","cloud","identity","gateway"}; assert s["cloud"]["image"]==sys.argv[1]; assert s["identity"]["image"]==sys.argv[2]; assert s["gateway"]["image"]==sys.argv[3]; assert int(s["cloud"]["mem_limit"])<=400*1024**2; assert int(s["identity"]["mem_limit"])<=192*1024**2; assert int(s["gateway"]["mem_limit"])<=80*1024**2' "$expected_cloud" "$expected_identity" "$expected_proxy" >/dev/null \
     || die 'existing ECS override changes a SHA-pinned image or exceeds the reviewed app memory limits'
   unset config
 }
 
 run_readonly_diagnostic() {
-  local sha="$1" cloud_digest="$2" identity_digest="$3" proxy_digest="$4"
-  local cloud_id compose_json manifest
+  local sha="$1" compose_sha="$2" cloud_digest="$3" identity_digest="$4" proxy_digest="$5"
+  local cloud_id compose_json
 
   /usr/local/libexec/datashield-cloud/check-cloud-config.sh
   . "$SECRETS/cloud.env" >/dev/null 2>&1 || die 'Cloud configuration cannot be loaded; values were suppressed'
@@ -88,20 +91,14 @@ run_readonly_diagnostic() {
   "${COMPOSE[@]}" version >/dev/null 2>&1 || die 'Docker Compose plugin is unavailable'
   df -Pk "$ROOT" | awk 'NR==2 { if ($4 < 5242880) exit 1 }' || die 'less than 5 GiB free under deployment filesystem'
   awk '/MemAvailable:/ { if ($2 < 614400) exit 1; found=1 } END { if (!found) exit 1 }' /proc/meminfo || die 'less than 600 MiB currently available'
-  [[ -f "$BASE" && -f "$ECS_BASE" ]] || die 'both existing source Compose files must remain present'
-  assert_existing_storage >/dev/null
-
   diagnostic_tmp="$(mktemp -d /tmp/datashield-cloud-diagnose.XXXXXXXX)"
   chmod 0700 "$diagnostic_tmp"
-  curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
-    "https://raw.githubusercontent.com/aarondyl/DataShield/$sha/docker-compose.cloud.yml" \
-    -o "$diagnostic_tmp/docker-compose.cloud.yml" \
-    || die 'could not fetch the candidate Cloud Compose file'
   printf 'CLOUD_IMAGE=ghcr.io/aarondyl/datashield-cloud@%s\nIDENTITY_IMAGE=ghcr.io/aarondyl/datashield-identity@%s\nPROXY_IMAGE=ghcr.io/aarondyl/datashield-cloud-proxy@%s\nDATASHIELD_RELEASE_SHA=%s\n' \
     "$cloud_digest" "$identity_digest" "$proxy_digest" "$sha" > "$diagnostic_tmp/candidate.env"
   chmod 0600 "$diagnostic_tmp/candidate.env"
-  BASE="$diagnostic_tmp/docker-compose.cloud.yml"
+  BASE="$(assert_staged_compose_release "$sha" "$compose_sha" "$cloud_digest" "$identity_digest" "$proxy_digest")"
   EXTRA_ENV_FILES+=(--env-file "$diagnostic_tmp/candidate.env")
+  [[ -f "$ECS_BASE" ]] || die 'existing source ECS Compose overlay is missing'
   assert_existing_storage >/dev/null
   assert_candidate_images "$cloud_digest" "$identity_digest" "$proxy_digest"
   compose_json="$(compose --profile identity --profile production config --format json 2>/dev/null)" || die 'candidate merged Compose configuration is invalid'
@@ -230,20 +227,21 @@ case "$1" in
     echo 'Preflight passed; source_cloud_postgres_data is attached and no data or containers were changed.'
     ;;
   diagnose)
-    [[ $# -eq 5 ]] || die 'diagnose requires SHA and three image digests'
-    sha="$2" cloud_digest="$3" identity_digest="$4" proxy_digest="$5"
-    valid_sha "$sha" || die 'invalid source commit SHA'
-    valid_digest "$cloud_digest" && valid_digest "$identity_digest" && valid_digest "$proxy_digest" || die 'diagnostic image references must be sha256 digests'
-    run_readonly_diagnostic "$sha" "$cloud_digest" "$identity_digest" "$proxy_digest"
+    [[ $# -eq 6 ]] || die 'diagnose requires SHA, Compose SHA256, and three image digests'
+    sha="$2" compose_sha="$3" cloud_digest="$4" identity_digest="$5" proxy_digest="$6"
+    run_readonly_diagnostic "$sha" "$compose_sha" "$cloud_digest" "$identity_digest" "$proxy_digest"
+    ;;
+  stage)
+    [[ $# -eq 6 ]] || die 'stage requires SHA, Compose SHA256, and three image digests'
+    stage_compose_release "$2" "$3" "$4" "$5" "$6"
     ;;
   deploy)
-    [[ $# -eq 5 ]] || die 'deploy requires SHA and three image digests'
+    [[ $# -eq 6 ]] || die 'deploy requires SHA, Compose SHA256, and three image digests'
     exec 9>"$ROOT/deploy.lock"
     chmod 0600 "$ROOT/deploy.lock"
     flock -n 9 || die 'another Cloud deployment is already running'
-    sha="$2" cloud_digest="$3" identity_digest="$4" proxy_digest="$5"
-    valid_sha "$sha" || die 'invalid source commit SHA'
-    valid_digest "$cloud_digest" && valid_digest "$identity_digest" && valid_digest "$proxy_digest" || die 'image references must be sha256 digests'
+    sha="$2" compose_sha="$3" cloud_digest="$4" identity_digest="$5" proxy_digest="$6"
+    validate_release_arguments "$sha" "$compose_sha" "$cloud_digest" "$identity_digest" "$proxy_digest"
     /usr/local/libexec/datashield-cloud/check-cloud-config.sh
     . "$SECRETS/cloud.env" >/dev/null 2>&1
     docker info >/dev/null 2>&1 || die 'Docker daemon is unavailable'
@@ -252,6 +250,7 @@ case "$1" in
     awk '/MemAvailable:/ { if ($2 < 614400) exit 1; found=1 } END { if (!found) exit 1 }' /proc/meminfo || die 'less than 600 MiB currently available; refusing memory-intensive deployment'
     [[ -f "$BASE" && -f "$ECS_BASE" ]] || die 'both existing source Compose files must remain present'
     postgres_before="$(assert_existing_storage)"
+    release="$(assert_staged_compose_release "$sha" "$compose_sha" "$cloud_digest" "$identity_digest" "$proxy_digest")"
     if [[ ! -e "$ROOT/production-cutover.approved" ]]; then
       active_service=0
       systemctl is-active --quiet datashield.service 2>/dev/null && active_service=1 || true
@@ -260,12 +259,6 @@ case "$1" in
     fi
     [[ -f "$ROOT/production-cutover.approved" && ! -L "$ROOT/production-cutover.approved" && "$(stat -c '%U:%G:%a' "$ROOT/production-cutover.approved")" == root:root:600 ]] || die 'production-cutover.approved must be a root-owned regular 0600 file'
     save_first_cutover_state
-    release="$ROOT/releases/$sha"
-    install -d -o root -g root -m 0700 "$release"
-    if [[ ! -s "$release/docker-compose.cloud.yml" ]]; then
-      curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 "https://raw.githubusercontent.com/aarondyl/DataShield/$sha/docker-compose.cloud.yml" -o "$release/docker-compose.cloud.yml"
-      chmod 0600 "$release/docker-compose.cloud.yml"
-    fi
     # The running compose project must already use this stack and volume identity.
     BASE="$release/docker-compose.cloud.yml"
     if [[ -s "$STATE" ]]; then cp -f "$STATE" "$ROOT/last-good.env"; chmod 0600 "$ROOT/last-good.env"; fi
