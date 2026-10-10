@@ -246,6 +246,10 @@ class TestChangeDetectionFlow:
             assert versions[1]["is_current"] is True
 
             changes = client.get("/api/v1/changes", params={"regulation_id": pipl["id"]}).json()
+            # Initial ingestion now publishes ADDED rows for Desktop's first
+            # incremental sync. Scope this version-diff assertion to the update
+            # being exercised rather than the initial corpus import.
+            changes = [c for c in changes if c["to_version_id"] == versions[1]["id"]]
             by_type = {c["change_type"]: c for c in changes}
             assert set(by_type) == {"MODIFIED", "REMOVED", "ADDED"}
             assert by_type["ADDED"]["article"] == "第六十六条之一"
