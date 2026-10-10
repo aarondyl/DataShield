@@ -74,9 +74,10 @@ jobs:
       - name: Validate startup Secret handling and migration rollback contract
         run: |
           python -m pytest backend/tests/test_cloud_startup_env_validation.py backend/tests/test_identity_startup_env_validation.py -q
-          python -m pytest deploy/tests/test_cloud_deploy_workflow.py -q
+          python -m pytest backend/tests/test_alembic_config_url.py deploy/tests/test_cloud_deploy_workflow.py deploy/tests/test_cloud_deploy_state.py deploy/tests/test_cloud_readonly_diagnostics.py deploy/tests/test_migration_rehearsal.py -q
           python deploy/check-additive-migrations.py
-          bash -n deploy/prepare-cloud-secrets.sh deploy/check-cloud-config.sh deploy/install-cloud-host.sh deploy/datashield-cloud-deploy
+          python -m py_compile deploy/verify-cloud-migrations.py
+          bash -n deploy/prepare-cloud-secrets.sh deploy/check-cloud-config.sh deploy/install-cloud-host.sh deploy/datashield-cloud-deploy deploy/cloud-deploy-state.sh
           bash deploy/tests/test-container-id-normalization.sh
       - name: Build isolated Cloud Backend image
         run: docker build --file backend/Dockerfile.cloud --tag datashield-cloud-ci:${{ github.sha }} backend
