@@ -77,6 +77,7 @@ case "$1" in
     valid_sha "$sha" || die 'invalid source commit SHA'
     valid_digest "$cloud_digest" && valid_digest "$identity_digest" && valid_digest "$proxy_digest" || die 'image references must be sha256 digests'
     /usr/local/libexec/datashield-cloud/check-cloud-config.sh
+    . "$SECRETS/cloud.env" >/dev/null 2>&1
     docker info >/dev/null 2>&1 || die 'Docker daemon is unavailable'
     "${COMPOSE[@]}" version >/dev/null 2>&1 || die 'Docker Compose plugin is unavailable'
     df -Pk "$ROOT" | awk 'NR==2 { if ($4 < 5242880) exit 1 }' || die 'less than 5 GiB free under deployment filesystem'
@@ -110,7 +111,7 @@ case "$1" in
     trap cleanup EXIT
     token_file="$SECRETS/ghcr_pull_token"
     [[ -s "$token_file" ]] || die 'GHCR_PULL_TOKEN_FILE is empty'
-    DOCKER_CONFIG="$docker_config" docker login ghcr.io --username datashield-actions --password-stdin < "$token_file" >/dev/null 2>&1 || die 'GHCR registry login failed'
+    DOCKER_CONFIG="$docker_config" docker login ghcr.io --username "$GHCR_PULL_USERNAME" --password-stdin < "$token_file" >/dev/null 2>&1 || die 'GHCR registry login failed'
     export DOCKER_CONFIG="$docker_config"
     docker pull "ghcr.io/aarondyl/datashield-cloud@$cloud_digest" >/dev/null
     docker pull "ghcr.io/aarondyl/datashield-identity@$identity_digest" >/dev/null
