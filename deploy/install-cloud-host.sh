@@ -9,6 +9,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 repo_root="$(cd -- "$(dirname -- "$0")/.." && pwd)"
+source "$repo_root/deploy/container-id.sh"
 libexec=/usr/local/libexec/datashield-cloud
 wrapper=/usr/local/sbin/datashield-cloud-deploy
 sudoers=/etc/sudoers.d/datashield-cloud-deploy
@@ -26,7 +27,7 @@ if [[ -e "$sudoers" ]]; then
   [[ "$(cat "$sudoers")" == "deploy ALL=(root) NOPASSWD: $wrapper *" ]] || { echo 'Existing sudoers policy differs from the restricted wrapper rule; no host changes were made.' >&2; exit 1; }
 fi
 
-[[ -x "$repo_root/deploy/datashield-cloud-deploy" && -x "$repo_root/deploy/prepare-cloud-secrets.sh" && -x "$repo_root/deploy/check-cloud-config.sh" && -f "$repo_root/deploy/cloud.env.example" ]] \
+[[ -x "$repo_root/deploy/datashield-cloud-deploy" && -f "$repo_root/deploy/container-id.sh" && -x "$repo_root/deploy/prepare-cloud-secrets.sh" && -x "$repo_root/deploy/check-cloud-config.sh" && -f "$repo_root/deploy/cloud.env.example" ]] \
   || { echo 'Deployment helper files are incomplete; no host changes were made.' >&2; exit 1; }
 [[ -d "$legacy_secrets" && ! -L "$legacy_secrets" && "$(stat -c '%a' "$legacy_secrets")" == 700 ]] \
   || { echo 'Existing legacy Cloud Secret directory is missing or not mode 0700; no host changes were made.' >&2; exit 1; }
@@ -64,14 +65,16 @@ fi
 command -v docker >/dev/null && docker info >/dev/null 2>&1 || { echo 'Docker daemon unavailable; no host changes were made.' >&2; exit 1; }
 pg_ids="$(docker ps -q --filter label=com.docker.compose.project=source --filter label=com.docker.compose.service=postgres)"
 [[ "$(printf '%s\n' "$pg_ids" | sed '/^$/d' | wc -l)" -eq 1 ]] || { echo 'Expected one running PostgreSQL container in project source; no host changes were made.' >&2; exit 1; }
-pg_id="$pg_ids"
+pg_ref="$(printf '%s\n' "$pg_ids" | sed '/^$/d')"
+pg_id="$(container_full_id "$pg_ref")" || { echo 'Could not resolve running PostgreSQL container ID; no host changes were made.' >&2; exit 1; }
 [[ "$(docker inspect --format '{{.State.Health.Status}}' "$pg_id")" == healthy ]] || { echo 'Existing PostgreSQL container is not healthy; no host changes were made.' >&2; exit 1; }
 pg_volume="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}{{end}}{{end}}' "$pg_id")"
 [[ "$pg_volume" == source_cloud_postgres_data ]] || { echo 'PostgreSQL is not mounted on source_cloud_postgres_data; no host changes were made.' >&2; exit 1; }
 docker volume inspect source_cloud_postgres_data >/dev/null 2>&1 || { echo 'Expected PostgreSQL volume missing; no host changes were made.' >&2; exit 1; }
 pg_networks="$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' "$pg_id")"
 [[ " $pg_networks " == *" source_cloud_database "* ]] || { echo 'PostgreSQL is not attached to source_cloud_database; no host changes were made.' >&2; exit 1; }
-compose_pg="$(docker compose --project-name source --project-directory "$project_dir" -f "$project_dir/docker-compose.cloud.yml" -f "$project_dir/docker-compose.ecs.yml" ps -q postgres 2>/dev/null)"
+compose_pg_ref="$(docker compose --project-name source --project-directory "$project_dir" -f "$project_dir/docker-compose.cloud.yml" -f "$project_dir/docker-compose.ecs.yml" ps -q postgres 2>/dev/null)"
+compose_pg="$(container_full_id "$compose_pg_ref")" || { echo 'Could not resolve Compose PostgreSQL container ID; no host changes were made.' >&2; exit 1; }
 [[ "$compose_pg" == "$pg_id" ]] || { echo 'Compose files do not resolve to the running source PostgreSQL; no host changes were made.' >&2; exit 1; }
 command -v python3 >/dev/null 2>&1 || { echo 'python3 is unavailable for safe Compose identity validation; no host changes were made.' >&2; exit 1; }
 docker compose --project-name source --project-directory "$project_dir" -f "$project_dir/docker-compose.cloud.yml" -f "$project_dir/docker-compose.ecs.yml" config --format json 2>/dev/null \
@@ -92,6 +95,7 @@ for port in 80 443 8001; do
 done
 
 install -d -o root -g root -m 0755 "$libexec"
+install -o root -g root -m 0644 "$repo_root/deploy/container-id.sh" "$libexec/container-id.sh"
 install -o root -g root -m 0755 "$repo_root/deploy/datashield-cloud-deploy" "$wrapper"
 install -o root -g root -m 0755 "$repo_root/deploy/prepare-cloud-secrets.sh" "$libexec/prepare-cloud-secrets.sh"
 install -o root -g root -m 0755 "$repo_root/deploy/check-cloud-config.sh" "$libexec/check-cloud-config.sh"

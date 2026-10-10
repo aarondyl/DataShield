@@ -22,6 +22,9 @@ die() { printf 'Cloud deploy preflight failed: %s\n' "$1" >&2; exit 1; }
 log() { printf '[%s] %s\n' "$(date -u +%FT%TZ)" "$*" >> "$LOG"; }
 valid_sha() { [[ "$1" =~ ^[0-9a-f]{40}$ ]]; }
 valid_digest() { [[ "$1" =~ ^sha256:[0-9a-f]{64}$ ]]; }
+id_helper=/usr/local/libexec/datashield-cloud/container-id.sh
+[[ -r "$id_helper" ]] || die 'container ID normalization helper is not installed'
+source "$id_helper"
 compose() {
   local args=(--project-name "$PROJECT" --project-directory "$PROJECT_DIR")
   [[ ! -f "$PROJECT_DIR/.env" ]] || args+=(--env-file "$PROJECT_DIR/.env")
@@ -31,20 +34,23 @@ compose() {
 }
 
 existing_postgres_id() {
-  local ids
+  local ids container_ref
   ids="$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT" --filter label=com.docker.compose.service=postgres)"
   [[ "$(printf '%s\n' "$ids" | sed '/^$/d' | wc -l)" -eq 1 ]] || die 'expected exactly one running PostgreSQL service in existing Compose project source'
-  printf '%s\n' "$ids"
+  container_ref="$(printf '%s\n' "$ids" | sed '/^$/d')"
+  container_full_id "$container_ref" || die 'could not resolve running PostgreSQL container to its full ID'
 }
 
 assert_existing_storage() {
-  local pg_id mount compose_pg networks cloud_ids cloud_port
+  local pg_id mount compose_pg compose_pg_ref networks cloud_ids cloud_port
   pg_id="$(existing_postgres_id)"
   [[ "$(docker inspect --format '{{.State.Health.Status}}' "$pg_id")" == healthy ]] || die 'existing PostgreSQL container is not healthy'
   mount="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}{{end}}{{end}}' "$pg_id")"
   [[ "$mount" == source_cloud_postgres_data ]] || die 'running PostgreSQL data mount is not source_cloud_postgres_data; refusing deployment'
   docker volume inspect source_cloud_postgres_data >/dev/null 2>&1 || die 'existing PostgreSQL volume source_cloud_postgres_data was not found'
-  compose_pg="$(compose ps -q postgres)"
+  compose_pg_ref="$(compose ps -q postgres)"
+  [[ -n "$compose_pg_ref" ]] || die 'Compose did not return a PostgreSQL container ID'
+  compose_pg="$(container_full_id "$compose_pg_ref")" || die 'could not resolve Compose PostgreSQL container to its full ID'
   [[ "$compose_pg" == "$pg_id" ]] || die 'Compose files do not resolve postgres to the running source project container'
   networks="$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' "$pg_id")"
   [[ " $networks " == *" source_cloud_database "* ]] || die 'existing PostgreSQL is not attached to source_cloud_database; refusing deployment'
