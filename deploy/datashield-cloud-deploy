@@ -14,9 +14,11 @@ PROJECT_DIR=/opt/datashield-cloud/source
 BASE="$PROJECT_DIR/docker-compose.cloud.yml"
 ECS_BASE="$PROJECT_DIR/docker-compose.ecs.yml"
 EXTRA_FILES=()
+EXTRA_ENV_FILES=()
 COMPOSE=(docker compose)
 LOG="$ROOT/deploy.log"
 docker_config=""
+diagnostic_tmp=""
 
 die() { printf 'Cloud deploy preflight failed: %s\n' "$1" >&2; exit 1; }
 log() { printf '[%s] %s\n' "$(date -u +%FT%TZ)" "$*" >> "$LOG"; }
@@ -29,6 +31,7 @@ compose() {
   local args=(--project-name "$PROJECT" --project-directory "$PROJECT_DIR")
   [[ ! -f "$PROJECT_DIR/.env" ]] || args+=(--env-file "$PROJECT_DIR/.env")
   args+=(--env-file "$SECRETS/cloud.env" -f "$BASE" -f "$ECS_BASE")
+  args+=("${EXTRA_ENV_FILES[@]}")
   args+=("${EXTRA_FILES[@]}")
   "${COMPOSE[@]}" "${args[@]}" "$@"
 }
@@ -54,7 +57,7 @@ assert_existing_storage() {
   [[ "$compose_pg" == "$pg_id" ]] || die 'Compose files do not resolve postgres to the running source project container'
   networks="$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' "$pg_id")"
   [[ " $networks " == *" source_cloud_database "* ]] || die 'existing PostgreSQL is not attached to source_cloud_database; refusing deployment'
-  compose --profile identity --profile production config --format json | python3 -c 'import json,sys; d=json.load(sys.stdin); v=d["volumes"]["cloud_postgres_data"]; assert v.get("name")=="source_cloud_postgres_data"; assert any(x.get("type")=="volume" and x.get("source")=="cloud_postgres_data" and x.get("target")=="/var/lib/postgresql/data" for x in d["services"]["postgres"]["volumes"]); assert d["networks"]["cloud_database"].get("name")=="source_cloud_database"; p=d["services"]["cloud"]["ports"]; assert any(x.get("host_ip")=="127.0.0.1" and x.get("published")=="8000" for x in p)' >/dev/null \
+  compose --profile identity --profile production config --format json 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); v=d["volumes"]["cloud_postgres_data"]; assert v.get("name")=="source_cloud_postgres_data"; assert any(x.get("type")=="volume" and x.get("source")=="cloud_postgres_data" and x.get("target")=="/var/lib/postgresql/data" for x in d["services"]["postgres"]["volumes"]); assert d["networks"]["cloud_database"].get("name")=="source_cloud_database"; p=d["services"]["cloud"]["ports"]; assert any(x.get("host_ip")=="127.0.0.1" and x.get("published")=="8000" for x in p)' >/dev/null \
     || die 'candidate Compose definition does not preserve the existing PostgreSQL volume/network or localhost Cloud API port'
   cloud_ids="$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT" --filter label=com.docker.compose.service=cloud)"
   [[ "$(printf '%s\n' "$cloud_ids" | sed '/^$/d' | wc -l)" -eq 1 ]] || die 'expected exactly one existing Cloud service container'
@@ -69,25 +72,100 @@ assert_candidate_images() {
   expected_cloud="ghcr.io/aarondyl/datashield-cloud@$1"
   expected_identity="ghcr.io/aarondyl/datashield-identity@$2"
   expected_proxy="ghcr.io/aarondyl/datashield-cloud-proxy@$3"
-  config="$(compose --profile identity --profile production config --format json)" || die 'candidate Compose configuration is invalid'
+  config="$(compose --profile identity --profile production config --format json 2>/dev/null)" || die 'candidate Compose configuration is invalid'
   printf '%s' "$config" | python3 -c 'import json,sys; d=json.load(sys.stdin); s=d["services"]; assert s["cloud"]["image"]==sys.argv[1]; assert s["identity"]["image"]==sys.argv[2]; assert s["gateway"]["image"]==sys.argv[3]; assert int(s["cloud"]["mem_limit"])<=400*1024**2; assert int(s["identity"]["mem_limit"])<=192*1024**2; assert int(s["gateway"]["mem_limit"])<=80*1024**2' "$expected_cloud" "$expected_identity" "$expected_proxy" >/dev/null \
     || die 'existing ECS override changes a SHA-pinned image or exceeds the reviewed app memory limits'
   unset config
 }
 
-save_legacy_cloud_rollback() {
-  local cloud_id image_id image_ref
-  [[ -s "$ROOT/legacy-cloud-rollback.yml" ]] && return 0
+run_readonly_diagnostic() {
+  local sha="$1" cloud_digest="$2" identity_digest="$3" proxy_digest="$4"
+  local cloud_id compose_json manifest
+
+  /usr/local/libexec/datashield-cloud/check-cloud-config.sh
+  . "$SECRETS/cloud.env" >/dev/null 2>&1 || die 'Cloud configuration cannot be loaded; values were suppressed'
+  docker info >/dev/null 2>&1 || die 'Docker daemon is unavailable'
+  "${COMPOSE[@]}" version >/dev/null 2>&1 || die 'Docker Compose plugin is unavailable'
+  df -Pk "$ROOT" | awk 'NR==2 { if ($4 < 5242880) exit 1 }' || die 'less than 5 GiB free under deployment filesystem'
+  awk '/MemAvailable:/ { if ($2 < 614400) exit 1; found=1 } END { if (!found) exit 1 }' /proc/meminfo || die 'less than 600 MiB currently available'
+  [[ -f "$BASE" && -f "$ECS_BASE" ]] || die 'both existing source Compose files must remain present'
+  assert_existing_storage >/dev/null
+
+  diagnostic_tmp="$(mktemp -d /tmp/datashield-cloud-diagnose.XXXXXXXX)"
+  chmod 0700 "$diagnostic_tmp"
+  curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+    "https://raw.githubusercontent.com/aarondyl/DataShield/$sha/docker-compose.cloud.yml" \
+    -o "$diagnostic_tmp/docker-compose.cloud.yml" \
+    || die 'could not fetch the candidate Cloud Compose file'
+  printf 'CLOUD_IMAGE=ghcr.io/aarondyl/datashield-cloud@%s\nIDENTITY_IMAGE=ghcr.io/aarondyl/datashield-identity@%s\nPROXY_IMAGE=ghcr.io/aarondyl/datashield-cloud-proxy@%s\nDATASHIELD_RELEASE_SHA=%s\n' \
+    "$cloud_digest" "$identity_digest" "$proxy_digest" "$sha" > "$diagnostic_tmp/candidate.env"
+  chmod 0600 "$diagnostic_tmp/candidate.env"
+  BASE="$diagnostic_tmp/docker-compose.cloud.yml"
+  EXTRA_ENV_FILES+=(--env-file "$diagnostic_tmp/candidate.env")
+  assert_existing_storage >/dev/null
+  assert_candidate_images "$cloud_digest" "$identity_digest" "$proxy_digest"
+  compose_json="$(compose --profile identity --profile production config --format json 2>/dev/null)" || die 'candidate merged Compose configuration is invalid'
+  printf '%s' "$compose_json" | python3 -c 'import json,sys; d=json.load(sys.stdin); s=d["services"]; assert set(("cloud","identity","gateway")) <= set(s); assert all(not any(p.get("host_ip")=="0.0.0.0" for p in s[name].get("ports",[])) for name in ("cloud","identity")); assert not s["postgres"].get("ports"); assert all(x.get("condition")=="service_healthy" for x in s["gateway"]["depends_on"].values())' >/dev/null \
+    || die 'candidate Compose service dependencies or API/database port exposure are invalid'
+  unset compose_json
+
   cloud_id="$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT" --filter label=com.docker.compose.service=cloud)"
-  [[ "$(printf '%s\n' "$cloud_id" | sed '/^$/d' | wc -l)" -eq 1 ]] || die 'expected exactly one running legacy Cloud service before first cutover'
-  [[ "$(docker inspect --format '{{.State.Health.Status}}' "$cloud_id")" == healthy ]] || die 'existing Cloud API container is not healthy; refusing to save rollback baseline'
-  image_id="$(docker inspect --format '{{.Image}}' "$cloud_id")"
-  image_ref="datashield-cloud-rollback:${image_id#sha256:}"
-  docker image tag "$image_id" "$image_ref"
-  printf 'services:\n  cloud:\n    image: %s\n    pull_policy: never\n' "$image_ref" > "$ROOT/legacy-cloud-rollback.yml"
-  printf '%s\n' "$image_id" > "$ROOT/legacy-cloud-image-id"
-  chmod 0600 "$ROOT/legacy-cloud-rollback.yml" "$ROOT/legacy-cloud-image-id"
+  [[ "$(printf '%s\n' "$cloud_id" | sed '/^$/d' | wc -l)" -eq 1 ]] || die 'expected exactly one running Cloud service for read-only database checks'
+  if ! {
+    cat "$CLOUD_SECRETS_DIR/cloud_database_url"
+    printf '\n'
+    cat "$CLOUD_SECRETS_DIR/identity_database_url"
+    printf '\n'
+  } | docker exec -i "$cloud_id" python -c '
+import sys
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
+
+urls = [line.strip() for line in sys.stdin if line.strip()]
+assert len(urls) == 2
+observed = []
+for index, raw_url in enumerate(urls):
+    parsed = make_url(raw_url)
+    engine = create_engine(parsed, pool_pre_ping=True, connect_args={"connect_timeout": 5})
+    with engine.connect() as connection:
+        row = connection.execute(text("""
+            SELECT current_database(), current_user,
+                   has_database_privilege(current_user, current_database(), :connect_priv),
+                   has_schema_privilege(current_user, :schema_name, :create_priv),
+                   COALESCE((SELECT rolsuper FROM pg_roles WHERE rolname = current_user), false),
+                   EXISTS (SELECT 1 FROM pg_extension WHERE extname = :extension_name),
+                   EXISTS (SELECT 1 FROM pg_available_extension_versions WHERE name = :extension_name AND trusted)
+        """), {"connect_priv": "CONNECT", "schema_name": "public", "create_priv": "CREATE", "extension_name": "vector"}).one()
+        assert row[2] and row[3]
+        if index == 0:
+            assert row[5] or row[4] or row[6], "Cloud role cannot create pgvector if it is absent"
+        observed.append((row[0], row[1]))
+    engine.dispose()
+assert observed[0][0] != observed[1][0] and observed[0][1] != observed[1][1]
+print("DB_CONNECTIONS_OK")
+' 2>/dev/null | grep -Fxq 'DB_CONNECTIONS_OK'; then
+    die 'Cloud/Identity database or role check failed; URL and driver diagnostics were suppressed'
+  fi
+
+  docker_config="$(mktemp -d "$diagnostic_tmp/docker-config.XXXXXXXX")"
+  chmod 0700 "$docker_config"
+  if ! DOCKER_CONFIG="$docker_config" docker login ghcr.io --username "$GHCR_PULL_USERNAME" --password-stdin < "$SECRETS/ghcr_pull_token" >/dev/null 2>&1; then
+    die 'GHCR credentials were rejected; token and registry output were suppressed'
+  fi
+  for manifest in \
+    "ghcr.io/aarondyl/datashield-cloud@$cloud_digest" \
+    "ghcr.io/aarondyl/datashield-identity@$identity_digest" \
+    "ghcr.io/aarondyl/datashield-cloud-proxy@$proxy_digest"; do
+    if ! DOCKER_CONFIG="$docker_config" docker manifest inspect "$manifest" >/dev/null 2>&1; then
+      die 'GHCR could not resolve a requested immutable image manifest; registry output was suppressed'
+    fi
+  done
+  rm -rf -- "$docker_config"
+  docker_config=""
+  echo 'Read-only deployment diagnosis passed: merged Compose, storage identity, Cloud/Identity DB roles, GHCR access, disk, and memory.'
 }
+
+source /usr/local/libexec/datashield-cloud/cloud-deploy-state.sh
 
 restore_previous_cloud() {
   local previous_sha
@@ -97,46 +175,34 @@ restore_previous_cloud() {
       cp "$ROOT/last-good.env" "$STATE"
       chmod 0600 "$STATE"
       BASE="$ROOT/releases/$previous_sha/docker-compose.cloud.yml"
-      COMPOSE+=(--env-file "$STATE")
+      EXTRA_ENV_FILES+=(--env-file "$STATE")
       if compose --profile production --profile identity up -d --no-build --no-deps cloud identity gateway >> "$LOG" 2>&1; then
         log "application rollback restored $previous_sha; database was not downgraded"
         return 0
       fi
       log "application rollback failed; database was not downgraded"
       return 1
-      return
     fi
   fi
-  if [[ -s "$ROOT/legacy-cloud-rollback.yml" ]]; then
-    BASE="$PROJECT_DIR/docker-compose.cloud.yml"
-    EXTRA_FILES+=(--file "$ROOT/legacy-cloud-rollback.yml")
-    if compose up -d --no-build --no-deps cloud >> "$LOG" 2>&1; then
-      log 'pre-CI Cloud image restored; database was not downgraded'
-      return 0
-    fi
-    log 'pre-CI Cloud image rollback failed; database was not downgraded'
-    return 1
-  else
-    log 'no last-good or pre-CI Cloud rollback snapshot exists; manual recovery required'
-  fi
+  restore_first_cutover_state
 }
 
 activation_started=0
 finish() {
   status=$?
   [[ -z "$docker_config" ]] || rm -rf -- "$docker_config"
-  if [[ $status -ne 0 && $activation_started -eq 1 ]]; then
-    restore_previous_cloud || true
-  fi
+  [[ -z "$diagnostic_tmp" ]] || rm -rf -- "$diagnostic_tmp"
+  rollback_after_failed_activation "$status"
   exit "$status"
 }
 trap finish EXIT
 
 [[ $EUID -eq 0 ]] || die 'must run as root'
 [[ $# -ge 1 ]] || die 'expected audit, preflight, deploy, or rollback'
-mkdir -p "$ROOT/releases" "$ROOT/backups"
-chmod 700 "$ROOT" "$ROOT/releases" "$ROOT/backups"
-install -d -o root -g root -m 0700 "$SECRETS"
+[[ -d "$ROOT" && ! -L "$ROOT" && -d "$ROOT/releases" && -d "$ROOT/backups" && -d "$SECRETS" && ! -L "$SECRETS" ]] \
+  || die 'deployment directories are missing; run the approved host installer first'
+[[ "$(stat -c '%U:%G:%a' "$ROOT")" == root:root:700 && "$(stat -c '%U:%G:%a' "$SECRETS")" == root:root:700 ]] \
+  || die 'deployment directories have unsafe ownership or mode'
 [[ -x /usr/local/libexec/datashield-cloud/check-cloud-config.sh ]] || die 'host installer has not installed the configuration checker'
 [[ -f "$SECRETS/cloud.env" && ! -L "$SECRETS/cloud.env" ]] || die 'cloud.env is missing'
 
@@ -163,6 +229,13 @@ case "$1" in
     assert_existing_storage >/dev/null
     echo 'Preflight passed; source_cloud_postgres_data is attached and no data or containers were changed.'
     ;;
+  diagnose)
+    [[ $# -eq 5 ]] || die 'diagnose requires SHA and three image digests'
+    sha="$2" cloud_digest="$3" identity_digest="$4" proxy_digest="$5"
+    valid_sha "$sha" || die 'invalid source commit SHA'
+    valid_digest "$cloud_digest" && valid_digest "$identity_digest" && valid_digest "$proxy_digest" || die 'diagnostic image references must be sha256 digests'
+    run_readonly_diagnostic "$sha" "$cloud_digest" "$identity_digest" "$proxy_digest"
+    ;;
   deploy)
     [[ $# -eq 5 ]] || die 'deploy requires SHA and three image digests'
     exec 9>"$ROOT/deploy.lock"
@@ -186,7 +259,7 @@ case "$1" in
       die 'first production cutover requires root-created production-cutover.approved after explicit operator approval'
     fi
     [[ -f "$ROOT/production-cutover.approved" && ! -L "$ROOT/production-cutover.approved" && "$(stat -c '%U:%G:%a' "$ROOT/production-cutover.approved")" == root:root:600 ]] || die 'production-cutover.approved must be a root-owned regular 0600 file'
-    save_legacy_cloud_rollback
+    save_first_cutover_state
     release="$ROOT/releases/$sha"
     install -d -o root -g root -m 0700 "$release"
     if [[ ! -s "$release/docker-compose.cloud.yml" ]]; then
@@ -200,7 +273,7 @@ case "$1" in
     printf 'CLOUD_IMAGE=ghcr.io/aarondyl/datashield-cloud@%s\nIDENTITY_IMAGE=ghcr.io/aarondyl/datashield-identity@%s\nPROXY_IMAGE=ghcr.io/aarondyl/datashield-cloud-proxy@%s\nDATASHIELD_RELEASE_SHA=%s\n' "$cloud_digest" "$identity_digest" "$proxy_digest" "$sha" > "$candidate"
     chmod 0600 "$candidate"
     # Keep current.env as the last active version until health checks pass.
-    COMPOSE+=(--env-file "$candidate")
+    EXTRA_ENV_FILES+=(--env-file "$candidate")
     [[ "$(assert_existing_storage)" == "$postgres_before" ]] || die 'candidate Compose release does not resolve to the existing PostgreSQL container and volume'
     assert_candidate_images "$cloud_digest" "$identity_digest" "$proxy_digest"
     docker_config="$(mktemp -d "$ROOT/.docker-config.XXXXXXXX")"
