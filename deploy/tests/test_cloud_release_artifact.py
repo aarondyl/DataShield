@@ -99,7 +99,7 @@ def test_compose_tampering_after_stage_is_rejected_before_diagnose_or_deploy(tmp
 
 def test_host_installer_checks_and_installs_runtime_helpers_as_a_set():
     installer = (ROOT / "deploy/install-cloud-host.sh").read_text()
-    required = ("datashield-cloud-deploy", "container-id.sh", "cloud-deploy-state.sh", "cloud-release-artifact.sh", "check-cloud-config.sh")
+    required = ("datashield-cloud-deploy", "container-id.sh", "cloud-deploy-state.sh", "cloud-release-artifact.sh", "check-cloud-config.sh", "check-cloud-storage-compose.py")
     preflight = installer.split("# Finish every host-state preflight", 1)[1].split("install -d -o root", 1)[0]
     installs = installer.split("install -d -o root", 1)[1]
     for filename in required:

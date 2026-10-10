@@ -29,7 +29,7 @@ if [[ -e "$sudoers" ]]; then
   [[ "$(cat "$sudoers")" == "deploy ALL=(root) NOPASSWD: $wrapper *" ]] || { echo 'Existing sudoers policy differs from the restricted wrapper rule; no host changes were made.' >&2; exit 1; }
 fi
 
-[[ -x "$repo_root/deploy/datashield-cloud-deploy" && -f "$repo_root/deploy/cloud-deploy-state.sh" && -f "$repo_root/deploy/cloud-release-artifact.sh" && -f "$repo_root/deploy/container-id.sh" && -x "$repo_root/deploy/prepare-cloud-secrets.sh" && -x "$repo_root/deploy/check-cloud-config.sh" && -f "$repo_root/deploy/cloud.env.example" ]] \
+[[ -x "$repo_root/deploy/datashield-cloud-deploy" && -f "$repo_root/deploy/cloud-deploy-state.sh" && -f "$repo_root/deploy/cloud-release-artifact.sh" && -f "$repo_root/deploy/container-id.sh" && -f "$repo_root/deploy/check-cloud-storage-compose.py" && -x "$repo_root/deploy/prepare-cloud-secrets.sh" && -x "$repo_root/deploy/check-cloud-config.sh" && -f "$repo_root/deploy/cloud.env.example" ]] \
   || { echo 'Deployment helper files are incomplete; no host changes were made.' >&2; exit 1; }
 [[ -d "$legacy_secrets" && ! -L "$legacy_secrets" && "$(stat -c '%a' "$legacy_secrets")" == 700 ]] \
   || { echo 'Existing legacy Cloud Secret directory is missing or not mode 0700; no host changes were made.' >&2; exit 1; }
@@ -111,6 +111,7 @@ install -d -o root -g root -m 0755 "$libexec"
 install -o root -g root -m 0644 "$repo_root/deploy/container-id.sh" "$libexec/container-id.sh"
 install -o root -g root -m 0644 "$repo_root/deploy/cloud-deploy-state.sh" "$libexec/cloud-deploy-state.sh"
 install -o root -g root -m 0644 "$repo_root/deploy/cloud-release-artifact.sh" "$libexec/cloud-release-artifact.sh"
+install -o root -g root -m 0644 "$repo_root/deploy/check-cloud-storage-compose.py" "$libexec/check-cloud-storage-compose.py"
 install -o root -g root -m 0755 "$repo_root/deploy/datashield-cloud-deploy" "$wrapper"
 install -o root -g root -m 0755 "$repo_root/deploy/prepare-cloud-secrets.sh" "$libexec/prepare-cloud-secrets.sh"
 install -o root -g root -m 0755 "$repo_root/deploy/check-cloud-config.sh" "$libexec/check-cloud-config.sh"

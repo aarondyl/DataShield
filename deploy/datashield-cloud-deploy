@@ -60,14 +60,18 @@ assert_existing_storage() {
   [[ "$compose_pg" == "$pg_id" ]] || die 'Compose files do not resolve postgres to the running source project container'
   networks="$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' "$pg_id")"
   [[ " $networks " == *" source_cloud_database "* ]] || die 'existing PostgreSQL is not attached to source_cloud_database; refusing deployment'
-  compose --profile identity --profile production config --format json 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); v=d["volumes"]["cloud_postgres_data"]; assert v.get("name")=="source_cloud_postgres_data"; assert any(x.get("type")=="volume" and x.get("source")=="cloud_postgres_data" and x.get("target")=="/var/lib/postgresql/data" for x in d["services"]["postgres"]["volumes"]); assert d["networks"]["cloud_database"].get("name")=="source_cloud_database"; p=d["services"]["cloud"]["ports"]; assert any(x.get("host_ip")=="127.0.0.1" and x.get("published")=="8000" for x in p)' >/dev/null \
-    || die 'candidate Compose definition does not preserve the existing PostgreSQL volume/network or localhost Cloud API port'
+  local merged_config
+  if ! merged_config="$(compose --profile identity --profile production config --format json 2>/dev/null)"; then
+    die 'candidate Compose configuration could not be rendered; storage and network state were left unchanged'
+  fi
+  printf '%s' "$merged_config" | python3 /usr/local/libexec/datashield-cloud/check-cloud-storage-compose.py >/dev/null \
+    || die 'candidate Compose configuration violates a named storage, network, or loopback binding invariant'
   cloud_ids="$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT" --filter label=com.docker.compose.service=cloud)"
   [[ "$(printf '%s\n' "$cloud_ids" | sed '/^$/d' | wc -l)" -eq 1 ]] || die 'expected exactly one existing Cloud service container'
   [[ "$(docker inspect --format '{{.State.Health.Status}}' "$cloud_ids")" == healthy ]] || die 'existing Cloud service is not healthy'
   cloud_port="$(docker inspect --format '{{range $port, $bindings := .NetworkSettings.Ports}}{{if eq $port "8000/tcp"}}{{range $bindings}}{{.HostIp}}:{{.HostPort}}{{end}}{{end}}{{end}}' "$cloud_ids")"
   [[ "$cloud_port" == 127.0.0.1:8000 ]] || die 'existing Cloud container does not own the expected 127.0.0.1:8000 mapping'
-  printf '%s\n' "$pg_id"
+  EXISTING_POSTGRES_ID="$pg_id"
 }
 
 assert_candidate_images() {
@@ -75,7 +79,7 @@ assert_candidate_images() {
   expected_cloud="ghcr.io/aarondyl/datashield-cloud@$1"
   expected_identity="ghcr.io/aarondyl/datashield-identity@$2"
   expected_proxy="ghcr.io/aarondyl/datashield-cloud-proxy@$3"
-  config="$(compose --profile identity --profile production config --format json 2>/dev/null)" || die 'candidate Compose configuration is invalid'
+  config="$(compose --profile identity --profile production config --format json 2>/dev/null)" || die 'candidate Compose configuration could not be rendered'
   printf '%s' "$config" | python3 -c 'import json,sys; d=json.load(sys.stdin); s=d["services"]; assert set(s)=={"postgres","cloud","identity","gateway"}; assert s["cloud"]["image"]==sys.argv[1]; assert s["identity"]["image"]==sys.argv[2]; assert s["gateway"]["image"]==sys.argv[3]; assert int(s["cloud"]["mem_limit"])<=400*1024**2; assert int(s["identity"]["mem_limit"])<=192*1024**2; assert int(s["gateway"]["mem_limit"])<=80*1024**2' "$expected_cloud" "$expected_identity" "$expected_proxy" >/dev/null \
     || die 'existing ECS override changes a SHA-pinned image or exceeds the reviewed app memory limits'
   unset config
@@ -249,7 +253,8 @@ case "$1" in
     df -Pk "$ROOT" | awk 'NR==2 { if ($4 < 5242880) exit 1 }' || die 'less than 5 GiB free under deployment filesystem'
     awk '/MemAvailable:/ { if ($2 < 614400) exit 1; found=1 } END { if (!found) exit 1 }' /proc/meminfo || die 'less than 600 MiB currently available; refusing memory-intensive deployment'
     [[ -f "$BASE" && -f "$ECS_BASE" ]] || die 'both existing source Compose files must remain present'
-    postgres_before="$(assert_existing_storage)"
+    assert_existing_storage
+    postgres_before="$EXISTING_POSTGRES_ID"
     release="$(assert_staged_compose_release "$sha" "$compose_sha" "$cloud_digest" "$identity_digest" "$proxy_digest")"
     if [[ ! -e "$ROOT/production-cutover.approved" ]]; then
       active_service=0
@@ -267,7 +272,8 @@ case "$1" in
     chmod 0600 "$candidate"
     # Keep current.env as the last active version until health checks pass.
     EXTRA_ENV_FILES+=(--env-file "$candidate")
-    [[ "$(assert_existing_storage)" == "$postgres_before" ]] || die 'candidate Compose release does not resolve to the existing PostgreSQL container and volume'
+    assert_existing_storage
+    [[ "$EXISTING_POSTGRES_ID" == "$postgres_before" ]] || die 'candidate Compose release does not resolve to the existing PostgreSQL container and volume'
     assert_candidate_images "$cloud_digest" "$identity_digest" "$proxy_digest"
     docker_config="$(mktemp -d "$ROOT/.docker-config.XXXXXXXX")"
     chmod 0700 "$docker_config"
@@ -279,7 +285,8 @@ case "$1" in
     docker pull "ghcr.io/aarondyl/datashield-identity@$identity_digest" >/dev/null
     docker pull "ghcr.io/aarondyl/datashield-cloud-proxy@$proxy_digest" >/dev/null
     backup="$ROOT/backups/pre-$sha-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
-    postgres_id="$(assert_existing_storage)"
+    assert_existing_storage
+    postgres_id="$EXISTING_POSTGRES_ID"
     [[ -n "$postgres_id" ]] || die 'PostgreSQL container missing after image pulls'
     docker exec "$postgres_id" pg_dumpall -U datashield_cloud | gzip -1 > "$backup" || { rm -f "$backup"; die 'database backup failed; migrations not run'; }
     chmod 0600 "$backup"
