@@ -446,13 +446,31 @@ def _run_pipeline(
     if current is None:
         # ---- 首版：全量提取 + 全量 chunk/embedding ----
         for key, (unit_row, parsed) in parsed_by_key.items():
-            new_requirement_ids.extend(
-                _extract_and_add_requirements(
-                    db, regulation, version, unit_row,
-                    language=language, default_subject=default_subject, use_llm=use_llm,
+            requirement_ids = _extract_and_add_requirements(
+                db, regulation, version, unit_row,
+                language=language, default_subject=default_subject, use_llm=use_llm,
+            )
+            new_requirement_ids.extend(requirement_ids)
+            new_chunk_dicts.extend(_chunk_and_embed(db, regulation, version, unit_row, parsed))
+            # The first imported version has no prior text to diff, but it still
+            # must publish a ready event so Desktop's incremental sync can receive
+            # the initial public corpus.  Keep each article and its extracted
+            # requirements traceable through the same Change/Bundle contract.
+            change_rows.append(
+                RegulationChange(
+                    regulation_id=regulation.id,
+                    from_version_id=None,
+                    to_version_id=version.id,
+                    legal_unit_id=unit_row.id,
+                    change_type="ADDED",
+                    old_text="",
+                    new_text=unit_row.text,
+                    semantic_summary=f"首次导入条款{unit_row.unit_number}。",
+                    materiality="MEDIUM",
+                    requirement_ids=requirement_ids,
                 )
             )
-            new_chunk_dicts.extend(_chunk_and_embed(db, regulation, version, unit_row, parsed))
+        db.add_all(change_rows)
     else:
         # ---- 更新版：只处理发生变化的条款（增量）----
         for change in changes:
