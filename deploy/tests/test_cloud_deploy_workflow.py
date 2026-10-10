@@ -68,3 +68,19 @@ def test_manual_audit_is_retained_and_server_first_cutover_guard_remains_require
     assert "datashield-cloud-deploy deploy $SOURCE_SHA $CLOUD_DIGEST $IDENTITY_DIGEST $PROXY_DIGEST" in deploy
     assert "production-cutover.approved" in wrapper
     assert "first production cutover requires root-created production-cutover.approved" in wrapper
+
+
+def test_ssh_jobs_read_environment_secrets_from_production_and_use_admin_port_22():
+    audit = job_block("audit")
+    deploy = job_block("deploy-production")
+    assert "environment: Production" in audit
+    assert "environment: Production" in deploy
+    for name in ("ECS_HOST", "ECS_PORT", "ECS_USER", "ECS_KNOWN_HOSTS", "ECS_SSH_KEY"):
+        assert f"{name}: ${{{{ secrets.{name} }}}}" in audit
+        assert f"{name}: ${{{{ secrets.{name} }}}}" in deploy
+    assert "${{ vars.ECS_" not in WORKFLOW
+    assert 'test -n "$ECS_HOST" && test "$ECS_USER" = admin && test "$ECS_PORT" = 22' in audit
+    assert 'test "$ECS_USER" = admin && test "$ECS_PORT" = 22' in deploy
+    assert "ECS_HOST: ${{ secrets.ECS_HOST }}" in deploy
+    assert "ECS_KNOWN_HOSTS: ${{ secrets.ECS_KNOWN_HOSTS }}" in deploy
+    assert "ECS_SSH_KEY: ${{ secrets.ECS_SSH_KEY }}" in deploy
