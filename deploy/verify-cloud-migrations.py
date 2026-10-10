@@ -114,6 +114,7 @@ def rehearse(backup: Path, cloud_url_file: Path, identity_url_file: Path) -> Non
     temp_path: Path | None = None
     network_created = False
     container_started = False
+    env = os.environ.copy()
     try:
         temp_path = Path(tempfile.mkdtemp(prefix="datashield-migration-rehearsal-"))
         temp_path.chmod(0o700)
