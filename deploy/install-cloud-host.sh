@@ -12,23 +12,56 @@ repo_root="$(cd -- "$(dirname -- "$0")/.." && pwd)"
 libexec=/usr/local/libexec/datashield-cloud
 wrapper=/usr/local/sbin/datashield-cloud-deploy
 sudoers=/etc/sudoers.d/datashield-cloud-deploy
-compose_file=/opt/datashield/docker-compose.cloud.yml
+project_dir=/opt/datashield-cloud/source
+
+# Finish every host-state preflight before creating files or changing policy.
+id deploy >/dev/null 2>&1 || { echo 'Dedicated deploy account is missing; no host changes were made.' >&2; exit 1; }
+command -v visudo >/dev/null 2>&1 || { echo 'visudo is unavailable; no host changes were made.' >&2; exit 1; }
+if [[ -e "$sudoers" ]]; then
+  [[ -f "$sudoers" && ! -L "$sudoers" ]] || { echo 'Existing deployment sudoers path is not a regular file; no host changes were made.' >&2; exit 1; }
+  [[ "$(stat -c '%U:%G:%a' "$sudoers")" == root:root:440 ]] || { echo 'Existing deployment sudoers file has unsafe ownership or mode; no host changes were made.' >&2; exit 1; }
+  [[ "$(cat "$sudoers")" == "deploy ALL=(root) NOPASSWD: $wrapper *" ]] || { echo 'Existing sudoers policy differs from the restricted wrapper rule; no host changes were made.' >&2; exit 1; }
+fi
+
+if [[ ! -f "$project_dir/docker-compose.cloud.yml" || ! -f "$project_dir/docker-compose.ecs.yml" ]]; then
+  echo 'Existing source Compose files are not both present; no host changes were made.' >&2
+  exit 1
+fi
+command -v docker >/dev/null && docker info >/dev/null 2>&1 || { echo 'Docker daemon unavailable; no host changes were made.' >&2; exit 1; }
+pg_ids="$(docker ps -q --filter label=com.docker.compose.project=source --filter label=com.docker.compose.service=postgres)"
+[[ "$(printf '%s\n' "$pg_ids" | sed '/^$/d' | wc -l)" -eq 1 ]] || { echo 'Expected one running PostgreSQL container in project source; no host changes were made.' >&2; exit 1; }
+pg_id="$pg_ids"
+[[ "$(docker inspect --format '{{.State.Health.Status}}' "$pg_id")" == healthy ]] || { echo 'Existing PostgreSQL container is not healthy; no host changes were made.' >&2; exit 1; }
+pg_volume="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}{{end}}{{end}}' "$pg_id")"
+[[ "$pg_volume" == source_cloud_postgres_data ]] || { echo 'PostgreSQL is not mounted on source_cloud_postgres_data; no host changes were made.' >&2; exit 1; }
+docker volume inspect source_cloud_postgres_data >/dev/null 2>&1 || { echo 'Expected PostgreSQL volume missing; no host changes were made.' >&2; exit 1; }
+pg_networks="$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' "$pg_id")"
+[[ " $pg_networks " == *" source_cloud_database "* ]] || { echo 'PostgreSQL is not attached to source_cloud_database; no host changes were made.' >&2; exit 1; }
+compose_pg="$(docker compose --project-name source --project-directory "$project_dir" -f "$project_dir/docker-compose.cloud.yml" -f "$project_dir/docker-compose.ecs.yml" ps -q postgres 2>/dev/null)"
+[[ "$compose_pg" == "$pg_id" ]] || { echo 'Compose files do not resolve to the running source PostgreSQL; no host changes were made.' >&2; exit 1; }
+command -v python3 >/dev/null 2>&1 || { echo 'python3 is unavailable for safe Compose identity validation; no host changes were made.' >&2; exit 1; }
+docker compose --project-name source --project-directory "$project_dir" -f "$project_dir/docker-compose.cloud.yml" -f "$project_dir/docker-compose.ecs.yml" config --format json 2>/dev/null \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); v=d["volumes"]["cloud_postgres_data"]; assert v.get("name")=="source_cloud_postgres_data"; assert d["networks"]["cloud_database"].get("name")=="source_cloud_database"; assert any(x.get("host_ip")=="127.0.0.1" and x.get("published")=="8000" for x in d["services"]["cloud"]["ports"])' \
+  || { echo 'Current Compose definition does not resolve the approved PostgreSQL volume, database network and Cloud loopback port; no host changes were made.' >&2; exit 1; }
+cloud_ids="$(docker ps -q --filter label=com.docker.compose.project=source --filter label=com.docker.compose.service=cloud)"
+[[ "$(printf '%s\n' "$cloud_ids" | sed '/^$/d' | wc -l)" -eq 1 ]] || { echo 'Expected one existing Cloud container; no host changes were made.' >&2; exit 1; }
+[[ "$(docker inspect --format '{{.State.Health.Status}}' "$cloud_ids")" == healthy ]] || { echo 'Existing Cloud container is not healthy; no host changes were made.' >&2; exit 1; }
+cloud_port="$(docker inspect --format '{{range $port, $bindings := .NetworkSettings.Ports}}{{if eq $port "8000/tcp"}}{{range $bindings}}{{.HostIp}}:{{.HostPort}}{{end}}{{end}}{{end}}' "$cloud_ids")"
+[[ "$cloud_port" == 127.0.0.1:8000 ]] || { echo 'Existing Cloud port mapping differs from 127.0.0.1:8000; no host changes were made.' >&2; exit 1; }
+for port in 80 443 8001; do
+  listener_count="$(ss -lnt "( sport = :$port )" 2>/dev/null | tail -n +2 | wc -l)"
+  published_count="$(docker ps -q --filter "publish=$port" | wc -l)"
+  if [[ "$listener_count" -gt 0 || "$published_count" -gt 0 ]]; then
+    printf 'TCP port %s is already in use; no host changes were made.\n' "$port" >&2
+    exit 1
+  fi
+done
 
 install -d -o root -g root -m 0755 "$libexec"
 install -o root -g root -m 0755 "$repo_root/deploy/datashield-cloud-deploy" "$wrapper"
 install -o root -g root -m 0755 "$repo_root/deploy/prepare-cloud-secrets.sh" "$libexec/prepare-cloud-secrets.sh"
 install -o root -g root -m 0755 "$repo_root/deploy/check-cloud-config.sh" "$libexec/check-cloud-config.sh"
 install -o root -g root -m 0644 "$repo_root/deploy/cloud.env.example" "$libexec/cloud.env.example"
-
-# Keep a host's existing Compose definition intact. The fixed deploy helper
-# uses the installed file only for its initial preflight; SHA-pinned releases
-# get their own immutable copy below /opt/datashield/releases.
-if [[ ! -e "$compose_file" ]]; then
-  install -o root -g root -m 0600 "$repo_root/docker-compose.cloud.yml" "$compose_file"
-elif [[ ! -f "$compose_file" || -L "$compose_file" ]]; then
-  echo 'Existing Compose definition is not a regular file; it was left untouched.' >&2
-  exit 1
-fi
 
 if [[ ! -e "$sudoers" ]]; then
   temp="$(mktemp /etc/sudoers.d/.datashield-cloud-deploy.XXXXXXXX)"
@@ -40,12 +73,6 @@ if [[ ! -e "$sudoers" ]]; then
     exit 1
   fi
   install -o root -g root -m 0440 "$temp" "$sudoers"
-elif ! grep -Fq "$wrapper" "$sudoers"; then
-  echo 'Existing sudoers file conflicts with the required restricted deploy wrapper; it was left unchanged.' >&2
-  exit 1
-elif [[ "$(cat "$sudoers")" != "deploy ALL=(root) NOPASSWD: $wrapper *" ]]; then
-  echo 'Existing sudoers policy is broader or different from the expected single wrapper rule; it was left unchanged.' >&2
-  exit 1
 fi
 
 "$libexec/prepare-cloud-secrets.sh"

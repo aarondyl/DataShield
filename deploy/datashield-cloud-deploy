@@ -9,30 +9,118 @@ ROOT=/opt/datashield
 SECRETS="$ROOT/secrets"
 STATE="$ROOT/current.env"
 ACTIVE="$ROOT/active-sha"
-PROJECT=datashield-cloud
-BASE="$ROOT/docker-compose.cloud.yml"
+PROJECT=source
+PROJECT_DIR=/opt/datashield-cloud/source
+BASE="$PROJECT_DIR/docker-compose.cloud.yml"
+ECS_BASE="$PROJECT_DIR/docker-compose.ecs.yml"
+EXTRA_FILES=()
 COMPOSE=(docker compose)
 LOG="$ROOT/deploy.log"
+docker_config=""
 
 die() { printf 'Cloud deploy preflight failed: %s\n' "$1" >&2; exit 1; }
 log() { printf '[%s] %s\n' "$(date -u +%FT%TZ)" "$*" >> "$LOG"; }
 valid_sha() { [[ "$1" =~ ^[0-9a-f]{40}$ ]]; }
 valid_digest() { [[ "$1" =~ ^sha256:[0-9a-f]{64}$ ]]; }
-compose() { "${COMPOSE[@]}" --project-name "$PROJECT" --env-file "$SECRETS/cloud.env" -f "$BASE" "$@"; }
+compose() {
+  local args=(--project-name "$PROJECT" --project-directory "$PROJECT_DIR")
+  [[ ! -f "$PROJECT_DIR/.env" ]] || args+=(--env-file "$PROJECT_DIR/.env")
+  args+=(--env-file "$SECRETS/cloud.env" -f "$BASE" -f "$ECS_BASE")
+  args+=("${EXTRA_FILES[@]}")
+  "${COMPOSE[@]}" "${args[@]}" "$@"
+}
+
+existing_postgres_id() {
+  local ids
+  ids="$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT" --filter label=com.docker.compose.service=postgres)"
+  [[ "$(printf '%s\n' "$ids" | sed '/^$/d' | wc -l)" -eq 1 ]] || die 'expected exactly one running PostgreSQL service in existing Compose project source'
+  printf '%s\n' "$ids"
+}
+
+assert_existing_storage() {
+  local pg_id mount compose_pg networks cloud_ids cloud_port
+  pg_id="$(existing_postgres_id)"
+  [[ "$(docker inspect --format '{{.State.Health.Status}}' "$pg_id")" == healthy ]] || die 'existing PostgreSQL container is not healthy'
+  mount="$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/postgresql/data"}}{{.Name}}{{end}}{{end}}' "$pg_id")"
+  [[ "$mount" == source_cloud_postgres_data ]] || die 'running PostgreSQL data mount is not source_cloud_postgres_data; refusing deployment'
+  docker volume inspect source_cloud_postgres_data >/dev/null 2>&1 || die 'existing PostgreSQL volume source_cloud_postgres_data was not found'
+  compose_pg="$(compose ps -q postgres)"
+  [[ "$compose_pg" == "$pg_id" ]] || die 'Compose files do not resolve postgres to the running source project container'
+  networks="$(docker inspect --format '{{range $name, $_ := .NetworkSettings.Networks}}{{$name}} {{end}}' "$pg_id")"
+  [[ " $networks " == *" source_cloud_database "* ]] || die 'existing PostgreSQL is not attached to source_cloud_database; refusing deployment'
+  compose --profile identity --profile production config --format json | python3 -c 'import json,sys; d=json.load(sys.stdin); v=d["volumes"]["cloud_postgres_data"]; assert v.get("name")=="source_cloud_postgres_data"; assert any(x.get("type")=="volume" and x.get("source")=="cloud_postgres_data" and x.get("target")=="/var/lib/postgresql/data" for x in d["services"]["postgres"]["volumes"]); assert d["networks"]["cloud_database"].get("name")=="source_cloud_database"; p=d["services"]["cloud"]["ports"]; assert any(x.get("host_ip")=="127.0.0.1" and x.get("published")=="8000" for x in p)' >/dev/null \
+    || die 'candidate Compose definition does not preserve the existing PostgreSQL volume/network or localhost Cloud API port'
+  cloud_ids="$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT" --filter label=com.docker.compose.service=cloud)"
+  [[ "$(printf '%s\n' "$cloud_ids" | sed '/^$/d' | wc -l)" -eq 1 ]] || die 'expected exactly one existing Cloud service container'
+  [[ "$(docker inspect --format '{{.State.Health.Status}}' "$cloud_ids")" == healthy ]] || die 'existing Cloud service is not healthy'
+  cloud_port="$(docker inspect --format '{{range $port, $bindings := .NetworkSettings.Ports}}{{if eq $port "8000/tcp"}}{{range $bindings}}{{.HostIp}}:{{.HostPort}}{{end}}{{end}}{{end}}' "$cloud_ids")"
+  [[ "$cloud_port" == 127.0.0.1:8000 ]] || die 'existing Cloud container does not own the expected 127.0.0.1:8000 mapping'
+  printf '%s\n' "$pg_id"
+}
+
+assert_candidate_images() {
+  local config expected_cloud expected_identity expected_proxy
+  expected_cloud="ghcr.io/aarondyl/datashield-cloud@$1"
+  expected_identity="ghcr.io/aarondyl/datashield-identity@$2"
+  expected_proxy="ghcr.io/aarondyl/datashield-cloud-proxy@$3"
+  config="$(compose --profile identity --profile production config --format json)" || die 'candidate Compose configuration is invalid'
+  printf '%s' "$config" | python3 -c 'import json,sys; d=json.load(sys.stdin); s=d["services"]; assert s["cloud"]["image"]==sys.argv[1]; assert s["identity"]["image"]==sys.argv[2]; assert s["gateway"]["image"]==sys.argv[3]; assert int(s["cloud"]["mem_limit"])<=400*1024**2; assert int(s["identity"]["mem_limit"])<=192*1024**2; assert int(s["gateway"]["mem_limit"])<=80*1024**2' "$expected_cloud" "$expected_identity" "$expected_proxy" >/dev/null \
+    || die 'existing ECS override changes a SHA-pinned image or exceeds the reviewed app memory limits'
+  unset config
+}
+
+save_legacy_cloud_rollback() {
+  local cloud_id image_id image_ref
+  [[ -s "$ROOT/legacy-cloud-rollback.yml" ]] && return 0
+  cloud_id="$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT" --filter label=com.docker.compose.service=cloud)"
+  [[ "$(printf '%s\n' "$cloud_id" | sed '/^$/d' | wc -l)" -eq 1 ]] || die 'expected exactly one running legacy Cloud service before first cutover'
+  [[ "$(docker inspect --format '{{.State.Health.Status}}' "$cloud_id")" == healthy ]] || die 'existing Cloud API container is not healthy; refusing to save rollback baseline'
+  image_id="$(docker inspect --format '{{.Image}}' "$cloud_id")"
+  image_ref="datashield-cloud-rollback:${image_id#sha256:}"
+  docker image tag "$image_id" "$image_ref"
+  printf 'services:\n  cloud:\n    image: %s\n    pull_policy: never\n' "$image_ref" > "$ROOT/legacy-cloud-rollback.yml"
+  printf '%s\n' "$image_id" > "$ROOT/legacy-cloud-image-id"
+  chmod 0600 "$ROOT/legacy-cloud-rollback.yml" "$ROOT/legacy-cloud-image-id"
+}
+
+restore_previous_cloud() {
+  local previous_sha
+  if [[ -s "$ROOT/last-good.env" ]]; then
+    previous_sha="$(sed -n 's/^DATASHIELD_RELEASE_SHA=//p' "$ROOT/last-good.env")"
+    if [[ "$previous_sha" =~ ^[0-9a-f]{40}$ && -f "$ROOT/releases/$previous_sha/docker-compose.cloud.yml" ]]; then
+      cp "$ROOT/last-good.env" "$STATE"
+      chmod 0600 "$STATE"
+      BASE="$ROOT/releases/$previous_sha/docker-compose.cloud.yml"
+      COMPOSE+=(--env-file "$STATE")
+      if compose --profile production --profile identity up -d --no-build --no-deps cloud identity gateway >> "$LOG" 2>&1; then
+        log "application rollback restored $previous_sha; database was not downgraded"
+        return 0
+      fi
+      log "application rollback failed; database was not downgraded"
+      return 1
+      return
+    fi
+  fi
+  if [[ -s "$ROOT/legacy-cloud-rollback.yml" ]]; then
+    BASE="$PROJECT_DIR/docker-compose.cloud.yml"
+    EXTRA_FILES+=(--file "$ROOT/legacy-cloud-rollback.yml")
+    if compose up -d --no-build --no-deps cloud >> "$LOG" 2>&1; then
+      log 'pre-CI Cloud image restored; database was not downgraded'
+      return 0
+    fi
+    log 'pre-CI Cloud image rollback failed; database was not downgraded'
+    return 1
+  else
+    log 'no last-good or pre-CI Cloud rollback snapshot exists; manual recovery required'
+  fi
+}
 
 activation_started=0
 finish() {
   status=$?
-  if [[ $status -ne 0 && $activation_started -eq 1 && -s "$ROOT/last-good.env" ]]; then
-    previous_sha="$(sed -n 's/^DATASHIELD_RELEASE_SHA=//p' "$ROOT/last-good.env")"
-    if valid_sha "$previous_sha" && [[ -f "$ROOT/releases/$previous_sha/docker-compose.cloud.yml" ]]; then
-      cp "$ROOT/last-good.env" "$STATE"
-      chmod 0600 "$STATE"
-      BASE="$ROOT/releases/$previous_sha/docker-compose.cloud.yml"
-      compose --profile production --profile identity up -d --no-build >> "$LOG" 2>&1 \
-        && log "automatic application rollback restored $previous_sha; database was not downgraded" \
-        || log "automatic rollback failed; manual recovery required; database was not downgraded"
-    fi
+  [[ -z "$docker_config" ]] || rm -rf -- "$docker_config"
+  if [[ $status -ne 0 && $activation_started -eq 1 ]]; then
+    restore_previous_cloud || true
   fi
   exit "$status"
 }
@@ -51,6 +139,7 @@ case "$1" in
     printf 'service='; systemctl is-active datashield.service 2>/dev/null || true
     printf 'docker='; docker info --format '{{.ServerVersion}}' 2>/dev/null || true
     printf 'compose='; "${COMPOSE[@]}" version --short 2>/dev/null || true
+    printf 'project=%s\n' "$PROJECT"
     printf 'project_containers='; docker ps -q --filter "label=com.docker.compose.project=$PROJECT" | wc -l
     printf 'port_8000='; ss -lnt '( sport = :8000 )' | tail -n +2 | wc -l
     printf 'port_8001='; ss -lnt '( sport = :8001 )' | tail -n +2 | wc -l
@@ -63,10 +152,10 @@ case "$1" in
     docker info >/dev/null 2>&1 || die 'Docker daemon is unavailable'
     "${COMPOSE[@]}" version >/dev/null 2>&1 || die 'Docker Compose plugin is unavailable'
     df -Pk "$ROOT" | awk 'NR==2 { if ($4 < 5242880) exit 1 }' || die 'less than 5 GiB free under deployment filesystem'
-    count="$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT" --filter label=com.docker.compose.service=postgres | wc -l)"
-    [[ "$count" -eq 1 ]] || die 'expected exactly one running PostgreSQL container in the existing datashield-cloud Compose project; no deployment performed'
-    compose ps postgres >/dev/null 2>&1 || die 'existing PostgreSQL service does not match the approved Compose project'
-    echo 'Preflight passed; current database container was found and no data was changed.'
+    awk '/MemAvailable:/ { if ($2 < 614400) exit 1; found=1 } END { if (!found) exit 1 }' /proc/meminfo || die 'less than 600 MiB currently available; refusing memory-intensive migration preflight'
+    [[ -f "$BASE" && -f "$ECS_BASE" ]] || die 'both existing source Compose files must remain present'
+    assert_existing_storage >/dev/null
+    echo 'Preflight passed; source_cloud_postgres_data is attached and no data or containers were changed.'
     ;;
   deploy)
     [[ $# -eq 5 ]] || die 'deploy requires SHA and three image digests'
@@ -81,15 +170,17 @@ case "$1" in
     docker info >/dev/null 2>&1 || die 'Docker daemon is unavailable'
     "${COMPOSE[@]}" version >/dev/null 2>&1 || die 'Docker Compose plugin is unavailable'
     df -Pk "$ROOT" | awk 'NR==2 { if ($4 < 5242880) exit 1 }' || die 'less than 5 GiB free under deployment filesystem'
-    count="$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT" --filter label=com.docker.compose.service=postgres | wc -l)"
-    [[ "$count" -eq 1 ]] || die 'existing PostgreSQL project not found; refusing to initialize a new database'
-    compose ps postgres >/dev/null 2>&1 || die 'PostgreSQL does not match current Compose project definition'
+    awk '/MemAvailable:/ { if ($2 < 614400) exit 1; found=1 } END { if (!found) exit 1 }' /proc/meminfo || die 'less than 600 MiB currently available; refusing memory-intensive deployment'
+    [[ -f "$BASE" && -f "$ECS_BASE" ]] || die 'both existing source Compose files must remain present'
+    postgres_before="$(assert_existing_storage)"
     if [[ ! -e "$ROOT/production-cutover.approved" ]]; then
       active_service=0
       systemctl is-active --quiet datashield.service 2>/dev/null && active_service=1 || true
       if [[ "$active_service" -eq 1 ]]; then die 'first production cutover requires root-created production-cutover.approved after explicit operator approval'; fi
       die 'first production cutover requires root-created production-cutover.approved after explicit operator approval'
     fi
+    [[ -f "$ROOT/production-cutover.approved" && ! -L "$ROOT/production-cutover.approved" && "$(stat -c '%U:%G:%a' "$ROOT/production-cutover.approved")" == root:root:600 ]] || die 'production-cutover.approved must be a root-owned regular 0600 file'
+    save_legacy_cloud_rollback
     release="$ROOT/releases/$sha"
     install -d -o root -g root -m 0700 "$release"
     if [[ ! -s "$release/docker-compose.cloud.yml" ]]; then
@@ -97,7 +188,6 @@ case "$1" in
       chmod 0600 "$release/docker-compose.cloud.yml"
     fi
     # The running compose project must already use this stack and volume identity.
-    old_base="$BASE"
     BASE="$release/docker-compose.cloud.yml"
     if [[ -s "$STATE" ]]; then cp -f "$STATE" "$ROOT/last-good.env"; chmod 0600 "$ROOT/last-good.env"; fi
     candidate="$ROOT/candidate.env"
@@ -105,10 +195,10 @@ case "$1" in
     chmod 0600 "$candidate"
     # Keep current.env as the last active version until health checks pass.
     COMPOSE+=(--env-file "$candidate")
+    [[ "$(assert_existing_storage)" == "$postgres_before" ]] || die 'candidate Compose release does not resolve to the existing PostgreSQL container and volume'
+    assert_candidate_images "$cloud_digest" "$identity_digest" "$proxy_digest"
     docker_config="$(mktemp -d "$ROOT/.docker-config.XXXXXXXX")"
     chmod 0700 "$docker_config"
-    cleanup() { rm -rf -- "$docker_config"; }
-    trap cleanup EXIT
     token_file="$SECRETS/ghcr_pull_token"
     [[ -s "$token_file" ]] || die 'GHCR_PULL_TOKEN_FILE is empty'
     DOCKER_CONFIG="$docker_config" docker login ghcr.io --username "$GHCR_PULL_USERNAME" --password-stdin < "$token_file" >/dev/null 2>&1 || die 'GHCR registry login failed'
@@ -117,15 +207,17 @@ case "$1" in
     docker pull "ghcr.io/aarondyl/datashield-identity@$identity_digest" >/dev/null
     docker pull "ghcr.io/aarondyl/datashield-cloud-proxy@$proxy_digest" >/dev/null
     backup="$ROOT/backups/pre-$sha-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
-    postgres_id="$(compose ps -q postgres)"
+    postgres_id="$(assert_existing_storage)"
     [[ -n "$postgres_id" ]] || die 'PostgreSQL container missing after image pulls'
     docker exec "$postgres_id" pg_dumpall -U datashield_cloud | gzip -1 > "$backup" || { rm -f "$backup"; die 'database backup failed; migrations not run'; }
     chmod 0600 "$backup"
+    gzip -t "$backup" || die 'database backup archive validation failed; migrations not run'
     log "database backup completed for $sha"
     if ! compose run --rm --no-deps cloud alembic -c alembic-cloud.ini upgrade head >> "$LOG" 2>&1; then die 'Cloud migration failed; database left intact and application not switched'; fi
     if ! compose --profile identity run --rm --no-deps identity alembic -c alembic-identity.ini upgrade head >> "$LOG" 2>&1; then die 'Identity migration failed; database left intact and application not switched'; fi
     activation_started=1
-    if ! compose --profile production --profile identity up -d --no-build >> "$LOG" 2>&1; then die 'Compose activation failed; see root-only deploy log'; fi
+    if ! compose --profile production --profile identity up -d --no-build --no-deps cloud identity gateway >> "$LOG" 2>&1; then die 'Compose activation failed; see root-only deploy log'; fi
+    [[ "$(existing_postgres_id)" == "$postgres_before" ]] || die 'PostgreSQL container identity changed during deployment; investigate before proceeding'
     for _ in {1..40}; do
       if compose exec -T cloud python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8000/api/health",timeout=4)); assert d.get("status")=="ok" and d.get("db")=="postgresql"' >/dev/null 2>&1 \
         && compose exec -T identity python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8001/health",timeout=4)); assert d.get("status")=="ok" and d.get("database")=="postgresql" and d.get("email_delivery_ready")' >/dev/null 2>&1; then break; fi
@@ -145,19 +237,18 @@ case "$1" in
     exec 9>"$ROOT/deploy.lock"
     chmod 0600 "$ROOT/deploy.lock"
     flock -n 9 || die 'another Cloud deployment is already running'
-    [[ -s "$ROOT/last-good.env" ]] || die 'no saved last-good image record'
-    rollback_sha="$(sed -n 's/^DATASHIELD_RELEASE_SHA=//p' "$ROOT/last-good.env")"
-    valid_sha "$rollback_sha" || die 'saved last-good release SHA is invalid'
-    [[ -f "$ROOT/releases/$rollback_sha/docker-compose.cloud.yml" ]] || die 'previous deployment Compose file is missing'
-    cp "$ROOT/last-good.env" "$STATE"
-    chmod 0600 "$STATE"
-    BASE="$ROOT/releases/$rollback_sha/docker-compose.cloud.yml"
-    COMPOSE+=(--env-file "$STATE")
-    compose --profile production --profile identity up -d --no-build >> "$LOG" 2>&1 || die 'application rollback failed; database was not downgraded'
-    printf '%s\n' "$rollback_sha" > "$ACTIVE"
-    chmod 0600 "$ACTIVE"
-    log "application rollback completed source=$rollback_sha; database not downgraded"
-    echo "Application images restored to $rollback_sha. Database migrations were not rolled back."
+    [[ -f "$BASE" && -f "$ECS_BASE" ]] || die 'existing source Compose files are unavailable'
+    restore_previous_cloud || die 'application rollback failed; inspect the root-only deployment log'
+    if [[ -s "$ROOT/last-good.env" ]]; then
+      rollback_sha="$(sed -n 's/^DATASHIELD_RELEASE_SHA=//p' "$ROOT/last-good.env")"
+      valid_sha "$rollback_sha" || die 'saved last-good release SHA is invalid'
+      printf '%s\n' "$rollback_sha" > "$ACTIVE"
+      chmod 0600 "$ACTIVE"
+      echo "Application images restored to $rollback_sha. Database migrations were not rolled back."
+    else
+      rm -f "$STATE" "$ACTIVE"
+      echo 'Pre-CI Cloud image restored. Database migrations were not rolled back.'
+    fi
     ;;
   *) die 'unknown command' ;;
 esac

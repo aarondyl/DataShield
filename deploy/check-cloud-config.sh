@@ -28,7 +28,7 @@ done
 [[ "${CLOUD_BIND_ADDRESS:-}" == 127.0.0.1 ]] || missing+=(CLOUD_BIND_ADDRESS)
 [[ "${CLOUD_HTTP_BIND_ADDRESS:-}" == 0.0.0.0 ]] || missing+=(CLOUD_HTTP_BIND_ADDRESS)
 [[ "${CLOUD_HTTPS_BIND_ADDRESS:-}" == 0.0.0.0 ]] || missing+=(CLOUD_HTTPS_BIND_ADDRESS)
-[[ "${COMPOSE_PROJECT_NAME:-}" == datashield-cloud ]] || missing+=(COMPOSE_PROJECT_NAME)
+[[ "${COMPOSE_PROJECT_NAME:-}" == source ]] || missing+=(COMPOSE_PROJECT_NAME)
 [[ "${GHCR_PULL_USERNAME:-}" =~ ^[A-Za-z0-9-]+$ ]] || missing+=(GHCR_PULL_USERNAME)
 [[ "${CLOUD_DOMAIN:-}" =~ ^[A-Za-z0-9.-]+$ ]] || missing+=(CLOUD_DOMAIN)
 [[ "${SCHEDULER_ENABLED:-}" == true || "${SCHEDULER_ENABLED:-}" == false ]] || missing+=(SCHEDULER_ENABLED)

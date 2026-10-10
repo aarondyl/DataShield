@@ -18,7 +18,7 @@
 
 不要在该文件写 DeepSeek API Key、数据库密码、SMTP 密码或 registry token。
 
-部署管理员应通过已批准的 Simple Application Server root 管理渠道，在仓库版本目录运行一次 `sudo bash deploy/install-cloud-host.sh`。该安装步骤只建立受限部署 wrapper、缺失的非 Secret 模板和空 Secret 占位文件；已有服务、Secret 内容和数据不会被覆盖。若主机已有 `/opt/datashield/docker-compose.cloud.yml` 或 sudoers 配置冲突，脚本会保留并停止，需管理员先审阅差异。
+部署管理员应通过已批准的 Simple Application Server root 管理渠道，在仓库版本目录运行一次 `sudo bash deploy/install-cloud-host.sh`。该安装步骤先核实 Compose Project `source` 下现有 PostgreSQL 容器健康状态、`source_cloud_postgres_data` 挂载、Compose 文件映射、数据库网络、Cloud 容器健康状态及 8000 端口映射，并确认 80/443/8001 空闲；预检失败时不改主机。通过后只建立受限部署 wrapper、缺失的非 Secret 模板和空 Secret 占位文件；不会停止容器、重建数据库卷或覆盖已有 Secret。不会在 `/opt/datashield` 创建一个新的 Compose project。
 
 ## 独立 Secret 文件
 
