@@ -1,4 +1,4 @@
-name: Test ECS SSH Connection
+name: Audit Simple Application Server
 
 on:
   workflow_dispatch:
@@ -7,7 +7,7 @@ permissions: {}
 
 jobs:
   ssh-test:
-    name: Read-only SSH verification
+    name: Read-only production host audit
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: test-ssh
@@ -59,11 +59,28 @@ jobs:
           printf 'os=%s\n' "$PRETTY_NAME"
           printf 'memory_mb='; awk '/MemTotal/ {printf "%.0f\n", $2 / 1024}' /proc/meminfo
           printf 'root_disk='; df -h / | tail -n 1
-          if [ -d /opt/datashield-cloud/secrets ]; then
-            stat -c 'secrets_dir_mode=%a owner=%U:%G' /opt/datashield-cloud/secrets
-          else
-            echo 'secrets_dir=missing'
+          for path in /opt/datashield /opt/datashield/secrets /opt/datashield/secrets/cloud.env /opt/datashield-cloud /opt/datashield-cloud/secrets; do
+            if [ -e "$path" ]; then stat -c 'path=%n mode=%a owner=%U:%G type=%F' "$path"; else printf 'path=%s state=missing\n' "$path"; fi
+          done
+          echo 'datashield_service:'
+          systemctl show datashield.service --no-pager \
+            -p LoadState -p ActiveState -p SubState -p UnitFileState \
+            -p FragmentPath -p User -p Group -p WorkingDirectory -p Restart -p MainPID \
+            -p EnvironmentFiles 2>/dev/null || true
+          main_pid=$(systemctl show datashield.service -p MainPID --value 2>/dev/null || echo 0)
+          case "$main_pid" in ''|0) ;; *) if [ -e "/proc/$main_pid/exe" ]; then printf 'datashield_executable='; readlink -f "/proc/$main_pid/exe"; fi ;; esac
+          echo 'related_running_services:'
+          systemctl list-units --type=service --state=running --no-legend 2>/dev/null | grep -Ei 'datashield|docker|nginx|caddy|postgres' || true
+          printf 'docker_binary='; command -v docker || echo unavailable
+          printf 'docker_service='; systemctl is-active docker 2>/dev/null || true
+          printf 'compose_binary='; command -v docker-compose || echo unavailable
+          printf 'host_firewall_service='; systemctl is-active firewalld 2>/dev/null || echo unavailable
+          if command -v ss >/dev/null 2>&1; then
+            echo 'listening_tcp_ports:'
+            ss -lnt
           fi
+          echo 'deploy_sudo_allowlist:'
+          sudo -n -l 2>&1 || true
           if curl --silent --show-error --max-time 6 --output /dev/null --write-out 'local_api_http=%{http_code}\n' http://127.0.0.1:8000/api/health; then
             :
           else
