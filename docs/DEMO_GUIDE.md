@@ -56,6 +56,6 @@
 
 ## Cloud 尚未切换时
 
-选择“离线工作区”，只演示本地工作区、产品画像和 Ollama 设置。当前 Production 尚未启用 Identity 与 HTTPS Proxy，离线模式无法证明 Cloud 注册、法规同步或云端法规检索成功。请在 `docs/DEMO_STATUS.md` 核实当日实际状态。
+在 RC5 中，首页“看看演示结果”会进入工作区选择，随后选择“离线工作区”创建本机工作区；它不会调用网页评估演示接口或写入预置 Finding。只演示本地工作区、产品画像和 Ollama 设置。当前 Production 尚未启用 Identity 与 HTTPS Proxy，离线模式无法证明 Cloud 注册、法规同步或云端法规检索成功。请在 `docs/DEMO_STATUS.md` 核实当日实际状态。
 
 AI 输出和自动提取要求都需要人工核验，不构成法律意见。

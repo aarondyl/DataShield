@@ -18,7 +18,7 @@
 | 生产数据库现有法规 | 不存在 | 只读计数：法规、版本、Legal Unit、Requirement、法规事件和来源快照均为 0；Identity 数据库当前没有 public 表。 |
 | 域名 DNS | 通过 | `api.datashield.ltd` 解析到 `123.57.252.25`。 |
 | 公网 HTTPS / Identity / Proxy | 未上线 | 公网 TCP 443 无服务监听，HTTPS 请求失败；Identity 与 Proxy 容器尚不存在。当前不能声称 Desktop 已连 Cloud。 |
-| Windows RC4 安装包 | 安装冒烟通过 | GitHub Release `v0.2.0-rc.4` 的 EXE SHA256 校验通过；隔离路径静默安装退出码 0；启动后窗口标题为 DataShield，未黑屏。画面检查发现品牌 Logo 资源缺失，已在本分支修复 Vite 公共资源目录；修复版仍需 Windows CI 和实际安装验证。 |
+| Windows RC4 安装包 | 安装冒烟通过，但不可用于本地业务演示 | GitHub Release `v0.2.0-rc.4` 的 EXE SHA256 校验通过；隔离路径静默安装退出码 0；启动后窗口标题为 DataShield，未黑屏。截图进一步确认 Tauri WebView 未设置 `window.datashieldDesktop`，导致 Renderer 误走网页 API、返回 HTML 后引发页面错误及“本地服务请求失败”。RC5 分支现在通过 `isTauri()` 在首次渲染前设置模式标记，并把桌面“演示”按钮导向工作区选择；修复版待 Windows CI 和安装验证。Logo 公共资源目录修复也在 RC5 分支。 |
 | Desktop Local sidecar | 健康 | Windows 进程启动 `datashield-local.exe`；`/api/health` 返回 `status=ok, db=sqlite`。 |
 | Ollama `qwen3:4b` | 实际推理通过 | Windows Ollama API 返回 `qwen3:4b`；Desktop sidecar 的 provider 测试返回 `status=ok, provider=local, model=qwen3:4b`。测试请求不含产品资料。 |
 | Desktop 到 Cloud 法规同步 | 未验收 | 当前公网入口不可连接，尚未完成从 Production 下载法规并写入 Desktop SQLite。 |
