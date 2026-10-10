@@ -6,6 +6,12 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
+  resolve: {
+    // The renderer reuses components from ../../frontend/src while its entry
+    // point lives in apps/desktop. Resolve both trees to the Desktop React
+    // runtime so ReactDOM and every shared component use one hook dispatcher.
+    dedupe: ['react', 'react-dom'],
+  },
   server: {
     port: 1420,
     strictPort: true,
