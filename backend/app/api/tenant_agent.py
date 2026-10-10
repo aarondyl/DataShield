@@ -38,6 +38,11 @@ def analyze(payload: TenantAnalyzeRequest, db: Session = Depends(get_db), princi
     require_company_access(payload.tenant_id, principal)
     require_product_access(db, payload.product_id, principal)
     settings = get_settings()
+    if settings.runtime_mode == "local" and settings.desktop_mode and settings.desktop_ai_mode == "mock":
+        raise HTTPException(
+            status_code=409,
+            detail="请先在设置中配置并测试 DeepSeek、OpenAI 兼容 API 或 Ollama，再运行真实合规分析。",
+        )
     try:
         run = create_pending_agent_run(
             db,

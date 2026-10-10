@@ -58,6 +58,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             seed_cloud_official_sources(db)
     else:
         init_db()
+        if settings.runtime_mode == "local":
+            # Install the real PIPL and DSL corpus into a fresh Desktop SQLite
+            # database without creating a sample company or product. Store the
+            # ingestion source snapshots in the user's data directory so the
+            # installed application never writes into its program files.
+            from app.services.seed_regintel import seed_regintel_if_empty
+
+            with SessionLocal() as db:
+                seed_regintel_if_empty(
+                    db,
+                    regulation_codes={"pipl", "dsl"},
+                    source_directory=Path(settings.local_data_dir) / "regulations" / "sources",
+                )
     if is_sqlite() and settings.runtime_mode != "cloud":
         from app.rag.retrieval import rebuild_local_store_from_db
         from app.regintel.retrieval import rebuild_legal_chunk_store_from_db

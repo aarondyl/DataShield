@@ -5,6 +5,8 @@ import react from '@vitejs/plugin-react';
 // owns the runtime token and exposes a deliberately narrow invoke bridge.
 export default defineConfig({
   plugins: [react()],
+  // Reuse the shared product UI brand assets in the installed Desktop bundle.
+  publicDir: '../../frontend/public',
   clearScreen: false,
   resolve: {
     // The renderer reuses components from ../../frontend/src while its entry

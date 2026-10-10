@@ -78,7 +78,7 @@ export default function AIProviderSettings() {
     <h2>{t('appnew.settings.aiProvider.configureTitle')}</h2>
     <div className="ds-ai-provider-settings">
       <label>{t('appnew.settings.aiProvider.mode')}<select value={config.provider} onChange={e => { const provider = e.target.value as Provider; update({ provider, model: provider === 'ollama' ? '' : provider === 'cloud' ? 'deepseek-flash' : config.model || 'deepseek-flash', baseUrl: provider === 'ollama' ? 'http://127.0.0.1:11434/v1' : provider === 'cloud' ? cloudBaseUrl : 'https://api.deepseek.com', cloudConsent: provider === 'mock' || provider === 'ollama' ? false : config.cloudConsent }); setRestartRequired(false); }}>
-        <option value="mock">{t('appnew.settings.aiProvider.mock')}</option>
+        <option value="mock" disabled>{t('appnew.settings.aiProvider.notConfigured')}</option>
         <option value="cloud">{t('appnew.settings.aiProvider.cloud')}</option>
         <option value="byok">{t('appnew.settings.aiProvider.byok')}</option>
         <option value="ollama">{t('appnew.settings.aiProvider.ollama')}</option>
