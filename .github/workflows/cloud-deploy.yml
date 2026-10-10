@@ -1,0 +1,163 @@
+name: Deploy Cloud to Simple Application Server
+
+on:
+  workflow_run:
+    workflows: [Cloud RegIntel validation]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Read-only audit or deploy latest validated main
+        type: choice
+        options: [audit, deploy]
+        default: audit
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: datashield-cloud-production
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'audit'
+    runs-on: ubuntu-latest
+    environment: test-ssh
+    timeout-minutes: 5
+    steps:
+      - name: Run restricted host audit
+        env:
+          ECS_HOST: ${{ vars.ECS_HOST }}
+          ECS_PORT: ${{ vars.ECS_PORT }}
+          ECS_USER: ${{ vars.ECS_USER }}
+          ECS_KNOWN_HOSTS: ${{ vars.ECS_KNOWN_HOSTS }}
+          ECS_SSH_KEY: ${{ secrets.ECS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$ECS_HOST" && test "$ECS_USER" = deploy && test "$ECS_PORT" = 22
+          test -n "$ECS_KNOWN_HOSTS" && test -n "$ECS_SSH_KEY"
+          mkdir -p "$HOME/.ssh"
+          key="$(mktemp "$HOME/.ssh/key.XXXXXXXX")"
+          hosts="$(mktemp "$HOME/.ssh/hosts.XXXXXXXX")"
+          trap 'rm -f "$key" "$hosts"' EXIT
+          printf '%s\n' "$ECS_SSH_KEY" > "$key"
+          printf '%s\n' "$ECS_KNOWN_HOSTS" > "$hosts"
+          ssh -F /dev/null -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$hosts" -i "$key" -p "$ECS_PORT" "$ECS_USER@$ECS_HOST" 'if [ -x /usr/local/sbin/datashield-cloud-deploy ]; then sudo -n /usr/local/sbin/datashield-cloud-deploy audit; else echo deploy_wrapper=not_installed; fi'
+
+  build-and-deploy:
+    if: >-
+      (vars.CLOUD_DEPLOY_ENABLED == 'true' && github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
+       && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main')
+      || (vars.CLOUD_DEPLOY_ENABLED == 'true' && github.event_name == 'workflow_dispatch' && inputs.action == 'deploy' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    environment: test-ssh
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      actions: read
+    env:
+      GHCR_OWNER: aarondyl
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      ECS_HOST: ${{ vars.ECS_HOST }}
+      ECS_PORT: ${{ vars.ECS_PORT }}
+      ECS_USER: ${{ vars.ECS_USER }}
+      ECS_KNOWN_HOSTS: ${{ vars.ECS_KNOWN_HOSTS }}
+      ECS_SSH_KEY: ${{ secrets.ECS_SSH_KEY }}
+    steps:
+      - name: Confirm validated commit is current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$ECS_USER" = deploy && test "$ECS_PORT" = 22
+          current_main="$(gh api repos/${GITHUB_REPOSITORY}/commits/main --jq .sha)"
+          test "$SOURCE_SHA" = "$current_main" || { echo 'Deployment skipped: validated commit is no longer main HEAD.'; exit 1; }
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            gh run list --workflow cloud-validation.yml --branch main --commit "$SOURCE_SHA" --status success --json databaseId --jq 'length' | grep -q '^1$'
+          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+      - uses: docker/setup-buildx-action@v3
+      - name: Authenticate to GHCR for image publishing
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push pinned Cloud image
+        id: cloud
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile.cloud
+          push: true
+          tags: ghcr.io/aarondyl/datashield-cloud:${{ env.SOURCE_SHA }}
+          labels: org.opencontainers.image.revision=${{ env.SOURCE_SHA }}
+      - name: Build and push pinned Identity image
+        id: identity
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile.identity
+          push: true
+          tags: ghcr.io/aarondyl/datashield-identity:${{ env.SOURCE_SHA }}
+          labels: org.opencontainers.image.revision=${{ env.SOURCE_SHA }}
+      - name: Build and push pinned HTTPS gateway image
+        id: proxy
+        uses: docker/build-push-action@v6
+        with:
+          context: deploy/proxy
+          file: deploy/proxy/Dockerfile
+          push: true
+          tags: ghcr.io/aarondyl/datashield-cloud-proxy:${{ env.SOURCE_SHA }}
+          labels: org.opencontainers.image.revision=${{ env.SOURCE_SHA }}
+      - name: Deploy image digests through restricted root wrapper
+        id: remote
+        env:
+          CLOUD_DIGEST: ${{ steps.cloud.outputs.digest }}
+          IDENTITY_DIGEST: ${{ steps.identity.outputs.digest }}
+          PROXY_DIGEST: ${{ steps.proxy.outputs.digest }}
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$ECS_HOST" && test -n "$ECS_KNOWN_HOSTS" && test -n "$ECS_SSH_KEY"
+          mkdir -p "$HOME/.ssh"
+          key="$(mktemp "$HOME/.ssh/key.XXXXXXXX")"
+          hosts="$(mktemp "$HOME/.ssh/hosts.XXXXXXXX")"
+          trap 'rm -f "$key" "$hosts"' EXIT
+          printf '%s\n' "$ECS_SSH_KEY" > "$key"
+          printf '%s\n' "$ECS_KNOWN_HOSTS" > "$hosts"
+          ssh -F /dev/null -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$hosts" -o ConnectTimeout=10 -i "$key" -p "$ECS_PORT" "$ECS_USER@$ECS_HOST" \
+            "sudo -n /usr/local/sbin/datashield-cloud-deploy deploy $SOURCE_SHA $CLOUD_DIGEST $IDENTITY_DIGEST $PROXY_DIGEST"
+      - name: Verify public HTTPS API and registration service
+        id: smoke
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 10 --retry-delay 5 --retry-connrefused https://api.datashield.ltd/api/health | python -c 'import json,sys; d=json.load(sys.stdin); assert d.get("status")=="ok" and d.get("db")=="postgresql"'
+          curl --fail --silent --show-error https://api.datashield.ltd/identity/health | python -c 'import json,sys; d=json.load(sys.stdin); assert d.get("status")=="ok" and d.get("database")=="postgresql" and d.get("email_delivery_ready")'
+          curl --fail --silent --show-error 'https://api.datashield.ltd/api/v1/regulations?limit=1' >/dev/null
+      - name: Restore last good application images if public smoke fails
+        if: failure() && steps.remote.outcome == 'success' && steps.smoke.outcome == 'failure'
+        env:
+          ECS_HOST: ${{ vars.ECS_HOST }}
+          ECS_PORT: ${{ vars.ECS_PORT }}
+          ECS_USER: ${{ vars.ECS_USER }}
+          ECS_KNOWN_HOSTS: ${{ vars.ECS_KNOWN_HOSTS }}
+          ECS_SSH_KEY: ${{ secrets.ECS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          key="$(mktemp "$HOME/.ssh/key.XXXXXXXX")"
+          hosts="$(mktemp "$HOME/.ssh/hosts.XXXXXXXX")"
+          trap 'rm -f "$key" "$hosts"' EXIT
+          printf '%s\n' "$ECS_SSH_KEY" > "$key"
+          printf '%s\n' "$ECS_KNOWN_HOSTS" > "$hosts"
+          ssh -F /dev/null -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$hosts" -i "$key" -p "$ECS_PORT" "$ECS_USER@$ECS_HOST" \
+            'sudo -n /usr/local/sbin/datashield-cloud-deploy rollback'

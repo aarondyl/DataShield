@@ -15,7 +15,7 @@ services:
     secrets: [postgres_password]
     networks: [cloud_database]
     restart: unless-stopped
-    mem_limit: 700m
+    mem_limit: 450m
     logging: &json_logging
       driver: local
       options:
@@ -29,8 +29,8 @@ services:
     # The local default keeps the Compose file usable for non-production tests.
     image: ${CLOUD_IMAGE:-datashield-cloud:local}
     build:
-      context: .
-      dockerfile: backend/Dockerfile.cloud
+      context: ./backend
+      dockerfile: Dockerfile.cloud
     environment:
       DATABASE_URL_FILE: /run/secrets/cloud_database_url
       RUNTIME_MODE: cloud
@@ -39,6 +39,9 @@ services:
       # one low-concurrency warm-up poll after startup and then daily refreshes.
       SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
       CLOUD_ADMIN_TOKEN_FILE: /run/secrets/cloud_admin_token
+      DATASHIELD_RELEASE_SHA: ${DATASHIELD_RELEASE_SHA:-unknown}
+    labels:
+      org.opencontainers.image.revision: ${DATASHIELD_RELEASE_SHA:-unknown}
     ports:
       - "${CLOUD_BIND_ADDRESS:-127.0.0.1}:8000:8000"
     volumes:
@@ -47,46 +50,74 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "from urllib.request import urlopen; assert urlopen('http://127.0.0.1:8000/api/health').status == 200"]
+      test: ["CMD", "python", "-c", "import json; from urllib.request import urlopen; r=urlopen('http://127.0.0.1:8000/api/health'); d=json.load(r); assert r.status == 200 and d['status'] == 'ok' and d['db'] == 'postgresql'"]
       interval: 15s
       timeout: 5s
       retries: 5
     secrets: [cloud_database_url, cloud_admin_token]
-    networks: [cloud_database, cloud_egress]
+    networks: [cloud_database, cloud_egress, cloud_api]
     restart: unless-stopped
-    mem_limit: 550m
+    mem_limit: 400m
     logging: *json_logging
 
   identity:
     profiles: [identity]
+    image: ${IDENTITY_IMAGE:-datashield-identity:local}
     build:
-      context: .
-      dockerfile: backend/Dockerfile.identity
+      context: ./backend
+      dockerfile: Dockerfile.identity
     environment:
       IDENTITY_DATABASE_URL_FILE: /run/secrets/identity_database_url
-      IDENTITY_EMAIL_VERIFY_REQUIRED: "true"
+      IDENTITY_EMAIL_VERIFY_REQUIRED: ${IDENTITY_EMAIL_VERIFY_REQUIRED:-true}
       IDENTITY_SMTP_HOST: ${IDENTITY_SMTP_HOST:-}
       IDENTITY_SMTP_PORT: ${IDENTITY_SMTP_PORT:-587}
       IDENTITY_SMTP_USER: ${IDENTITY_SMTP_USER:-}
       IDENTITY_SMTP_PASSWORD_FILE: /run/secrets/identity_smtp_password
       IDENTITY_EMAIL_FROM: ${IDENTITY_EMAIL_FROM:-}
-      IDENTITY_SMTP_STARTTLS: "true"
+      IDENTITY_SMTP_STARTTLS: ${IDENTITY_SMTP_STARTTLS:-true}
       IDENTITY_LLM_API_KEY_FILE: /run/secrets/identity_llm_api_key
       IDENTITY_LLM_MODEL: ${IDENTITY_LLM_MODEL:-deepseek-flash}
+      DATASHIELD_RELEASE_SHA: ${DATASHIELD_RELEASE_SHA:-unknown}
+    labels:
+      org.opencontainers.image.revision: ${DATASHIELD_RELEASE_SHA:-unknown}
     ports:
       - "${IDENTITY_BIND_ADDRESS:-127.0.0.1}:8001:8001"
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "from urllib.request import urlopen; assert urlopen('http://127.0.0.1:8001/health').status == 200"]
+      test: ["CMD", "python", "-c", "import json; from urllib.request import urlopen; d=json.load(urlopen('http://127.0.0.1:8001/health')); assert d['status'] == 'ok' and d['database'] == 'postgresql' and d['email_delivery_ready']"]
       interval: 15s
       timeout: 5s
       retries: 5
     secrets: [identity_database_url, identity_smtp_password, identity_llm_api_key]
-    networks: [cloud_database, cloud_egress]
+    networks: [cloud_database, cloud_egress, cloud_api]
     restart: unless-stopped
-    mem_limit: 260m
+    mem_limit: 192m
+    logging: *json_logging
+
+  gateway:
+    profiles: [production]
+    image: ${PROXY_IMAGE:-datashield-cloud-proxy:local}
+    build:
+      context: ./deploy/proxy
+      dockerfile: Dockerfile
+    environment:
+      CLOUD_DOMAIN: ${CLOUD_DOMAIN:-api.datashield.ltd}
+    ports:
+      - "${CLOUD_HTTP_BIND_ADDRESS:-0.0.0.0}:80:80"
+      - "${CLOUD_HTTPS_BIND_ADDRESS:-0.0.0.0}:443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      cloud:
+        condition: service_healthy
+      identity:
+        condition: service_healthy
+    networks: [cloud_api, cloud_egress]
+    restart: unless-stopped
+    mem_limit: 80m
     logging: *json_logging
 
 networks:
@@ -94,6 +125,9 @@ networks:
     internal: true
   # Cloud 可从该网络访问官方法规来源；PostgreSQL 不加入此网络。
   cloud_egress: {}
+  # Reverse proxy can reach APIs but cannot access PostgreSQL.
+  cloud_api:
+    internal: true
 
 secrets:
   postgres_password:
@@ -112,3 +146,5 @@ secrets:
 volumes:
   cloud_postgres_data:
   cloud_regintel_snapshots:
+  caddy_data:
+  caddy_config:

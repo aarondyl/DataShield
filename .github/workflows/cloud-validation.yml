@@ -1,11 +1,27 @@
 name: Cloud RegIntel validation
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'docker-compose.cloud.yml'
+      - 'deploy/**'
+      - '.dockerignore'
+      - 'backend/.dockerignore'
+      - '.github/workflows/cloud-validation.yml'
+      - '.github/workflows/cloud-deploy.yml'
+      - '.github/workflows/test-ssh.yml'
   pull_request:
     paths:
       - 'backend/**'
       - 'docker-compose.cloud.yml'
+      - 'deploy/**'
+      - '.dockerignore'
+      - 'backend/.dockerignore'
       - '.github/workflows/cloud-validation.yml'
+      - '.github/workflows/cloud-deploy.yml'
+      - '.github/workflows/test-ssh.yml'
   workflow_dispatch:
 
 permissions:
@@ -55,5 +71,27 @@ jobs:
       - name: Validate Cloud API contract and Local sync behavior
         working-directory: backend
         run: python -m pytest tests/test_cloud_api_contract.py tests/test_cloud_migration_isolation.py tests/test_local_regulation_cache.py tests/test_local_sync_http_e2e.py -q
-      - name: Build Cloud image only
-        run: docker build --file backend/Dockerfile.cloud --tag datashield-cloud-ci:${{ github.sha }} .
+      - name: Validate startup Secret handling and migration rollback contract
+        run: |
+          python -m pytest backend/tests/test_cloud_startup_env_validation.py backend/tests/test_identity_startup_env_validation.py -q
+          python deploy/check-additive-migrations.py
+          bash -n deploy/prepare-cloud-secrets.sh deploy/check-cloud-config.sh deploy/install-cloud-host.sh deploy/datashield-cloud-deploy
+      - name: Build isolated Cloud Backend image
+        run: docker build --file backend/Dockerfile.cloud --tag datashield-cloud-ci:${{ github.sha }} backend
+      - name: Verify Cloud image excludes Desktop and private Local payloads
+        run: |
+          docker run --rm --entrypoint sh datashield-cloud-ci:${{ github.sha }} -ec 'test ! -e /app/frontend && test ! -e /app/apps && test ! -e /app/desktop_sidecar.py && test -d /app/app/regintel && test -d /app/alembic_cloud'
+      - name: Build isolated Identity image
+        run: docker build --file backend/Dockerfile.identity --tag datashield-identity-ci:${{ github.sha }} backend
+      - name: Verify Identity image excludes RegIntel and Desktop payloads
+        run: |
+          docker run --rm --entrypoint sh datashield-identity-ci:${{ github.sha }} -ec 'test ! -e /app/frontend && test ! -e /app/alembic_cloud && test ! -e /app/app/regintel && test -d /app/identity_service && test -f /app/app/core/passwords.py'
+      - name: Build and validate HTTPS gateway image
+        run: |
+          docker build --file deploy/proxy/Dockerfile --tag datashield-cloud-proxy-ci:${{ github.sha }} deploy/proxy
+          docker run --rm --entrypoint caddy -e CLOUD_DOMAIN=api.datashield.ltd datashield-cloud-proxy-ci:${{ github.sha }} validate --config /etc/caddy/Caddyfile
+      - name: Validate Cloud Compose definition without exposing configuration
+        run: |
+          mkdir -p /tmp/datashield-compose-secrets
+          for secret in postgres_password cloud_database_url cloud_admin_token identity_database_url identity_smtp_password identity_llm_api_key; do : > "/tmp/datashield-compose-secrets/$secret"; done
+          docker compose --env-file deploy/cloud.env.example --env-file <(printf 'CLOUD_SECRETS_DIR=/tmp/datashield-compose-secrets\nCLOUD_IMAGE=datashield-cloud:ci\nIDENTITY_IMAGE=datashield-identity:ci\nPROXY_IMAGE=datashield-proxy:ci\n') -f docker-compose.cloud.yml config --quiet
