@@ -77,12 +77,12 @@ jobs:
           python deploy/check-additive-migrations.py
           bash -n deploy/prepare-cloud-secrets.sh deploy/check-cloud-config.sh deploy/install-cloud-host.sh deploy/datashield-cloud-deploy
       - name: Build isolated Cloud Backend image
-        run: docker build --file Dockerfile.cloud --tag datashield-cloud-ci:${{ github.sha }} backend
+        run: docker build --file backend/Dockerfile.cloud --tag datashield-cloud-ci:${{ github.sha }} backend
       - name: Verify Cloud image excludes Desktop and private Local payloads
         run: |
           docker run --rm --entrypoint sh datashield-cloud-ci:${{ github.sha }} -ec 'test ! -e /app/frontend && test ! -e /app/apps && test ! -e /app/desktop_sidecar.py && test -d /app/app/regintel && test -d /app/alembic_cloud'
       - name: Build isolated Identity image
-        run: docker build --file Dockerfile.identity --tag datashield-identity-ci:${{ github.sha }} backend
+        run: docker build --file backend/Dockerfile.identity --tag datashield-identity-ci:${{ github.sha }} backend
       - name: Verify Identity image excludes RegIntel and Desktop payloads
         run: |
           docker run --rm --entrypoint sh datashield-identity-ci:${{ github.sha }} -ec 'test ! -e /app/frontend && test ! -e /app/alembic_cloud && test ! -e /app/app/regintel && test -d /app/identity_service && test -f /app/app/core/passwords.py'
