@@ -1,33 +1,19 @@
-# DataShield 演示验收状态
+# DataShield 本地比赛版验收状态
 
-更新日期：2026-10-10（Asia/Shanghai）
+更新日期：2026-10-10。记录只描述实际验证结果；本地完成的 CI/单元测试不替代安装包的 Windows GUI 验收。
 
-状态仅根据本轮实际运行记录填写。源代码存在或 CI 通过不等于功能已在真实环境验收。
-
-## 本轮真实证据
-
-| 项目 | 状态 | 证据 |
+| 验收项 | 状态 | 证据/剩余工作 |
 |---|---|---|
-| PR #46 部署修复 | 已合并 | Commit `7a3334233285fea9e1455104f1975947062cf7b5`；Cloud CI [Run 38041835256](https://github.com/aarondyl/DataShield/actions/runs/38041835256) 通过。 |
-| Cloud、Identity、Proxy 镜像构建 | 已发布 GHCR | [Run 38041917596](https://github.com/aarondyl/DataShield/actions/runs/38041917596) 成功；发布来源 `7a3334233285fea9e1455104f1975947062cf7b5`；Compose SHA256 `ba4dccd621245498025fad82db03bde109fc89448d2d4fc1f4c227d8b88a4b6b`；Cloud `sha256:8eddf9278ab4576d3d051618f2640cbd05c4f5eccae7ea518272637549453f04`；Identity `sha256:f3aa4fa259a4a3e25d611a8f32e0724c5ac67609d08e90675b00f2a4e4c08239`；Proxy `sha256:7f5035a32dc32ced4c7a3e7ea456f0a5d4693d1e43318088850c6bb24a8beba0`。 |
-| ECS 部署器及辅助脚本 | 已更新 | 使用 main 固定 Commit 的 `install-cloud-host.sh`；部署器、容器 ID、状态、发布校验、Compose 存储检查与配置检查脚本均安装为 root 所有。 |
-| ECS 配置预检 | 通过 | `/usr/local/sbin/datashield-cloud-deploy preflight` 返回通过；没有显示环境变量值。 |
-| 候选 stage / diagnose | 通过 | 固定 Commit 与 Compose SHA 候选已暂存；read-only diagnose 覆盖合并配置、存储身份、Cloud/Identity 数据库角色、GHCR、磁盘和内存。没有调用 deploy。 |
-| PostgreSQL 备份 | 已生成并校验 | `/opt/datashield/backups/pre-demo-cutover-20261010T093952Z.sql.gz`，gzip 完整性通过；大小 9,180 bytes，SHA256 `d69ec7e79e54d044e953c7636cd4e77c7494e93293aadbc807b058eaaec7f017`；前后 PostgreSQL 容器完整 ID 与 `source_cloud_postgres_data` 卷均未改变。 |
-| ECS Cloud 与 PostgreSQL | 健康（旧版） | SSH 只读检查显示 `source-cloud-1` 与 `source-postgres-1` 均 Healthy；旧 Cloud API 只绑定 `127.0.0.1:8000`。 |
-| 生产数据库现有法规 | 不存在 | 只读计数：法规、版本、Legal Unit、Requirement、法规事件和来源快照均为 0；Identity 数据库当前没有 public 表。 |
-| 域名 DNS | 通过 | `api.datashield.ltd` 解析到 `123.57.252.25`。 |
-| 公网 HTTPS / Identity / Proxy | 未上线 | 公网 TCP 443 无服务监听，HTTPS 请求失败；Identity 与 Proxy 容器尚不存在。当前不能声称 Desktop 已连 Cloud。 |
-| Windows RC4 安装包 | 安装冒烟通过，但不可用于本地业务演示 | GitHub Release `v0.2.0-rc.4` 的 EXE SHA256 校验通过；隔离路径静默安装退出码 0；启动后窗口标题为 DataShield，未黑屏。截图进一步确认 Tauri WebView 未设置 `window.datashieldDesktop`，导致 Renderer 误走网页 API、返回 HTML 后引发页面错误及“本地服务请求失败”。RC5 分支现在通过 `isTauri()` 在首次渲染前设置模式标记，并把桌面“演示”按钮导向工作区选择；修复版待 Windows CI 和安装验证。Logo 公共资源目录修复也在 RC5 分支。 |
-| Desktop Local sidecar | 健康 | Windows 进程启动 `datashield-local.exe`；`/api/health` 返回 `status=ok, db=sqlite`。 |
-| Ollama `qwen3:4b` | 实际推理通过 | Windows Ollama API 返回 `qwen3:4b`；Desktop sidecar 的 provider 测试返回 `status=ok, provider=local, model=qwen3:4b`。测试请求不含产品资料。 |
-| Desktop 到 Cloud 法规同步 | 未验收 | 当前公网入口不可连接，尚未完成从 Production 下载法规并写入 Desktop SQLite。 |
-| Local Tenant Agent Finding 闭环 | 未验收 | 本轮没有伪造法规或 Finding；待 Cloud 切换和实际法规同步后执行 Ollama 分析、Finding 展示及重启持久化验收。 |
-| 迁移备份副本演练 | 未完成 | WSL Docker default socket 返回权限不足；没有把迁移演练改在低内存生产机上运行。Production DB 未执行迁移。 |
+| Tauri 本地 API Bridge | RC4 缺失模式标记；RC5 分支已修复 | 桌面启动时读取 Tauri `isTauri()`，再决定 HashRouter、Rust Bridge 和本地工作区；新增桌面/浏览器两种模式回归测试。等待当前 Windows 安装包作业完成后安装复验。 |
+| 首次启动进入本地流程 | 已实现，待安装复验 | Desktop 根路径跳过营销页；新用户进入开发者/企业版选择，已有本机工作区直接进入 Today。 |
+| 本地 SQLite | RC4 已验证可启动及持久化文件存在 | 旧版 `%LOCALAPPDATA%\DataShield\datashield.db` 有既有数据，本轮不会删除或覆盖。需在 RC5 安装后新增专用工作区、重启复验。 |
+| PIPL / 数据安全法离线资料 | 有官方正文与导入流水线；首次启动导入刚实现 | 冷启动仅导入 PIPL/数据安全法，不生成示例企业或产品；来源快照保存在用户数据目录；版本标记未人工核验。需跑新增隔离 SQLite 测试并安装实测。 |
+| 用户模型配置 | 已实现设置与 Windows Credential Manager 路径 | Base URL、模型、BYOK Key、同意勾选和真实推理测试已存在；Ollama 不需要 Key。Key 不进 SQLite/明文配置。当前运行的 RC4 Ollama `qwen3:4b` provider 测试曾成功；需要在修复版安装后复验。 |
+| 禁止 Mock 冒充 | 已加 API 门禁 | Desktop 本地模式为 Mock 时，Tenant Agent 返回 409 并提示先配置真实模型。新增回归测试待运行。 |
+| Product Twin 向导 | 已有三步页面 | 需在修复版安装后逐步点击验收。 |
+| Finding 证据链 / 今日待办 | 已有业务页面与本地持久化 API | 需用真实 Ollama、新导入法规做完整分析后验收；当前不能把 RC4 的演示法条当成真实证据。 |
+| Windows EXE | RC4 安装冒烟已通过；RC5 处理中 | RC4 安装包 SHA256 校验、隔离路径安装和启动窗口检查通过；RC5 Windows workflow 进行中。WSL 无 Windows Rust 工具链，需优先使用仓库 Windows Runner 生成的安装 artifact 在本机真实安装验收。 |
+| Cloud / 网站 | 本地比赛版不依赖 | 不执行任何生产 Cloud 操作、不发布 GitHub Release。 |
+| 比赛截图 | 未完成 | 等 RC5 实际安装后，从真实 Windows GUI 截取画像向导、Finding 证据链、Today/法规库三张图；不得伪造数据或构图替代实机。 |
 
-## 安全边界与下一步
-
-- `CLOUD_DEPLOY_ENABLED` 保持关闭，`production-cutover.approved` 标记不存在。
-- 新候选的 `stage` 与只读 `diagnose` 已通过；未调用 `deploy`、未迁移数据库、未停止或替换容器。
-- 新备份 gzip 可读性已验证，但尚未在隔离数据库恢复验证；生产数据库尚无已知法规或用户数据行。
-- 正式演示仍需首次切换批准。批准前不能完成公网 HTTPS、Identity 注册、Cloud 法规导入、Desktop 云同步或端到端 Agent Finding。
+演示步骤见 [`DEMO_GUIDE.md`](DEMO_GUIDE.md)，数据准备说明见 [`DEMO_DATA.md`](DEMO_DATA.md)。
