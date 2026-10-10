@@ -46,4 +46,4 @@ sudo stat -c '%a %U:%G %n' /opt/datashield/secrets /opt/datashield/secrets/cloud
 
 预期目录为 `700 root:root`，文件为 `600 root:root`。不要用 `cat`、`env`、`docker inspect` 或 `docker compose config` 输出 Secret 内容。
 
-完成 Secret 录入后，以交互式安全终端运行 `/usr/local/libexec/datashield-cloud/check-cloud-config.sh`。检查器只输出缺少/权限错误的变量名，不输出值。私有 GHCR 拉取 token 需要 `read:packages` 权限；保存在 `/opt/datashield/secrets/ghcr_pull_token`。以后换 token 时使用 root 管理终端就地编辑该文件，保持 `root:root 0600`，不要在命令参数、Actions 日志或聊天中传递 token。
+完成 Secret 录入后，以交互式安全终端运行 `/usr/local/libexec/datashield-cloud/check-cloud-config.sh`。检查器只输出缺少/权限错误的变量名，不输出值。`GHCR_PULL_USERNAME` 应是创建私有镜像拉取 token 的 GitHub 用户名。私有 GHCR 拉取 token 需要 `read:packages` 权限；保存在 `/opt/datashield/secrets/ghcr_pull_token`。以后换 token 时使用 root 管理终端就地编辑该文件，保持 `root:root 0600`，不要在命令参数、Actions 日志或聊天中传递 token。
