@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+set +x
+umask 077
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+ROOT=/opt/datashield
+SECRETS="$ROOT/secrets"
+STATE="$ROOT/current.env"
+ACTIVE="$ROOT/active-sha"
+PROJECT=datashield-cloud
+BASE="$ROOT/docker-compose.cloud.yml"
+COMPOSE=(docker compose)
+LOG="$ROOT/deploy.log"
+
+die() { printf 'Cloud deploy preflight failed: %s\n' "$1" >&2; exit 1; }
+log() { printf '[%s] %s\n' "$(date -u +%FT%TZ)" "$*" >> "$LOG"; }
+valid_sha() { [[ "$1" =~ ^[0-9a-f]{40}$ ]]; }
+valid_digest() { [[ "$1" =~ ^sha256:[0-9a-f]{64}$ ]]; }
+compose() { "${COMPOSE[@]}" --project-name "$PROJECT" --env-file "$SECRETS/cloud.env" -f "$BASE" "$@"; }
+
+activation_started=0
+finish() {
+  status=$?
+  if [[ $status -ne 0 && $activation_started -eq 1 && -s "$ROOT/last-good.env" ]]; then
+    previous_sha="$(sed -n 's/^DATASHIELD_RELEASE_SHA=//p' "$ROOT/last-good.env")"
+    if valid_sha "$previous_sha" && [[ -f "$ROOT/releases/$previous_sha/docker-compose.cloud.yml" ]]; then
+      cp "$ROOT/last-good.env" "$STATE"
+      chmod 0600 "$STATE"
+      BASE="$ROOT/releases/$previous_sha/docker-compose.cloud.yml"
+      compose --profile production --profile identity up -d --no-build >> "$LOG" 2>&1 \
+        && log "automatic application rollback restored $previous_sha; database was not downgraded" \
+        || log "automatic rollback failed; manual recovery required; database was not downgraded"
+    fi
+  fi
+  exit "$status"
+}
+trap finish EXIT
+
+[[ $EUID -eq 0 ]] || die 'must run as root'
+[[ $# -ge 1 ]] || die 'expected audit, preflight, deploy, or rollback'
+mkdir -p "$ROOT/releases" "$ROOT/backups"
+chmod 700 "$ROOT" "$ROOT/releases" "$ROOT/backups"
+install -d -o root -g root -m 0700 "$SECRETS"
+[[ -x /usr/local/libexec/datashield-cloud/check-cloud-config.sh ]] || die 'host installer has not installed the configuration checker'
+[[ -f "$SECRETS/cloud.env" && ! -L "$SECRETS/cloud.env" ]] || die 'cloud.env is missing'
+
+case "$1" in
+  audit)
+    printf 'service='; systemctl is-active datashield.service 2>/dev/null || true
+    printf 'docker='; docker info --format '{{.ServerVersion}}' 2>/dev/null || true
+    printf 'compose='; "${COMPOSE[@]}" version --short 2>/dev/null || true
+    printf 'project_containers='; docker ps -q --filter "label=com.docker.compose.project=$PROJECT" | wc -l
+    printf 'port_8000='; ss -lnt '( sport = :8000 )' | tail -n +2 | wc -l
+    printf 'port_8001='; ss -lnt '( sport = :8001 )' | tail -n +2 | wc -l
+    printf 'active_sha='; if [[ -r $ACTIVE ]]; then cat "$ACTIVE"; else echo none; fi
+    exit 0
+    ;;
+  preflight)
+    [[ $# -eq 1 ]] || die 'preflight accepts no arguments'
+    /usr/local/libexec/datashield-cloud/check-cloud-config.sh
+    docker info >/dev/null 2>&1 || die 'Docker daemon is unavailable'
+    "${COMPOSE[@]}" version >/dev/null 2>&1 || die 'Docker Compose plugin is unavailable'
+    df -Pk "$ROOT" | awk 'NR==2 { if ($4 < 5242880) exit 1 }' || die 'less than 5 GiB free under deployment filesystem'
+    count="$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT" --filter label=com.docker.compose.service=postgres | wc -l)"
+    [[ "$count" -eq 1 ]] || die 'expected exactly one running PostgreSQL container in the existing datashield-cloud Compose project; no deployment performed'
+    compose ps postgres >/dev/null 2>&1 || die 'existing PostgreSQL service does not match the approved Compose project'
+    echo 'Preflight passed; current database container was found and no data was changed.'
+    ;;
+  deploy)
+    [[ $# -eq 5 ]] || die 'deploy requires SHA and three image digests'
+    exec 9>"$ROOT/deploy.lock"
+    chmod 0600 "$ROOT/deploy.lock"
+    flock -n 9 || die 'another Cloud deployment is already running'
+    sha="$2" cloud_digest="$3" identity_digest="$4" proxy_digest="$5"
+    valid_sha "$sha" || die 'invalid source commit SHA'
+    valid_digest "$cloud_digest" && valid_digest "$identity_digest" && valid_digest "$proxy_digest" || die 'image references must be sha256 digests'
+    /usr/local/libexec/datashield-cloud/check-cloud-config.sh
+    docker info >/dev/null 2>&1 || die 'Docker daemon is unavailable'
+    "${COMPOSE[@]}" version >/dev/null 2>&1 || die 'Docker Compose plugin is unavailable'
+    df -Pk "$ROOT" | awk 'NR==2 { if ($4 < 5242880) exit 1 }' || die 'less than 5 GiB free under deployment filesystem'
+    count="$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT" --filter label=com.docker.compose.service=postgres | wc -l)"
+    [[ "$count" -eq 1 ]] || die 'existing PostgreSQL project not found; refusing to initialize a new database'
+    compose ps postgres >/dev/null 2>&1 || die 'PostgreSQL does not match current Compose project definition'
+    if [[ ! -e "$ROOT/production-cutover.approved" ]]; then
+      active_service=0
+      systemctl is-active --quiet datashield.service 2>/dev/null && active_service=1 || true
+      if [[ "$active_service" -eq 1 ]]; then die 'first production cutover requires root-created production-cutover.approved after explicit operator approval'; fi
+      die 'first production cutover requires root-created production-cutover.approved after explicit operator approval'
+    fi
+    release="$ROOT/releases/$sha"
+    install -d -o root -g root -m 0700 "$release"
+    if [[ ! -s "$release/docker-compose.cloud.yml" ]]; then
+      curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 "https://raw.githubusercontent.com/aarondyl/DataShield/$sha/docker-compose.cloud.yml" -o "$release/docker-compose.cloud.yml"
+      chmod 0600 "$release/docker-compose.cloud.yml"
+    fi
+    # The running compose project must already use this stack and volume identity.
+    old_base="$BASE"
+    BASE="$release/docker-compose.cloud.yml"
+    if [[ -s "$STATE" ]]; then cp -f "$STATE" "$ROOT/last-good.env"; chmod 0600 "$ROOT/last-good.env"; fi
+    candidate="$ROOT/candidate.env"
+    printf 'CLOUD_IMAGE=ghcr.io/aarondyl/datashield-cloud@%s\nIDENTITY_IMAGE=ghcr.io/aarondyl/datashield-identity@%s\nPROXY_IMAGE=ghcr.io/aarondyl/datashield-cloud-proxy@%s\nDATASHIELD_RELEASE_SHA=%s\n' "$cloud_digest" "$identity_digest" "$proxy_digest" "$sha" > "$candidate"
+    chmod 0600 "$candidate"
+    # Keep current.env as the last active version until health checks pass.
+    COMPOSE+=(--env-file "$candidate")
+    docker_config="$(mktemp -d "$ROOT/.docker-config.XXXXXXXX")"
+    chmod 0700 "$docker_config"
+    cleanup() { rm -rf -- "$docker_config"; }
+    trap cleanup EXIT
+    token_file="$SECRETS/ghcr_pull_token"
+    [[ -s "$token_file" ]] || die 'GHCR_PULL_TOKEN_FILE is empty'
+    DOCKER_CONFIG="$docker_config" docker login ghcr.io --username datashield-actions --password-stdin < "$token_file" >/dev/null 2>&1 || die 'GHCR registry login failed'
+    export DOCKER_CONFIG="$docker_config"
+    docker pull "ghcr.io/aarondyl/datashield-cloud@$cloud_digest" >/dev/null
+    docker pull "ghcr.io/aarondyl/datashield-identity@$identity_digest" >/dev/null
+    docker pull "ghcr.io/aarondyl/datashield-cloud-proxy@$proxy_digest" >/dev/null
+    backup="$ROOT/backups/pre-$sha-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
+    postgres_id="$(compose ps -q postgres)"
+    [[ -n "$postgres_id" ]] || die 'PostgreSQL container missing after image pulls'
+    docker exec "$postgres_id" pg_dumpall -U datashield_cloud | gzip -1 > "$backup" || { rm -f "$backup"; die 'database backup failed; migrations not run'; }
+    chmod 0600 "$backup"
+    log "database backup completed for $sha"
+    if ! compose run --rm --no-deps cloud alembic -c alembic-cloud.ini upgrade head >> "$LOG" 2>&1; then die 'Cloud migration failed; database left intact and application not switched'; fi
+    if ! compose --profile identity run --rm --no-deps identity alembic -c alembic-identity.ini upgrade head >> "$LOG" 2>&1; then die 'Identity migration failed; database left intact and application not switched'; fi
+    activation_started=1
+    if ! compose --profile production --profile identity up -d --no-build >> "$LOG" 2>&1; then die 'Compose activation failed; see root-only deploy log'; fi
+    for _ in {1..40}; do
+      if compose exec -T cloud python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8000/api/health",timeout=4)); assert d.get("status")=="ok" and d.get("db")=="postgresql"' >/dev/null 2>&1 \
+        && compose exec -T identity python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8001/health",timeout=4)); assert d.get("status")=="ok" and d.get("database")=="postgresql" and d.get("email_delivery_ready")' >/dev/null 2>&1; then break; fi
+      sleep 3
+    done
+    compose exec -T cloud python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8000/api/health",timeout=4)); assert d.get("status")=="ok" and d.get("db")=="postgresql"'
+    compose exec -T identity python -c 'import json,urllib.request; d=json.load(urllib.request.urlopen("http://127.0.0.1:8001/health",timeout=4)); assert d.get("status")=="ok" and d.get("database")=="postgresql" and d.get("email_delivery_ready")'
+    cp "$candidate" "$STATE"
+    chmod 0600 "$STATE"
+    printf '%s\n' "$sha" > "$ACTIVE"
+    chmod 0600 "$ACTIVE"
+    log "deployment succeeded source=$sha cloud=$cloud_digest identity=$identity_digest proxy=$proxy_digest"
+    echo "Deployment activated; source=$sha. External HTTPS smoke tests are still required."
+    ;;
+  rollback)
+    [[ $# -eq 1 ]] || die 'rollback accepts no user-supplied command or version'
+    exec 9>"$ROOT/deploy.lock"
+    chmod 0600 "$ROOT/deploy.lock"
+    flock -n 9 || die 'another Cloud deployment is already running'
+    [[ -s "$ROOT/last-good.env" ]] || die 'no saved last-good image record'
+    rollback_sha="$(sed -n 's/^DATASHIELD_RELEASE_SHA=//p' "$ROOT/last-good.env")"
+    valid_sha "$rollback_sha" || die 'saved last-good release SHA is invalid'
+    [[ -f "$ROOT/releases/$rollback_sha/docker-compose.cloud.yml" ]] || die 'previous deployment Compose file is missing'
+    cp "$ROOT/last-good.env" "$STATE"
+    chmod 0600 "$STATE"
+    BASE="$ROOT/releases/$rollback_sha/docker-compose.cloud.yml"
+    COMPOSE+=(--env-file "$STATE")
+    compose --profile production --profile identity up -d --no-build >> "$LOG" 2>&1 || die 'application rollback failed; database was not downgraded'
+    printf '%s\n' "$rollback_sha" > "$ACTIVE"
+    chmod 0600 "$ACTIVE"
+    log "application rollback completed source=$rollback_sha; database not downgraded"
+    echo "Application images restored to $rollback_sha. Database migrations were not rolled back."
+    ;;
+  *) die 'unknown command' ;;
+esac

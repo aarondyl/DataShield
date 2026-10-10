@@ -1,0 +1,15 @@
+{$CLOUD_DOMAIN:api.datashield.ltd} {
+	encode zstd gzip
+
+	@identity path /identity/*
+	handle @identity {
+		uri strip_prefix /identity
+		reverse_proxy identity:8001
+	}
+
+	handle /api/* {
+		reverse_proxy cloud:8000
+	}
+
+	respond "Not Found" 404
+}

@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+tests/
+scripts/
+*.db
+*.sqlite*
+.env
+.env.*
+datashield-local.spec
+desktop_sidecar.py
+dist/
+build/
