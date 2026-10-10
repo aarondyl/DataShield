@@ -1,6 +1,6 @@
 [package]
 name = "datashield-desktop"
-version = "0.2.0-rc.4"
+version = "0.2.0-rc.5"
 description = "DataShield Desktop"
 edition = "2021"
 
