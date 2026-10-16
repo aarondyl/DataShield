@@ -90,7 +90,12 @@ _REGULATION_DEFS: list[dict] = [
 ]
 
 
-def seed_regintel_if_empty(db: Session) -> bool:
+def seed_regintel_if_empty(
+    db: Session,
+    *,
+    regulation_codes: set[str] | None = None,
+    source_directory: Path | None = None,
+) -> bool:
     """若全局法规智能层为空，则把三部 MVP 法规完整入库。
 
     :return: 是否实际执行了写入
@@ -99,10 +104,14 @@ def seed_regintel_if_empty(db: Session) -> bool:
     if source_count > 0:
         return False
 
-    for definition in _REGULATION_DEFS:
+    definitions = [
+        definition for definition in _REGULATION_DEFS
+        if regulation_codes is None or definition["code"] in regulation_codes
+    ]
+    for definition in definitions:
         code = definition["code"]
         origin = BACKEND_ROOT / _REGULATION_DIR / f"{code}.txt"
-        live = BACKEND_ROOT / _SOURCE_DIR / f"{code}.txt"
+        live = (source_directory / f"{code}.txt") if source_directory else (BACKEND_ROOT / _SOURCE_DIR / f"{code}.txt")
         live.parent.mkdir(parents=True, exist_ok=True)
         if not live.exists():
             shutil.copyfile(origin, live)
@@ -132,7 +141,7 @@ def seed_regintel_if_empty(db: Session) -> bool:
             authority=definition["authority"],
             source_name=definition["source_name"],
             base_url=definition["canonical_source_url"],
-            fetch_url=f"data/sources/{code}.txt",
+            fetch_url=str(live.resolve()) if source_directory else f"data/sources/{code}.txt",
             source_type="local_file",
             parser_type=definition["parser_type"],
             priority=1,

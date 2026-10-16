@@ -605,6 +605,12 @@ def get_llm_client() -> BaseLLMClient:
     调用方（节点）需捕获异常并走降级路径。
     """
     settings = get_settings()
+    if (
+        settings.runtime_mode == "local"
+        and settings.desktop_mode
+        and settings.desktop_ai_mode == "mock"
+    ):
+        raise LLMError("请先在 DataShield 设置中配置并测试真实模型；桌面版不会使用 Mock 生成分析结果")
     if settings.llm_provider == "cloud":
         return CloudLLMClient()
     if settings.llm_provider == "api":
@@ -619,6 +625,9 @@ def get_llm_client_safe() -> BaseLLMClient:
     try:
         return get_llm_client()
     except LLMError:
-        if get_settings().desktop_ai_mode == "mock":
+        settings = get_settings()
+        if settings.desktop_ai_mode == "mock" and not (
+            settings.runtime_mode == "local" and settings.desktop_mode
+        ):
             return MockLLMClient()
         raise
